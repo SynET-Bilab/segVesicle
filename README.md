@@ -21,5 +21,5 @@ pip install -r requirements.txt
 ```
 vi ~/.bashrc
 export PATH=PATH_OF_THIS_FOLDER/bin/:$PATH
-export PYTHONPATH=PATH_OF_THIS_FOLDER/:$PYTHONPATH
+export PYTHONPATH=PARENT_PATH_OF_THIS_FOLDER/:$PYTHONPATH
 ```
