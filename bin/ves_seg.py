@@ -24,15 +24,16 @@ class Ves_seg:
         from tomoSgmt.bin.resampling import resample_image, measure
 
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, filename='log.txt')
-        logging.info("\nStart resampling process\n")
+                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
+        
+        logging.info("\n######Start resampling process######\n")
 
         [original_spacing, original_size, out_spacing, out_size] = measure(tomo, pixel_size, outspacing)
         logging.info("resample_tomo: {}| original_spacing: {}| original_size: {}| out_spacing: {}| out_size: {}".format(
             tomo, original_spacing, original_size, out_spacing, out_size
         ))
         resample_image(tomo, pixel_size, outspacing)
-        logging.info("\nDone resampling process\n")
+        logging.info("\n######Done resampling process######\n")
 
 
     def predict(self,mrc,
@@ -49,9 +50,9 @@ class Ves_seg:
         import mrcfile
         from tomoSgmt.bin.sgmt_predict import predict_new
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, filename='log.txt')
+                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
 
-        logging.info("\nStart prediction process\n")
+        logging.info("\n######Start prediction process######\n")
         root_name = mrc.split('/')[-1].split('.')[0]
         if not os.path.isdir(dir):
             os.mkdir(dir)
@@ -82,7 +83,7 @@ class Ves_seg:
             with mrcfile.new(final_name, overwrite=True) as f:
                 f.set_data(mask)
 
-            logging.info("\nDone prediction process\n")
+            logging.info("\n######Done prediction process######\n")
 
 
     def morph(self,mask_file,
@@ -94,24 +95,24 @@ class Ves_seg:
         '''
         from tomoSgmt.bin.morph import morph_process, vesicle_measure, vesicle_rendering
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, filename='log.txt')
+                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
         root_name = mask_file.split('/')[-1].split('-')[0]
 
-        logging.info("\nStart morphological process\n")
+        logging.info("\n######Start morphological process######\n")
         with mrcfile.open(mask_file) as m:
             bimask = m.data
         shape = bimask.data
         vesicle_list, vesicle_list_sup, shape_morph_process = morph_process(mask_file, radius)
-        logging.info("\nDone morphological process\n")
+        logging.info("\n######Done morphological process######\n")
 
-        logging.info("\nStart vesicle measuring\n")
+        logging.info("\n######Start vesicle measuring######\n")
         output_file = dir + '/' + root_name + '_vesicle.json'
         output_file_in_area = dir + '/' + root_name + '_vesicle_in.json'
         [vesicle_info, in_vesicle_info] = vesicle_measure(vesicle_list, vesicle_list_sup, shape, radius,
                                                           output_file, output_file_in_area, area_file)
-        logging.info("\nDone vesicle measuring\n")
+        logging.info("\n######Done vesicle measuring######\n")
 
-        logging.info("\nStart vesicle rendering\n")
+        logging.info("\n######Start vesicle rendering######\n")
         render = dir + '/' + root_name + '_vesicle.mrc'
         render_in = dir + '/' + root_name + '_vesicle_in.mrc'
         ves_tomo = vesicle_rendering(output_file, shape)
@@ -120,7 +121,7 @@ class Ves_seg:
         ves_tomo_in = vesicle_rendering(output_file_in_area, shape)
         with mrcfile.new(render_in, overwrite=True) as m_in:
             m_in.set_data(ves_tomo_in)
-        logging.info("\nDone vesicle rendering\n")
+        logging.info("\n######Done vesicle rendering######\n")
 
 
     def gui(self):
