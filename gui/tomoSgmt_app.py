@@ -127,11 +127,11 @@ class MainWindowUIClass(Ui_MainWindow):
 
     def start_process(self, cmd, btn):
         self.p = None
-        if self.p is None:  # No process running.
+        if self.p is None:  # No process is running.
             self.p = QProcess()
             #change the status of the current botton
-            if btn.text() in ["Deconvolve","Generate Mask","Extract","Refine","Predict"]:
-                self.model.btn_pressed_text =  btn.text()
+            if btn.text() in ["resample", "Predict", "Morph_process"]:
+                self.model.btn_pressed_text = btn.text()
                 btn.setText("Stop")
                 btn.setStyleSheet('QPushButton {color: red;}')
             else:
@@ -158,7 +158,7 @@ class MainWindowUIClass(Ui_MainWindow):
         printable.add(u'\u2588')
 
         txt = str(self.p.readAll(), 'utf-8')
-        # txt += self.mw.p.errorString()
+        # txt += self.p.errorString()
 
         printable_txt = "".join(list(filter(lambda x: x in printable, txt)))
 
@@ -181,12 +181,11 @@ class MainWindowUIClass(Ui_MainWindow):
         if btn.text() == "Stop":
             if self.model.btn_pressed_text:
                 btn.setText(self.model.btn_pressed_text)
-                #btn.setText("Refine")
                 self.model.btn_pressed_text = None
                 btn.setStyleSheet('QPushButton {color: black;}')
         else:
             btn.setEnabled(True)
-        self.mw.p = None
+        self.p = None
 
 
     def switch_btn(self, btn):
@@ -275,44 +274,49 @@ class MainWindowUIClass(Ui_MainWindow):
 
 
     def resample(self):
-        cmd = 'ves_seg.py resample '
+        cmd = 'ves_seg.py resample'
         if self.lineEdit_tomogram_file_name.text():
-            cmd = '{} --tomo {}'.format(cmd, self.lineEdit_tomogram_file_name.text())
+            if self.lineEdit_tomogram_file_name.text().endswith('.rec') or self.lineEdit_tomogram_file_name.text().endswith('.mrc'):
+                tomoname = self.lineEdit_tomogram_file_name.text().split('/')[-1]
+            cmd = '{} {}'.format(cmd, tomoname)
         if self.lineEdit_pixel_size.text():
-            cmd = '{} --pixel_size {}'.format(cmd, self.lineEdit_pixel_size.text())
+            cmd = '{} {}'.format(cmd, self.lineEdit_pixel_size.text())
 
         self.start_process(cmd, self.pushButton_resample)
 
 
     def predict(self):
-        cmd = 'ves_seg.py predict '
+        cmd = 'ves_seg.py predict'
+
+        if self.checkBox_use_resampled_tomo.isChecked():
+            tomo = self.lineEdit_tomogram_file_name.text().split('/')[-1]
+            cmd = '{} {}'.format(cmd, tomo.split('.')[0] + '-resample.' + tomo.split('.')[1])
+        else:
+            if self.lineEdit_tomogram_file_name.text():
+                tomoname = self.lineEdit_tomogram_file_name.text().split('/')[-1]
+                cmd = '{} {}'.format(cmd, tomoname)
         if self.lineEdit_Trained_model.text():
-            cmd = '{} --model {}'.format(cmd, self.lineEdit_Trained_model.text())
+            cmd = '{} {}'.format(cmd, self.lineEdit_Trained_model.text())
         if self.lineEdit_result_folder.text():
             cmd = '{} --dir {}'.format(cmd, self.lineEdit_result_folder.text())
         if self.lineEdit_GPU_ID.text():
             cmd = '{} --gpuID {}'.format(cmd, self.lineEdit_GPU_ID.text())
-        if self.checkBox_use_resampled_tomo.isChecked():
-            tomo = self.lineEdit_tomogram_file_name.text()
-            cmd = '{} --mrc {}'.format(cmd, tomo.split('.')[0] + '-resample.' + tomo.split('.')[1])
-        else:
-            if self.lineEdit_tomogram_file_name.text():
-                cmd = '{} --mrc {}'.format(cmd, self.lineEdit_tomogram_file_name.text())
 
         self.start_process(cmd, self.pushButton_predict)
 
 
     def morph_process(self):
-        cmd = 'ves_seg.py morph '
-        if self.lineEdit_result_folder.text():
-            cmd = '{} --dir {}'.format(cmd, self.lineEdit_result_folder.text())
-        if self.lineEdit_area_file.text():
-            cmd = '{} --area_file {}'.format(cmd, self.lineEdit_area_file.text())
+        cmd = 'ves_seg.py morph'
+
         if self.lineEdit_tomogram_file_name.text():
             tomo = self.lineEdit_tomogram_file_name.text()
             root_name = tomo.split('/')[-1].split('.')[0]
             mask_file = self.lineEdit_result_folder.text() + '/' + root_name + '-mask.mrc'
-            cmd = '{} --mask_file {}'.format(cmd, mask_file)
+            cmd = '{} {}'.format(cmd, mask_file)
+        if self.lineEdit_area_file.text():
+            cmd = '{} {}'.format(cmd, self.lineEdit_area_file.text())
+        if self.lineEdit_result_folder.text():
+            cmd = '{} --dir {}'.format(cmd, self.lineEdit_result_folder.text())
 
         self.start_process(cmd, self.pushButton_morph_process)
 
