@@ -1,4 +1,7 @@
 ##### Requirements without Version Specifiers #####
 mrcfile
 fire
-PyQt5
+SimpleITK
+
+##### Requirements with Version Specifiers #####
+pyqt5==5.9.2
