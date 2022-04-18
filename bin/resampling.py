@@ -11,7 +11,7 @@ import argparse
 
 
 
-def prepare_resample(tomo, pixel_size, outspacing=17.141):
+def prepare_resample(tomo, pixel_size, outspacing=17.142):
     sitk_tomo = sitk.ReadImage(tomo)
     if sitk_tomo.GetSpacing()[0] == 1:
         ratio = outspacing / pixel_size
@@ -27,7 +27,7 @@ def generate_new_tomo(resample_tomo, out_name):
         m.set_data(resampletomo_data)
 
 
-def resample_image(tomo, pixel_size, outspacing=17.141):
+def resample_image(tomo, pixel_size, outspacing=17.142):
 
     tomo_sitk = sitk.ReadImage(tomo)
     out_spacing = prepare_resample(tomo, pixel_size, outspacing)
@@ -54,7 +54,7 @@ def resample_image(tomo, pixel_size, outspacing=17.141):
     return resample_tomo
 
 
-def measure(tomo, pixel_size, outspacing=17.141):
+def measure(tomo, pixel_size, outspacing=17.142):
     sitk_tomo = sitk.ReadImage(tomo)
     original_spacing = sitk_tomo.GetSpacing()
     if original_spacing != 1:
