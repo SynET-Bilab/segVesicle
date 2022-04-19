@@ -178,7 +178,7 @@ def ellipsoid_fit(X):
     return center, evecs, radii, MA, SMA
     '''
     
-    return center, evecs, radii, v
+    return center, evecs, radii
 
 
 def ellipse_fit(x, y, Zc):
