@@ -2,6 +2,9 @@
 mrcfile
 fire
 SimpleITK
+scikit-image
+pywt
+tqdm
 
 ##### Requirements with Version Specifiers #####
 pyqt5==5.9.2
