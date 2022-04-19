@@ -8,12 +8,14 @@ from scipy.sparse import csr_matrix
 import json
 #from tomoSgmt.bin.sgmt_predict import predict_new
 import math
+from tqdm import tqdm
 
 def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     # 1. closing and opening process of vesicle mask. 2. label the vesicles.
     # 3. exclude false vesicles by counting their volumes and thresholding, return only vesicle binary mask
     # 4. extract boundaries and labels them
     # 5. extract labeled individual vesicle boundary, convert into points vectors and output them.
+    import logging, sys
     from skimage.morphology import opening, closing, erosion, cube, dilation
     from skimage.measure import label
     with mrcfile.open(mask) as f:
@@ -32,7 +34,8 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     idx_pre = get_indices_sparse(labeled_pre)
     num_pre = np.max(labeled_pre)
 
-    for i in range(1, num_pre+1):
+    logging.info('\nFirst separatation of the mask by volume thresholding\n')
+    for i in tqdm(range(1, num_pre+1), file=sys.stdout):
         if idx_pre[i][0].shape[0] > area_thre*15:
             pre_pro[idx_pre[i][0],idx_pre[i][1],idx_pre[i][2]] = 1
             labeled_pre[idx_pre[i][0],idx_pre[i][1],idx_pre[i][2]] = 0
@@ -43,6 +46,7 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     pre_pro = erosion(pre_pro, cube(2))
     labeled_pre_pro = label(pre_pro) #process linked vesicles just after prediction, Part 1
 
+    logging.info('\nFix the broken vesicles\n')
     # for other vesicles
     if True:
         kernel_xy = np.reshape([1 for i in range(9)], (3, 3, 1))
@@ -62,7 +66,8 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     idx = get_indices_sparse(labeled)
     num = np.max(labeled)
 
-    for i in range(1,num+1):
+    logging.info('\nSecond separation of the mask by volume thresholding\n')
+    for i in tqdm(range(1,num+1), file=sys.stdout):
         if idx[i][0].shape[0] < area_thre:    
             labeled[idx[i][0],idx[i][1],idx[i][2]] = 0
             if idx[i][0].shape[0] > 0.2*area_thre:
@@ -92,18 +97,19 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     labeled = labeled + labeled_post_pro + labeled_pre_pro
     num = np.max(labeled)
 
-    # for supplementary proccess
-    labeled_sup_pro = label(sup_pro)
-    sup_filtered = (labeled_sup_pro >= 1).astype(np.uint8)
-    #sup_boundaries = sup_filtered - erosion(sup_filtered, cube(3))
-    sup_bd_labeled = label(sup_filtered)
-    sup_num = np.max(sup_bd_labeled)
-    sup_idx = get_indices_sparse(sup_bd_labeled)
-    vesicle_list_sup = [np.swapaxes(np.array(sup_idx[i]),0,1) for i in range(1, sup_num+1)]
+    # # for supplementary proccess
+    # labeled_sup_pro = label(sup_pro)
+    # sup_filtered = (labeled_sup_pro >= 1).astype(np.uint8)
+    # #sup_boundaries = sup_filtered - erosion(sup_filtered, cube(3))
+    # sup_bd_labeled = label(sup_filtered)
+    # sup_num = np.max(sup_bd_labeled)
+    # sup_idx = get_indices_sparse(sup_bd_labeled)
+    vesicle_list_sup = []
+    # vesicle_list_sup = [np.swapaxes(np.array(sup_idx[i]),0,1) for i in range(1, sup_num+1)]
 
     # for main vesicles
     filtered  = (labeled >= 1).astype(np.uint8)
-    print('complete filtering')
+    logging.info('\ncomplete filtering\n')
     boundaries = filtered - erosion(filtered,cube(3))
     # label the boundaries of vesicles 
     bd_labeled = label(boundaries)
@@ -124,6 +130,7 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
     from tomoSgmt.bin.ellipsoid import ellipsoid_fit as ef
     from skimage.morphology import erosion
     from skimage.measure import label
+    import logging, sys
 
     results = []
     results_in = []
@@ -155,8 +162,9 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
             a = True
         return a
 
-    for i in range(len(vesicle_list)):
-        print('fitting vesicle_',i)
+    logging.info('\nStart vesicle measurement\n')
+    for i in tqdm(range(len(vesicle_list)), file=sys.stdout):
+        #print('fitting vesicle_',i)
         [center, evecs, radii]=ef.ellipsoid_fit(vesicle_list[i])
         if if_normal(radii):
             info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
@@ -166,10 +174,10 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
             c[0], c[1] = c[1], c[0]
             if Check(CH, len(CH), c):
                 results_in.append(info)
-                print('in vesicle {}'.format(i))
+                #print('in vesicle {}'.format(i))
                 in_count = in_count+1
-        else:
-            print('bad vesicle {}'.format(i))
+        # else:
+        #     print('bad vesicle {}'.format(i))
     '''
     for i in range(len(vesicle_list_sup)):
         print('fitting ellipse vesicle_',i)
@@ -224,6 +232,8 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
 
 
 def vesicle_rendering(vesicle_file,tomo_dims):
+    import logging, sys
+
     # vesicle file can be json or a info list
     from tomoSgmt.utils import make_ellipsoid as mk
     from skimage.morphology import closing, cube
@@ -234,16 +244,21 @@ def vesicle_rendering(vesicle_file,tomo_dims):
     else:
         vesicle_info = vesicle_file
     vesicle_tomo = np.zeros(np.array(tomo_dims)+np.array([30,30,30]),dtype=np.uint8)
-    for i,vesicle in enumerate(vesicle_info):
-        print(i)
-        ellip_i = mk.ellipsoid_point(
-            np.array(vesicle['radii']),
-            np.array(vesicle['center']),
-            np.array(vesicle['evecs'])
-        )
+    #vesicle_tomo = np.zeros(np.array(tomo_dims),dtype=np.uint8)
+    logging.info('\nrendering vesicle\n')
+    #for i,vesicle in enumerate(vesicle_info):
+    for i in tqdm(range(len(vesicle_info)), file=sys.stdout):
+        ellip_i = mk.ellipsoid_point(vesicle_info[i]['radii'], vesicle_info[i]['center'], vesicle_info[i]['evecs'])
+        # print(i)
+        # ellip_i = mk.ellipsoid_point(
+        #     np.array(vesicle['radii']),
+        #     np.array(vesicle['center']),
+        #     np.array(vesicle['evecs'])
+        # )
         # ellip_i is an array (N,3) of points of a filled ellipsoid
         vesicle_tomo[ellip_i[:,0],ellip_i[:,1],ellip_i[:,2]] = 1
     vesicle_tomo = closing(vesicle_tomo,cube(3))
+    logging.info('{} vesicles in total'.format(len(vesicle_info)))
     return vesicle_tomo[0:tomo_dims[0],0:tomo_dims[1],0:tomo_dims[2]]
 
 
@@ -373,6 +388,7 @@ def get_area_points(area_file):
         p = np.delete(point, 2, axis=1) # delete z value
         tmp = p.tolist()
         for poi in tmp:
+            poi = list(map(float, poi))
             poi = list(map(int, poi))
             P.append(poi)
     return P
