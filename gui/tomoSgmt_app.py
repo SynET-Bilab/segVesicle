@@ -130,7 +130,7 @@ class MainWindowUIClass(Ui_MainWindow):
         if self.p is None:  # No process is running.
             self.p = QProcess()
             #change the status of the current botton
-            if btn.text() in ["resample", "Predict", "Morph_process"]:
+            if btn.text() in ["resample", "Predict", "Morph process"]:
                 self.model.btn_pressed_text = btn.text()
                 btn.setText("Stop")
                 btn.setStyleSheet('QPushButton {color: red;}')
@@ -300,24 +300,38 @@ class MainWindowUIClass(Ui_MainWindow):
         if self.lineEdit_result_folder.text():
             cmd = '{} --dir {}'.format(cmd, self.lineEdit_result_folder.text())
         if self.lineEdit_GPU_ID.text():
-            cmd = '{} --gpuID {}'.format(cmd, self.lineEdit_GPU_ID.text())
+            cmd = '{} --gpuID {}'.format(cmd, str(self.lineEdit_GPU_ID.text()))
 
+        #os.system(cmd)
         self.start_process(cmd, self.pushButton_predict)
 
 
     def morph_process(self):
         cmd = 'ves_seg.py morph'
 
-        if self.lineEdit_tomogram_file_name.text():
-            tomo = self.lineEdit_tomogram_file_name.text()
-            root_name = tomo.split('/')[-1].split('.')[0]
-            mask_file = self.lineEdit_result_folder.text() + '/' + root_name + '-mask.mrc'
+        if not self.checkBox_use_resampled_tomo.isChecked():
+            if self.lineEdit_tomogram_file_name.text():
+                tomo = self.lineEdit_tomogram_file_name.text()
+                root_name = tomo.split('/')[-1].split('.')[0]
+                if self.lineEdit_result_folder.text():
+                    mask_file = self.lineEdit_result_folder.text() + '/' + root_name + '-mask.mrc'
+                else:
+                    mask_file = './' + root_name + '-mask.mrc'
+        else:
+            if self.lineEdit_tomogram_file_name.text():
+                tomo = self.lineEdit_tomogram_file_name.text()
+                root_name = tomo.split('/')[-1].split('.')[0]
+                if self.lineEdit_result_folder.text():
+                    mask_file = self.lineEdit_result_folder.text() + '/' + root_name + '-resample-mask.mrc'
+                else:
+                    mask_file = './' + root_name + '-resample-mask.mrc'
             cmd = '{} {}'.format(cmd, mask_file)
         if self.lineEdit_area_file.text():
             cmd = '{} {}'.format(cmd, self.lineEdit_area_file.text())
         if self.lineEdit_result_folder.text():
             cmd = '{} --dir {}'.format(cmd, self.lineEdit_result_folder.text())
 
+        #os.system(cmd)
         self.start_process(cmd, self.pushButton_morph_process)
 
 
@@ -358,13 +372,21 @@ class MainWindowUIClass(Ui_MainWindow):
 
 
     def view_result(self):
-        cmd = '3dmod {} {}'.format(self.lineEdit_tomogram_file_name.text(), 'point.mod')
+        if self.checkBox_use_resampled_tomo.isChecked():
+            root_name = self.lineEdit_tomogram_file_name.text().split('/')[-1]
+            tomo = root_name.split('.')[0] + '-resample.' + root_name.split('.')[1]
+        else:
+            tomo = self.lineEdit_tomogram_file_name.text()
+        cmd = '3dmod {} {}'.format(tomo, 'point.mod')
         if self.lineEdit_tomogram_file_name.text():
             item_text = self.lineEdit_tomogram_file_name.text()
             if item_text[-4:] == '.mrc' or item_text[-4:] == '.rec':
                 root_name = item_text.split('/')[-1].split('-')[0]
-                dir = self.lineEdit_result_folder.text()
-                output_file_in_area = dir + '/' + root_name + '_vesicle_in.json'
+                if self.lineEdit_result_folder.text():
+                    dir = self.lineEdit_result_folder.text()
+                    output_file_in_area = dir + '/' + root_name + '_vesicle_in.json'
+                else:
+                    output_file_in_area = './' + root_name + '_vesicle_in.json'
                 self.json2mod(output_file_in_area)
                 os.system(cmd)
             else:
