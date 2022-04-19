@@ -40,8 +40,8 @@ class Ves_seg:
                 model,
                 dir='.',
                 sidelen=128,
-                neighbor_in=5,
-                neighbor_out=1,
+                neighbor_in=7,
+                neighbor_out=3,
                 batch_size=8,
                 gpuID='0'):
         '''
@@ -83,7 +83,7 @@ class Ves_seg:
             with mrcfile.new(final_name, overwrite=True) as f:
                 f.set_data(mask)
 
-            logging.info("\n######Done prediction process######\n")
+        logging.info("\n######Done prediction process######\n")
 
 
     def morph(self,mask_file,
@@ -101,7 +101,7 @@ class Ves_seg:
         logging.info("\n######Start morphological process######\n")
         with mrcfile.open(mask_file) as m:
             bimask = m.data
-        shape = bimask.data
+        shape = bimask.shape
         vesicle_list, vesicle_list_sup, shape_morph_process = morph_process(mask_file, radius)
         logging.info("\n######Done morphological process######\n")
 
@@ -118,6 +118,7 @@ class Ves_seg:
         ves_tomo = vesicle_rendering(output_file, shape)
         with mrcfile.new(render, overwrite=True) as m:
             m.set_data(ves_tomo)
+        print('Rendering vesicles in roi')
         ves_tomo_in = vesicle_rendering(output_file_in_area, shape)
         with mrcfile.new(render_in, overwrite=True) as m_in:
             m_in.set_data(ves_tomo_in)

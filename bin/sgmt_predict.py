@@ -5,10 +5,11 @@ import mrcfile
 import tensorflow as tf
 from tomoSgmt.bin.utils import Patch,normalize
 from tqdm import tqdm
+import sys
 
 
 def predict_new(mrc,output,model,sidelen=128,neighbor_in=5,neighbor_out=1, batch_size=8,gpuID='0'):
-    import os
+    import os, sys
     import logging
     from tensorflow.keras.models import load_model
 
@@ -41,7 +42,7 @@ def predict_new(mrc,output,model,sidelen=128,neighbor_in=5,neighbor_out=1, batch
     data = np.append(data, data[0:append_number], axis = 0)
     num_big_batch = data.shape[0]//N
     outData = np.zeros((*data.shape[0:-1],neighbor_out))
-    for i in tqdm(range(num_big_batch)):
+    for i in tqdm(range(num_big_batch), file=sys.stdout):
         outData[i*N:(i+1)*N] = kmodel.predict(data[i*N:(i+1)*N], batch_size= batch_size,verbose=0)
     outData = outData[0:num_batches]
     # patch_predicted = kmodel.predict(data_to_predict,batch_size=batch_size,verbose=1)
