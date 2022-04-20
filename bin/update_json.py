@@ -40,11 +40,11 @@ def compare(point_file, json_file):
     '''
     point_data = get_point_data(point_file)
     json_data, whole_data = get_json_data(json_file)
-    delete_count = []
+    delete_record = []
     for i in range(len(json_data)):
         if not json_data[i] in point_data:
-            delete_count.append(i)
-    return delete_count, whole_data, json_data
+            delete_record.append(i)
+    return delete_record, whole_data, json_data
 
 
 def write_new_json(point_file, json_file):
@@ -60,11 +60,13 @@ def write_new_json(point_file, json_file):
     elif point_file.endswith('.point'):
         point_file = point_file
         
-    delete_count, whole_data, json_data = compare(point_file, json_file)
+    delete_record, whole_data, json_data = compare(point_file, json_file)
     new_data = []
     for i  in range(len(whole_data)):
-        if not i in delete_count:
+        if not i in delete_record:
+            whole_data[i].get('center')[0], whole_data[i].get('center')[1], whole_data[i].get('center')[2] = whole_data[i].get('center')[2], whole_data[i].get('center')[1], whole_data[i].get('center')[0]
             new_data.append(whole_data[i])
+    
     vesicle_info = {'vesicles':new_data}
     json_file_old = json_file + '~'
     cmd_protect = 'mv {} {}'.format(json_file, json_file_old)
@@ -72,7 +74,7 @@ def write_new_json(point_file, json_file):
     with open(json_file, "w") as f:
         json.dump(vesicle_info, f)
 
-    return delete_count, json_data, json_file
+    return delete_record, json_data
 
 
 if __name__ == "__main__":
