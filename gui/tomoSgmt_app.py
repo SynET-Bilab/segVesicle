@@ -211,12 +211,12 @@ class MainWindowUIClass(Ui_MainWindow):
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
 
         flt = "All Files (*)"
-        # if btn == "tomo_file":
-        #     flt = "rec file (*.rec);;All Files (*)"
+        if btn == "tomo_file":
+            flt = "mrc file(*.mrc);;rec file (*.rec);;All Files (*)"
         if btn == "trained_model":
             flt = "model file (*.h5);;All Files (*)"
         if btn == "area_file":
-            flt = "area file (*.point);;All Files (*)"
+            flt = "point file (*.point);;mod file(*.mod);;All Files (*)"
 
         fileName, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
@@ -397,20 +397,16 @@ class MainWindowUIClass(Ui_MainWindow):
 
     def update_json(self):
 
-        from tomoSgmt.bin.update_json import write_new_json
+        cmd = 'ves_seg.py update_json'
+
         if self.lineEdit_tomogram_file_name.text():
             root_name = self.lineEdit_tomogram_file_name.text().split('/')[-1]
             tomo_name = root_name.split('-')[0]
             json_name = tomo_name + '_vesicle_in.json'
-        delete_count, json_data, json_file = write_new_json('point.mod', json_name)
 
-        logging.info('############################################################')
-        logging.info('{} has been updated'.format(json_file))
-        logging.info('#####Done updating json file#####')
-        logging.info('{} points are removed'.format(len(delete_count)))
-        for i in delete_count:
-            logging.info('{}'.format(json_data[i]))
+        cmd = '{} {} {}'.format(cmd, 'point.mod', json_name)
 
+        self.start_process(cmd, self.pushButton_update_json)
 
 
     def warn_window(self,text):
