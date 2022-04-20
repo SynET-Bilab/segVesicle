@@ -63,17 +63,18 @@ class Ves_seg:
             predict_new(mrc, output, model[0], sidelen, neighbor_in, neighbor_out, batch_size, gpuID)
         elif len(model) > 1:
             output_list = []
-            alias_name = []
+            #alias_name = []
             data = []
             for i in range(len(model)):
+                logging.info('start predict with model {}'.format(i))
                 output = dir+'/'+root_name+'-mask'+str(i)+'.mrc'
                 predict_new(mrc, output, model[i], sidelen, neighbor_in, neighbor_out, batch_size, gpuID)
                 output_list.append(output)
-                name = 'mask' + str(i)
-                alias_name.append(name)
+                # name = 'mask' + str(i)
+                # alias_name.append(name)
             for j in range(len(output_list)):
-                with mrcfile.open(output_list[j]) as alias_name[0]:
-                    data.append([alias_name[0].data])
+                with mrcfile.open(output_list[j]) as mask:
+                    data.append(mask.data)
             with mrcfile.open(mrc) as orig_m:
                 shape = orig_m.data.shape
             mask = np.zeros(shape)
@@ -123,6 +124,24 @@ class Ves_seg:
         with mrcfile.new(render_in, overwrite=True) as m_in:
             m_in.set_data(ves_tomo_in)
         logging.info("\n######Done vesicle rendering######\n")
+    
+
+    def update_json(self, point_file, json_file):
+        '''
+
+        '''
+        from tomoSgmt.bin.update_json import write_new_json
+        logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
+                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
+        
+        logging.info("\n######Start update json process######\n")
+        delete_record, json_data = write_new_json(point_file, json_file)
+        logging.info('{} has been updated'.format(json_file))
+        logging.info('{} points are removed'.format(len(delete_record)))
+        for i in delete_record:
+            logging.info('{}'.format(json_data[i]))
+
+        logging.info("\n######Done update json process######\n")
 
 
     def gui(self):
