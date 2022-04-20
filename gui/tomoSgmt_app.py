@@ -2,6 +2,7 @@
 
 '''
 import sys,os
+import logging
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QTableWidgetItem,QMessageBox,QDialog
@@ -101,6 +102,7 @@ class MainWindowUIClass(Ui_MainWindow):
         self.pushButton_predict.clicked.connect(self.predict)
         self.pushButton_morph_process.clicked.connect(self.morph_process)
         self.pushButton_view_result_with_tomogram.clicked.connect(self.view_result)
+        self.pushButton_update_json.clicked.connect(self.update_json)
 
         ves_seg_path = os.popen("which ves_seg.py").read()
         tmp = ves_seg_path.split("bin/ves_seg.py")
@@ -391,6 +393,24 @@ class MainWindowUIClass(Ui_MainWindow):
                 os.system(cmd)
             else:
                 self.warn_window("selected items are not mrc or rec file(s)")
+        
+
+    def update_json(self):
+
+        from tomoSgmt.bin.update_json import write_new_json
+        if self.lineEdit_tomogram_file_name.text():
+            root_name = self.lineEdit_tomogram_file_name.text().split('/')[-1]
+            tomo_name = root_name.split('-')[0]
+            json_name = tomo_name + '_vesicle_in.json'
+        delete_count, json_data, json_file = write_new_json('point.mod', json_name)
+
+        logging.info('############################################################')
+        logging.info('{} has been updated'.format(json_file))
+        logging.info('#####Done updating json file#####')
+        logging.info('{} points are removed'.format(len(delete_count)))
+        for i in delete_count:
+            logging.info('{}'.format(json_data[i]))
+
 
 
     def warn_window(self,text):
@@ -400,6 +420,8 @@ class MainWindowUIClass(Ui_MainWindow):
         msg.setStandardButtons(QMessageBox.Ok)
         msg.setIcon(QMessageBox.Warning)
         msg.exec_()
+
+
 
 class MyWindow(QtWidgets.QMainWindow):
     def __init__(self):

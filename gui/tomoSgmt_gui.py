@@ -146,23 +146,30 @@ class Ui_MainWindow(object):
         self.checkBox_use_resampled_tomo.setChecked(True)
         self.checkBox_use_resampled_tomo.setObjectName("checkBox_use_resampled_tomo")
         self.pushButton_predict = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_predict.setGeometry(QtCore.QRect(310, 650, 111, 41))
+        self.pushButton_predict.setGeometry(QtCore.QRect(310, 650, 85, 41))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.pushButton_predict.setFont(font)
         self.pushButton_predict.setObjectName("pushButton_predict")
         self.pushButton_view_result_with_tomogram = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_view_result_with_tomogram.setGeometry(QtCore.QRect(650, 650, 281, 41))
+        self.pushButton_view_result_with_tomogram.setGeometry(QtCore.QRect(575, 650, 210, 41))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.pushButton_view_result_with_tomogram.setFont(font)
         self.pushButton_view_result_with_tomogram.setObjectName("pushButton_view_result_with_tomogram")
         self.pushButton_morph_process = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_morph_process.setGeometry(QtCore.QRect(470, 650, 150, 41))
+        self.pushButton_morph_process.setGeometry(QtCore.QRect(420, 650, 130, 41))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.pushButton_morph_process.setFont(font)
         self.pushButton_morph_process.setObjectName("morph_process")
+
+        self.pushButton_update_json = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_update_json.setGeometry(QtCore.QRect(810, 650, 130, 41))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.pushButton_update_json.setFont(font)
+        self.pushButton_update_json.setObjectName("update_json")
 
         self.textBrowser_log = QtWidgets.QTextBrowser(self.centralwidget)
         self.textBrowser_log.setGeometry(QtCore.QRect(60, 720, 911, 200))
@@ -238,6 +245,10 @@ class Ui_MainWindow(object):
         self.pushButton_morph_process.setText(_translate("MainWindow", "Morph process"))
         self.pushButton_morph_process.setToolTip(_translate("MainWindow",
                                                             "<html><head/><body><p><span style=\" font-size:9pt;\">start morphological process after prediction.</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
+        self.pushButton_update_json.setText(_translate("MainWindow", "Update json"))
+        self.pushButton_update_json.setToolTip(_translate("MainWindow",
+                                                            "<html><head/><body><p><span style=\" font-size:9pt;\">If you change the point.mod file, press it to update the json result file synchronous</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
+        
         self.checkBox_use_resampled_tomo.setToolTip(_translate("MainWindow",
                                                                "<html><head/><body><p><span style=\" font-size:9pt;\">use the resampled tomo for next prediction.</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
         self.textBrowser_log.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
