@@ -377,10 +377,21 @@ def Check(CH, n, p_che):
     else:
         return False
 
+
 def get_area_points(area_file):
+    '''
+    Support .mod or .point file as input
+    '''
     P = []
     # s = 'model2point area.mod area.point'
     # os.system(s)
+    if area_file.endswith('.mod'):
+        cmd = 'model2point {} {}'.format(area_file, area_file.replace('.mod', '.point'))
+        os.system(cmd)
+        area_file = area_file.replace('.mod', '.point')
+    else:
+        area_file = area_file
+
     with open(area_file,'r') as f:
         line = f.read()
         line = line.split()
