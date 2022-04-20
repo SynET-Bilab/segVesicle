@@ -152,7 +152,7 @@ class Ui_MainWindow(object):
         self.pushButton_predict.setFont(font)
         self.pushButton_predict.setObjectName("pushButton_predict")
         self.pushButton_view_result_with_tomogram = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_view_result_with_tomogram.setGeometry(QtCore.QRect(575, 650, 210, 41))
+        self.pushButton_view_result_with_tomogram.setGeometry(QtCore.QRect(575, 650, 230, 41))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.pushButton_view_result_with_tomogram.setFont(font)
@@ -165,7 +165,7 @@ class Ui_MainWindow(object):
         self.pushButton_morph_process.setObjectName("morph_process")
 
         self.pushButton_update_json = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_update_json.setGeometry(QtCore.QRect(810, 650, 130, 41))
+        self.pushButton_update_json.setGeometry(QtCore.QRect(830, 650, 130, 41))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.pushButton_update_json.setFont(font)
@@ -247,7 +247,7 @@ class Ui_MainWindow(object):
                                                             "<html><head/><body><p><span style=\" font-size:9pt;\">start morphological process after prediction.</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
         self.pushButton_update_json.setText(_translate("MainWindow", "Update json"))
         self.pushButton_update_json.setToolTip(_translate("MainWindow",
-                                                            "<html><head/><body><p><span style=\" font-size:9pt;\">If you change the point.mod file, press it to update the json result file synchronous</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
+                                                            "<html><head/><body><p><span style=\" font-size:9pt;\">If you change the point.mod file, press it to update the json result file synchronously</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
         
         self.checkBox_use_resampled_tomo.setToolTip(_translate("MainWindow",
                                                                "<html><head/><body><p><span style=\" font-size:9pt;\">use the resampled tomo for next prediction.</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
