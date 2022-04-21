@@ -14,8 +14,16 @@ def predict_new(mrc,output,model,sidelen=128,neighbor_in=5,neighbor_out=1, batch
     from tensorflow.keras.models import load_model
 
     logging.basicConfig(filename='myapp.log', level=logging.INFO)
+
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"]=gpuID
+    if type(gpuID) == tuple:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(str(x) for x in gpuID)
+        gpuID = ','.join(str(x) for x in gpuID)
+    elif type(gpuID) == int:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpuID)
+        gpuID = str(gpuID)
+    elif type(gpuID) == str:
+        os.environ["CUDA_VISIBLE_DEVICES"]=gpuID
     ngpus = len(gpuID.split(','))
     # model = load_model(args.model)
     logging.info('gpuID:{}'.format(gpuID))
