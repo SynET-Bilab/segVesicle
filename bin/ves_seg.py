@@ -43,7 +43,7 @@ class Ves_seg:
                 neighbor_in=7,
                 neighbor_out=3,
                 batch_size=8,
-                gpuID='0'):
+                gpuID:str='0'):
         '''
 
         '''
@@ -77,7 +77,7 @@ class Ves_seg:
                     data.append(mask.data)
             with mrcfile.open(mrc) as orig_m:
                 shape = orig_m.data.shape
-            mask = np.zeros(shape)
+            mask = np.zeros(shape, dtype=np.uint16)
             for k in data:
                 mask = mask | k
             final_name = dir + '/' + root_name + '-mask.mrc'
