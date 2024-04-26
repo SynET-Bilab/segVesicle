@@ -34,6 +34,10 @@ def resample_image(tomo, pixel_size, outspacing=17.142):
     out_spacing = [outspacing, outspacing, outspacing]
     original_spacing = tomo_sitk.GetSpacing()
     original_size = tomo_sitk.GetSize()
+    if original_spacing[0] != 1:
+        out_spacing = out_spacing
+    else:
+        out_spacing = [0.942, 0.942, 0.942]
     out_size = [
         int(np.round(original_size[0] * original_spacing[0] / out_spacing[0])),
         int(np.round(original_size[1] * original_spacing[1] / out_spacing[1])),
@@ -58,7 +62,7 @@ def resample_image(tomo, pixel_size, outspacing=17.142):
 def measure(tomo, pixel_size, outspacing=17.142):
     sitk_tomo = sitk.ReadImage(tomo)
     original_spacing = sitk_tomo.GetSpacing()
-    if original_spacing != 1:
+    if original_spacing[0] != 1:
         original_spacing = original_spacing
     else:
         original_spacing = [pixel_size, pixel_size, pixel_size]
