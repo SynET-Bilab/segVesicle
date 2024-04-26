@@ -12,6 +12,8 @@ def predict_new(mrc,output,model,sidelen=128,neighbor_in=5,neighbor_out=1, batch
     import os, sys
     import logging
     from tensorflow.keras.models import load_model
+    from tomoSgmt.models.loss import loss_use
+    from tomoSgmt.models.blocks.dropblock import DropBlock2D
 
     logging.basicConfig(filename='myapp.log', level=logging.INFO)
 
@@ -30,9 +32,9 @@ def predict_new(mrc,output,model,sidelen=128,neighbor_in=5,neighbor_out=1, batch
     if ngpus >1:
         strategy = tf.distribute.MirroredStrategy()
         with strategy.scope():
-            kmodel = load_model(model)
+            kmodel = load_model(model, custom_objects={'loss_use':loss_use, 'dice_coef':loss_use.dice_coef, 'DropBlock2D':DropBlock2D})
     else:
-        kmodel = load_model(model)
+        kmodel = load_model(model, custom_objects={'loss_use':loss_use, 'dice_coef':loss_use.dice_coef, 'DropBlock2D':DropBlock2D})
 
     with mrcfile.open(mrc) as mrcData:
         real_data = mrcData.data.astype(np.float32)
