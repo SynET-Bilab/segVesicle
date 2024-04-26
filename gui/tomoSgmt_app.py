@@ -330,6 +330,8 @@ class MainWindowUIClass(Ui_MainWindow):
             cmd = '{} {}'.format(cmd, mask_file)
         if self.lineEdit_area_file.text():
             cmd = '{} {}'.format(cmd, self.lineEdit_area_file.text())
+        if self.lineEdit_pixel_size.text():
+            cmd = '{} {}'.format(cmd, self.lineEdit_pixel_size.text())
         if self.lineEdit_result_folder.text():
             cmd = '{} --dir {}'.format(cmd, self.lineEdit_result_folder.text())
 
@@ -379,6 +381,8 @@ class MainWindowUIClass(Ui_MainWindow):
             tomo = root_name.split('.')[0] + '-resample.' + root_name.split('.')[1]
         else:
             tomo = self.lineEdit_tomogram_file_name.text()
+            root_name = self.lineEdit_tomogram_file_name.text().split('/')[-1]
+            tomo = root_name.split('.')[0] + '.' + root_name.split('.')[1]
         cmd = '3dmod {} {}'.format(tomo, 'point.mod')
         if self.lineEdit_tomogram_file_name.text():
             item_text = self.lineEdit_tomogram_file_name.text()
