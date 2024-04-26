@@ -7,7 +7,7 @@ import mrcfile
 import numpy as np
 import os
 from tomoSgmt.bin.utils import  gene_2d_training_data
-from tomoSgmt.unet.unet2D import build_compiled_model
+from tomoSgmt.models.unet2D import build_compiled_model
 import tensorflow as tf
 from tensorflow import keras
 import matplotlib.pyplot as plt
