@@ -3,7 +3,7 @@
 '''
 import mrcfile
 import numpy as np
-from skimage.morphology import opening,closing, disk
+#from skimage.morphology import opening,closing, disk
 from tensorflow.keras.utils import Sequence
 
 
@@ -35,10 +35,24 @@ def normalize(x, percentile = True, pmin=4.0, pmax=96.0, axis=None, clip=False, 
         out = out.astype(np.float32)
         return out
 
+
+def toUint8(data):
+    data=np.real(data)
+    data=data.astype(np.double)
+    ma=np.max(data)
+    mi=np.min(data)
+    data=(data-mi)/(ma-mi)*255
+    data=np.clip(data,0,255)
+    data=data.astype(np.uint8)
+    return data
+
+
 def gene_2d_training_data(tomo,mask,sample_mask=None,num=100,sidelen=128,neighbor_in=5, neighbor_out=1):
     with mrcfile.open(tomo) as o:
         orig_tomo=o.data 
     tomo = normalize(orig_tomo,percentile = False)
+    tomo = toUint8(tomo)
+    
     with mrcfile.open(mask) as m:
         mask=m.data
 
@@ -165,7 +179,7 @@ class Patch:
                                 ]
 
         return restored_tomo
-
+'''
 def bottom_hat(tomo,disk_size=40,factor=1.0):
     sp = tomo.shape
     # transformed = np.zeros([1,sp[1],sp[2]])
@@ -193,4 +207,4 @@ def bottom_hat_parallel(tomo,disk_size=40,factor=1.0,ncpu=8):
         transformed_list  = list(p.map(func,slice_list))
     transformed = np.array(transformed_list)
     return transformed.astype(type(tomo[0,0,0]))
-        
+'''     
