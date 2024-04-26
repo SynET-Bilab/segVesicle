@@ -13,8 +13,8 @@ def solve_ellipse(A,B,C,D,E,F):
     FA1 = 2*(A*Xc**2+C*Yc**2+B*Xc*Yc-F)
     FA2 = np.sqrt((A-C)**2+B**2)
     
-    MA = np.sqrt(FA1/(A+C+FA2)) #长轴
-    SMA= np.sqrt(FA1/(A+C-FA2)) if A+C-FA2!=0 else 0#半长轴
+    MA = np.sqrt(FA1/(A+C+FA2)) 
+    SMA= np.sqrt(FA1/(A+C-FA2)) if A+C-FA2!=0 else 0
             
     if MA<SMA:
         MA,SMA = SMA,MA
