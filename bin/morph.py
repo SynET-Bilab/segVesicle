@@ -126,7 +126,7 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     return vesicle_list, vesicle_list_sup, shape
 
 
-def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, outfile_in_area, area_file=None):
+def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, outfile_in_area, pixel_size, area_file=None):
     from tomoSgmt.bin.ellipsoid import ellipsoid_fit as ef
     from skimage.morphology import erosion
     from skimage.measure import label
@@ -136,7 +136,7 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
     results_in = []
     sup_results = []
     sup_results_in = []
-    P = get_area_points(area_file)
+    P = get_area_points(area_file, pixel_size)
     CH = Graham_scan(P)
     global in_count
     global sup_in_count
@@ -378,7 +378,7 @@ def Check(CH, n, p_che):
         return False
 
 
-def get_area_points(area_file):
+def get_area_points(area_file, pixel_size):
     '''
     Support .mod or .point file as input
     '''
@@ -398,8 +398,11 @@ def get_area_points(area_file):
         point = np.reshape(line,(-1, 3))
         p = np.delete(point, 2, axis=1) # delete z value
         tmp = p.tolist()
+        ratio = pixel_size/17.142
         for poi in tmp:
             poi = list(map(float, poi))
+            poi[0] = poi[0]*ratio
+            poi[1] = poi[1]*ratio
             poi = list(map(int, poi))
             P.append(poi)
     return P
