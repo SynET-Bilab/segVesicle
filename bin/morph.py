@@ -48,8 +48,8 @@ def morph_process(mask, area_file, elem_len=1, radius=10, save_labeled=None):
     logging.info('\nFirst separatation of the mask by volume thresholding\n')
     for i in tqdm(range(1, num_pre+1), file=sys.stdout):
         if idx_pre[i][0].shape[0] > area_thre*15:
-            pre_pro[idx_pre[i][0],idx_pre[i][1],idx_pre[i][2]] = 1
-            labeled_pre[idx_pre[i][0],idx_pre[i][1],idx_pre[i][2]] = 0
+            pre_pro[idx_pre[i][0], idx_pre[i][1], idx_pre[i][2]] = 1
+            labeled_pre[idx_pre[i][0], idx_pre[i][1], idx_pre[i][2]] = 0
     labeled_pre[labeled_pre > 1] = 1
 
     kernel_pre = cube(11)
