@@ -124,32 +124,6 @@ class Ves_seg:
         with mrcfile.new(render_in, overwrite=True) as m_in:
             m_in.set_data(ves_tomo_in)
         logging.info("\n######Done vesicle rendering######\n")
-    
-
-    def update_json(self, point_file, json_file):
-        '''
-
-        '''
-        from tomoSgmt.bin.update_json import write_new_json
-        logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-                            datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
-        
-        logging.info("\n######Start update json process######\n")
-        delete_record, json_data = write_new_json(point_file, json_file)
-        logging.info('{} has been updated'.format(json_file))
-        logging.info('{} points are removed'.format(len(delete_record)))
-        for i in delete_record:
-            logging.info('{}'.format(json_data[i]))
-
-        logging.info("\n######Done update json process######\n")
-
-
-    def gui(self):
-        '''
-
-        '''
-        import tomoSgmt.gui.tomoSgmt_app as app
-        app.main()
 
 
 def check_parse(args_list):
