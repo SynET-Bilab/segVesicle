@@ -230,3 +230,13 @@ def ellipse_fit(x, y, Zc):
         evecs = np.reshape(np.zeros(9), (3, 3))
 
     return center, evecs, radii
+
+
+def ellispoid_fit_RSS(center,evecs,radii,X):
+    # Calculate residual sum of squared errors (chi^2), this chi2 is in the coordinate frame in which the ellipsoid is a unit sphere. X.shape is (3, n)
+    cloud = X.T - center
+    cloud_r = np.dot(cloud,evecs)
+    cloud_n = cloud_r / [radii[2],radii[1],radii[0]] 
+    d = np.sqrt(np.sum(cloud_n * cloud_n, axis = 1))
+    rss = np.sum((d - 1) ** 2)
+    return rss/len(d)
