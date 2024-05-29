@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
 
-import os
-import mrcfile
-import numpy as np
 import sys
+import json
+import mrcfile
+import logging
+import numpy as np
+
+from tqdm import tqdm
+from scipy import ndimage
 from scipy.sparse import csr_matrix
 from skimage.measure import label
-import json
-import sys
-sys.path.append('/share/data/CryoET_Data/lvzy/veseg/')
-from bin.ellipsoid import make_ellipsoid as mk
-from bin.ellipsoid import ellipsoid_fit as ef
-#from tomoSgmt.bin.sgmt_predict import predict_new
-import math
-from tqdm import tqdm
-from scipy import misc,ndimage
-from skimage.morphology import opening, closing, erosion, dilation
+from skimage.morphology import opening, closing, erosion, dilation, remove_small_objects
 from skimage.morphology import cube, ball
 
-def morph_process(mask,area_file,elem_len=1,radius=10,save_labeled=None):
+from segVesicle.bin.boundary_mask import boundary_mask
+from segVesicle.utils import make_ellipsoid as mk
+from segVesicle.bin.ellipsoid import ellipsoid_fit as ef
+
+
+
+def morph_process(mask, area_file, elem_len=1, radius=10, save_labeled=None):
     # 1. closing and opening process of vesicle mask. 2. label the vesicles.
     # 3. exclude false vesicles by counting their volumes and thresholding, return only vesicle binary mask
     # 4. extract boundaries and labels them
     # 5. extract labeled individual vesicle boundary, convert into points vectors and output them.
-    import logging, sys
-    from skimage.morphology import opening, closing, erosion, cube, dilation
-    from skimage.measure import label
+
     with mrcfile.open(mask) as f:
         tomo_seg = f.data 
     tomo_mask = tomo_seg.copy().astype(np.int8)
@@ -142,9 +141,6 @@ def morph_process(mask,area_file,elem_len=1,radius=10,save_labeled=None):
 def density_fit(data_iso,center,radius):
     '''input center(x,y,z), output center(z,y.x), both in array
     '''
-    from scipy import misc,ndimage
-    from skimage.morphology import opening, closing, erosion, dilation, remove_small_objects
-    from skimage.morphology import cube, ball
 
     shape = data_iso.shape
     padwidth = int(max(-min(center-radius), -min(np.array(shape)[::-1]-1-center-radius),0))+5
@@ -197,7 +193,7 @@ def density_fit(data_iso,center,radius):
 
     # return [center_fit, evecs_fit, radii_fit, rss]
 
-def template(radii, center, evecs, shape, d=5):
+def template(radii, center, evecs, shape, d=3):
     #generate a circle shape template
     ellip = mk.ellipsoid_point(radii, center+np.array([25,25,25]), evecs)
     cube_ellip = np.zeros((shape[2]+50,shape[1]+50,shape[0]+50))
@@ -213,97 +209,29 @@ def template(radii, center, evecs, shape, d=5):
         tm = tm[25:-25,25:-25,25:-25]
     return tm
 
+
 def CCF(img,template):
+    '''
+    '''
     img_mean = np.mean(img)
     tm_mean = np.mean(template)
-    if np.sum((template-tm_mean)**2)<0.0001:
+    if np.sum((template - tm_mean)**2)<0.0001:
         return 0
     else:
-        ccf = np.sum((img-img_mean) * (template-tm_mean))/np.sqrt(np.sum((img-img_mean)**2)*np.sum((template-tm_mean)**2))
+        ccf = np.sum((img - img_mean) * (template - tm_mean)) / np.sqrt(np.sum((img - img_mean)**2) * np.sum((template - tm_mean)**2))
     return ccf
-def boundary_mask(tomo, mask_boundary, binning = 2):
-    from skimage.morphology import opening, closing, erosion, dilation
-    from skimage.morphology import cube, ball
-    out = np.zeros(tomo.shape, dtype = np.int8)
-    import logging
-    import os
-    import sys
-    if mask_boundary == None:
-        out = np.ones(tomo.shape, dtype = np.int8)
-        return out
-    if mask_boundary[-4:] == '.mod':
-        os.system('model2point {} {}.point >> /dev/null'.format(mask_boundary, mask_boundary[:-4]))
-        points = np.loadtxt(mask_boundary[:-4]+'.point', dtype = np.float32)/binning
-    elif mask_boundary[-6:] == '.point':
-        points = np.loadtxt(mask_boundary[:-6]+'.point', dtype = np.float32)/binning
-    else:
-        logging.error("mask boundary file should end with .mod or .point but got {} !\n".format(mask_boundary))
-        sys.exit()
-    
-    
-    def get_polygon(points):
-        if len(points) == 0:
-            logging.info("No polygonal mask")
-            return None
-        elif len(points) <= 2:
-            logging.error("In {}, {} points cannot defines a polygon of mask".format(mask_boundary, len(points)))
-            sys.exit()
-        else:
-            logging.info("In {}, {} points defines a polygon of mask".format(mask_boundary, len(points)))
-            return points[:,[1,0]]
-    
-    if points.ndim < 2: 
-        logging.error("In {}, too few points to define a boundary".format(mask_boundary))
-        sys.exit()
-
-    z1=points[-2][-1]
-    z0=points[-1][-1]
-
-    if abs(z0 - z1) < 5:
-        zmin = 0
-        zmax = tomo.shape[0]
-        polygon = get_polygon(points)
-        logging.info("In {}, all points defines a polygon with full range in z".format(mask_boundary))
-
-    else:
-        zmin = max(min(z0,z1),0) 
-        zmax = min(max(z0,z1),tomo.shape[0])
-        polygon = get_polygon(points[:-2])
-        logging.info("In {}, the last two points defines the z range of mask".format(mask_boundary))
 
 
-    zmin = int(zmin)
-    zmax = int(zmax)
-    if polygon is None:
-        out[zmin:zmax,:,:] = 1
-    else:
-        from matplotlib.path import Path
-        poly_path = Path(polygon)
-        y, x = np.mgrid[:tomo.shape[1],:tomo.shape[2]]
-        coors = np.hstack((y.reshape(-1, 1), x.reshape(-1,1)))
-        mask = poly_path.contains_points(coors)
-        mask = mask.reshape(tomo.shape[1],tomo.shape[2])
-        mask = mask.astype(np.int8)
-        out[zmin:zmax,:,:] = mask[np.newaxis,:,:]
-        out=out.astype(np.int8)
-    selem=cube(5)
-    out = dilation(out, selem)
-
-    return out
-
-def vesicle_measure(data,vesicle_list, shape, min_radius, outfile, area_file=None):
-    import sys
-    from skimage.morphology import erosion
-    from skimage.measure import label
-    import logging, sys
-
+def vesicle_measure(data, vesicle_list, shape, min_radius, outfile, area_file=None):
+    '''
+    '''
     results = []
     global in_count
     global sup_in_count
     in_count = 0
     sup_in_count = 0
 
-    def if_normal(radii,threshold=0.22):
+    def if_normal(radii, threshold=0.22):
         if np.std(radii)/np.mean(radii) >threshold:
             a = False
         elif np.mean(radii) < 0.6*min_radius or np.mean(radii) > min_radius*4:
@@ -406,10 +334,9 @@ def vesicle_measure(data,vesicle_list, shape, min_radius, outfile, area_file=Non
 
 
 def vesicle_rendering(vesicle_file,tomo_dims):
-    import logging, sys
-
+    '''
+    '''
     # vesicle file can be json or a info list
-    from skimage.morphology import closing, cube
     if type(vesicle_file) is str:
         with open(vesicle_file) as f:
             ves = json.load(f)
@@ -459,8 +386,8 @@ def get_indices_sparse(data):
 
 
 if __name__ == "__main__":
+    
     import argparse
-    import json
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--tomo', type=str, default=None, help='tomo file')
     parser.add_argument('--tomo_file', type=str, default=None, help='the isonet_corrected tomo file')
@@ -505,12 +432,3 @@ if __name__ == "__main__":
         #labels = label(ves_tomo).astype(np.float32)
         with mrcfile.new(args.label,overwrite=True) as n:
             n.set_data(ves_tomo.astype(np.float32))
-    # vdata=vesicle_info['vesicles']
-    # for i in range(len(vdata)):
-    #     with open('vesicles.coord','a') as coo:
-    #         center=np.array(vdata[i]['center'])+1
-    #         coo.write(' '.join(str(center[x]) for x in [2,1,0]))
-    #         coo.write('\n')
-    # os.system('point2model vesicles.coord vesicles.mod')
-    # os.system('rm -r vesicles.coord')
-    
