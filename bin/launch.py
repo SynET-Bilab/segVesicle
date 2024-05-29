@@ -10,7 +10,7 @@ from scipy.spatial import KDTree
 from skimage.morphology import closing, cube
 from napari.utils.notifications import show_info
 
-from bin.ellipsoid import make_ellipsoid as mk
+from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, dis
 
 
@@ -129,8 +129,11 @@ def delete_picked_vesicle(viewer, deleted_point):
 
 
 def add_picked_vesicle(viewer, data_to_add):
-    viewer.layers[LABEL_LAYER_IDX].data = viewer.layers[LABEL_LAYER_IDX].data + data_to_add  # update label layer
-    viewer.layers[LABEL_LAYER_IDX].refresh()
+    if np.sum(np.sign(viewer.layers[LABEL_LAYER_IDX].data) * np.sign(data_to_add)) > 0:
+        show_info('Please reselect two points')
+    else:
+        viewer.layers[LABEL_LAYER_IDX].data = viewer.layers[LABEL_LAYER_IDX].data + data_to_add  # update label layer
+        viewer.layers[LABEL_LAYER_IDX].refresh()
 
 
 def save_and_update_delete(viewer, root_dir, new_json_file_path):
