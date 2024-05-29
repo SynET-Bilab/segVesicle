@@ -1,6 +1,10 @@
 # segVesicle
 
-DL-based vesicle segmentation program for cryo electron tomography images.
+DL-based vesicle segmentation program for cryo electron tomography images, with user-friendly GUI based on [napari](https://napari.org/stable/) for manual correction.
+
+<p align='center'>
+<video src="images/segVesicle_demo.mp4" controls="controls" width="800px">
+</p>
 
 ## Installation
 
