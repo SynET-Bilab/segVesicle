@@ -5,12 +5,20 @@ import mrcfile
 import numpy as np
 import sys
 from scipy.sparse import csr_matrix
+from skimage.measure import label
 import json
+import sys
+sys.path.append('/share/data/CryoET_Data/lvzy/veseg/')
+from bin.ellipsoid import make_ellipsoid as mk
+from bin.ellipsoid import ellipsoid_fit as ef
 #from tomoSgmt.bin.sgmt_predict import predict_new
 import math
 from tqdm import tqdm
+from scipy import misc,ndimage
+from skimage.morphology import opening, closing, erosion, dilation
+from skimage.morphology import cube, ball
 
-def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
+def morph_process(mask,area_file,elem_len=1,radius=10,save_labeled=None):
     # 1. closing and opening process of vesicle mask. 2. label the vesicles.
     # 3. exclude false vesicles by counting their volumes and thresholding, return only vesicle binary mask
     # 4. extract boundaries and labels them
@@ -19,7 +27,11 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     from skimage.morphology import opening, closing, erosion, cube, dilation
     from skimage.measure import label
     with mrcfile.open(mask) as f:
-        tomo_mask = f.data 
+        tomo_seg = f.data 
+    tomo_mask = tomo_seg.copy().astype(np.int8)
+    area_mask = boundary_mask(tomo_mask, area_file,1)
+    tomo_mask *= area_mask
+    
     # transform mask into uint8
     bimask = np.round(tomo_mask).astype(np.uint8)
     shape = bimask.shape
@@ -82,7 +94,7 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     num = np.max(labeled)
 
     # process for Part2
-    kernel_p = cube(11)
+    kernel_p = cube(5)
     post_pro = opening(post_pro, kernel_p)
     #post_pro = erosion(post_pro, cube(3))
     labeled_post_pro = label(post_pro)
@@ -104,7 +116,7 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     # sup_bd_labeled = label(sup_filtered)
     # sup_num = np.max(sup_bd_labeled)
     # sup_idx = get_indices_sparse(sup_bd_labeled)
-    vesicle_list_sup = []
+    #vesicle_list_sup = []
     # vesicle_list_sup = [np.swapaxes(np.array(sup_idx[i]),0,1) for i in range(1, sup_num+1)]
 
     # for main vesicles
@@ -123,26 +135,173 @@ def morph_process(mask,elem_len=1,radius=10,save_labeled=None):
     #     cloud = np.swapaxes(cloud,0,1)
     #     vesicle_list.append(cloud)
     
-    return vesicle_list, vesicle_list_sup, shape
+    return vesicle_list, shape
 
 
-def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, outfile_in_area, pixel_size, area_file=None):
-    from tomoSgmt.bin.ellipsoid import ellipsoid_fit as ef
+
+def density_fit(data_iso,center,radius):
+    '''input center(x,y,z), output center(z,y.x), both in array
+    '''
+    from scipy import misc,ndimage
+    from skimage.morphology import opening, closing, erosion, dilation, remove_small_objects
+    from skimage.morphology import cube, ball
+
+    shape = data_iso.shape
+    padwidth = int(max(-min(center-radius), -min(np.array(shape)[::-1]-1-center-radius),0))+5
+    maxvalue=np.max(data_iso)
+    data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
+
+
+    center = np.round(center+padwidth).astype(np.int16)
+    cube_=data_pad[center[2]-int(radius)-5: center[2]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[0]-int(radius)-5: center[0]+int(radius)+5+1]
+    cube_ = ndimage.gaussian_filter(cube_,sigma=1)
+    cube_reverse = -cube_
+    cube_normalize = (cube_reverse - np.min(cube_reverse))/(np.max(cube_reverse)-np.min(cube_reverse))
+
+    mask=ball(cube_.shape[0]//2)
+    mask_circle=cube_.copy()
+    p=np.percentile(cube_, 50)
+    mask_circle[cube_<p]=1
+    mask_circle[cube_>=p]=0
+    mean_circle=np.sum(mask_circle*cube_)/np.sum(mask_circle)
+
+    cube_m=cube_.copy()
+    cube_m[cube_<mean_circle]=1
+    cube_m[cube_>=mean_circle]=0
+    cube_m_mask=mask*cube_m
+    databool=cube_m_mask >0
+    cube_m_mask=remove_small_objects(databool, min_size=50).astype(np.int8)
+    
+    open=opening(cube_m_mask)
+    databool=open >0
+    opened=remove_small_objects(databool, min_size=50).astype(np.int16)
+    #erded=erosion(opened,cube(2))
+    idx=get_indices_sparse(opened)
+    
+    vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
+    [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
+
+
+
+    tm = template(radii, center_cube, evecs, cube_.shape)
+    ccf = CCF(cube_normalize,tm)
+    [center_fit, evecs_fit, radii_fit]=[center[::-1]-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
+
+    return [center_fit, evecs_fit, radii_fit, ccf]
+
+    # cloud = np.array(np.where(opened==1))
+    # [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
+
+    # rss = ef.ellispoid_fit_RSS(center_cube, evecs, radii, cloud)
+    # [center_fit, evecs_fit, radii_fit]=[center[::-1]-padwidth+center_cube-cube.shape[0]//2, evecs, radii]
+
+    # return [center_fit, evecs_fit, radii_fit, rss]
+
+def template(radii, center, evecs, shape, d=5):
+    #generate a circle shape template
+    ellip = mk.ellipsoid_point(radii, center+np.array([25,25,25]), evecs)
+    cube_ellip = np.zeros((shape[2]+50,shape[1]+50,shape[0]+50))
+
+
+    if np.min(center+25-np.max(radii))<=0 or np.min(shape[0]+25-center-radii)<=0:
+        return 1-cube_ellip
+    else:
+        cube_ellip[ellip[:,0],ellip[:,1],ellip[:,2]] = 1
+        cube_ellip=closing(cube_ellip,cube(3))
+        circle = dilation(cube_ellip,cube(d)) - erosion(cube_ellip,cube(d))
+        tm = ndimage.gaussian_filter(circle,sigma=1).astype(np.float32)
+        tm = tm[25:-25,25:-25,25:-25]
+    return tm
+
+def CCF(img,template):
+    img_mean = np.mean(img)
+    tm_mean = np.mean(template)
+    if np.sum((template-tm_mean)**2)<0.0001:
+        return 0
+    else:
+        ccf = np.sum((img-img_mean) * (template-tm_mean))/np.sqrt(np.sum((img-img_mean)**2)*np.sum((template-tm_mean)**2))
+    return ccf
+def boundary_mask(tomo, mask_boundary, binning = 2):
+    from skimage.morphology import opening, closing, erosion, dilation
+    from skimage.morphology import cube, ball
+    out = np.zeros(tomo.shape, dtype = np.int8)
+    import logging
+    import os
+    import sys
+    if mask_boundary == None:
+        out = np.ones(tomo.shape, dtype = np.int8)
+        return out
+    if mask_boundary[-4:] == '.mod':
+        os.system('model2point {} {}.point >> /dev/null'.format(mask_boundary, mask_boundary[:-4]))
+        points = np.loadtxt(mask_boundary[:-4]+'.point', dtype = np.float32)/binning
+    elif mask_boundary[-6:] == '.point':
+        points = np.loadtxt(mask_boundary[:-6]+'.point', dtype = np.float32)/binning
+    else:
+        logging.error("mask boundary file should end with .mod or .point but got {} !\n".format(mask_boundary))
+        sys.exit()
+    
+    
+    def get_polygon(points):
+        if len(points) == 0:
+            logging.info("No polygonal mask")
+            return None
+        elif len(points) <= 2:
+            logging.error("In {}, {} points cannot defines a polygon of mask".format(mask_boundary, len(points)))
+            sys.exit()
+        else:
+            logging.info("In {}, {} points defines a polygon of mask".format(mask_boundary, len(points)))
+            return points[:,[1,0]]
+    
+    if points.ndim < 2: 
+        logging.error("In {}, too few points to define a boundary".format(mask_boundary))
+        sys.exit()
+
+    z1=points[-2][-1]
+    z0=points[-1][-1]
+
+    if abs(z0 - z1) < 5:
+        zmin = 0
+        zmax = tomo.shape[0]
+        polygon = get_polygon(points)
+        logging.info("In {}, all points defines a polygon with full range in z".format(mask_boundary))
+
+    else:
+        zmin = max(min(z0,z1),0) 
+        zmax = min(max(z0,z1),tomo.shape[0])
+        polygon = get_polygon(points[:-2])
+        logging.info("In {}, the last two points defines the z range of mask".format(mask_boundary))
+
+
+    zmin = int(zmin)
+    zmax = int(zmax)
+    if polygon is None:
+        out[zmin:zmax,:,:] = 1
+    else:
+        from matplotlib.path import Path
+        poly_path = Path(polygon)
+        y, x = np.mgrid[:tomo.shape[1],:tomo.shape[2]]
+        coors = np.hstack((y.reshape(-1, 1), x.reshape(-1,1)))
+        mask = poly_path.contains_points(coors)
+        mask = mask.reshape(tomo.shape[1],tomo.shape[2])
+        mask = mask.astype(np.int8)
+        out[zmin:zmax,:,:] = mask[np.newaxis,:,:]
+        out=out.astype(np.int8)
+    selem=cube(5)
+    out = dilation(out, selem)
+
+    return out
+
+def vesicle_measure(data,vesicle_list, shape, min_radius, outfile, area_file=None):
+    import sys
     from skimage.morphology import erosion
     from skimage.measure import label
     import logging, sys
 
     results = []
-    results_in = []
-    sup_results = []
-    sup_results_in = []
-    P = get_area_points(area_file, pixel_size)
-    CH = Graham_scan(P)
     global in_count
     global sup_in_count
     in_count = 0
     sup_in_count = 0
-    bd_shape = 0
 
     def if_normal(radii,threshold=0.22):
         if np.std(radii)/np.mean(radii) >threshold:
@@ -161,14 +320,26 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
         else:
             a = True
         return a
+    
 
     logging.info('\nStart vesicle measurement\n')
     for i in tqdm(range(len(vesicle_list)), file=sys.stdout):
         #print('fitting vesicle_',i)
-        [center, evecs, radii]=ef.ellipsoid_fit(vesicle_list[i])
+        [center0, evecs, radii]=ef.ellipsoid_fit(vesicle_list[i])
+        if min(center0-max(radii))<=0 or min(np.array(data.shape)-1-center0-max(radii))<=0:
+            continue
+
+
+        [center, evecs, radii, ccf]=density_fit(data,center0[::-1],np.max(radii))
+        #[center, evecs, radii]=density_fit(data,center0[::-1],np.max(radii))
+        if ccf < 0.3: #delete wrong segments
+            continue
+
         if if_normal(radii):
-            info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
+            info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
+            #info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
             results.append(info)
+            '''
             # check whether a vesicle in given presyn
             c = np.delete(center, 0)
             c[0], c[1] = c[1], c[0]
@@ -178,6 +349,7 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
                 in_count = in_count+1
         # else:
         #     print('bad vesicle {}'.format(i))
+            '''
     '''
     for i in range(len(vesicle_list_sup)):
         print('fitting ellipse vesicle_',i)
@@ -218,24 +390,25 @@ def vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, outfile, 
     '''    
     # return vesicle information dict and save as json
     vesicle_info={'vesicles':results}
-    in_vesicle_info={'vesicles':results_in}
+    #in_vesicle_info={'vesicles':results_in}
 
     if outfile is not None:    
         with open(outfile,"w") as out:
             json.dump(vesicle_info,out)
 
+    '''
     if outfile_in_area is not None:
         with open(outfile_in_area,"w") as out_in:
             json.dump(in_vesicle_info, out_in)
+    '''
 
-    return [vesicle_info, in_vesicle_info]
+    return vesicle_info
 
 
 def vesicle_rendering(vesicle_file,tomo_dims):
     import logging, sys
 
     # vesicle file can be json or a info list
-    from tomoSgmt.utils import make_ellipsoid as mk
     from skimage.morphology import closing, cube
     if type(vesicle_file) is str:
         with open(vesicle_file) as f:
@@ -243,7 +416,7 @@ def vesicle_rendering(vesicle_file,tomo_dims):
         vesicle_info = ves['vesicles']
     else:
         vesicle_info = vesicle_file
-    vesicle_tomo = np.zeros(np.array(tomo_dims)+np.array([30,30,30]),dtype=np.uint8)
+    vesicle_tomo = np.zeros(np.array(tomo_dims)+np.array([30,30,30]),dtype=np.int16)
     #vesicle_tomo = np.zeros(np.array(tomo_dims),dtype=np.uint8)
     logging.info('\nrendering vesicle\n')
     #for i,vesicle in enumerate(vesicle_info):
@@ -256,157 +429,24 @@ def vesicle_rendering(vesicle_file,tomo_dims):
         #     np.array(vesicle['evecs'])
         # )
         # ellip_i is an array (N,3) of points of a filled ellipsoid
-        vesicle_tomo[ellip_i[:,0],ellip_i[:,1],ellip_i[:,2]] = 1
-    vesicle_tomo = closing(vesicle_tomo,cube(3))
+        
+        vesicle_tomo[ellip_i[:,0],ellip_i[:,1],ellip_i[:,2]] = i + 1
+        xmin, xmax = np.min(ellip_i[:,2]), np.max(ellip_i[:,2])
+        ymin, ymax = np.min(ellip_i[:,1]), np.max(ellip_i[:,1])
+        zmin, zmax = np.min(ellip_i[:,0]), np.max(ellip_i[:,0])
+        cube_i = vesicle_tomo[zmin:zmax+1,ymin:ymax+1,xmin:xmax+1]
+        cube_i = closing(cube_i,cube(3))
+        vesicle_tomo[zmin:zmax+1,ymin:ymax+1,xmin:xmax+1] = cube_i
+
+    #vesicle_tomo = closing(vesicle_tomo,cube(3))
     logging.info('{} vesicles in total'.format(len(vesicle_info)))
     return vesicle_tomo[0:tomo_dims[0],0:tomo_dims[1],0:tomo_dims[2]]
 
 
-def get_bottom_point(points):
-    # get the first point for Graham_scan
-    # cuz the farthest point must be one of the vertex of convex hull
-    min_index = 0
-    n = len(points)
-    for i in range(0, n):
-        if points[i][1] < points[min_index][1] or (points[i][1] == points[min_index][1] and points[i][0] < points[min_index][0]):
-            min_index = i
-    return min_index
 
-
-def sort_polar_angle_cos(points, center_point):
-    # sort by polar angle with center point(with cos value)
-    n = len(points)
-    cos_value = []
-    rank = []
-    norm_list = []
-    for i in range(0, n):
-        point_ = points[i]
-        point = [point_[0]-center_point[0], point_[1]-center_point[1]]
-        rank.append(i)
-        norm_value = math.sqrt(point[0]*point[0] + point[1]*point[1])
-        norm_list.append(norm_value)
-        if norm_value == 0:
-            cos_value.append(1)
-        else:
-            cos_value.append(point[0] / norm_value)
-
-    for i in range(0, n-1):
-        index = i + 1
-        while index > 0:
-            if cos_value[index] > cos_value[index-1] or (cos_value[index] == cos_value[index-1] and norm_list[index] > norm_list[index-1]):
-                temp = cos_value[index]
-                temp_rank = rank[index]
-                temp_norm = norm_list[index]
-                cos_value[index] = cos_value[index-1]
-                rank[index] = rank[index-1]
-                norm_list[index] = norm_list[index-1]
-                cos_value[index-1] = temp
-                rank[index-1] = temp_rank
-                norm_list[index-1] = temp_norm
-                index = index-1
-            else:
-                break
-    sorted_points = []
-    for i in rank:
-        sorted_points.append(points[i])
-
-    return sorted_points
-
-
-def vector_angle(vector):
-
-    norm_ = math.sqrt(vector[0]*vector[0] + vector[1]*vector[1])
-    if norm_ == 0:
-        return 0
-
-    angle = math.acos(vector[0]/norm_)
-    if vector[1] >= 0:
-        return angle
-    else:
-        return 2*math.pi - angle
-
-
-def Cross(p1, p2, p0):
-
-    return ((p1[0]-p0[0])*(p2[1]-p0[1])-(p2[0]-p0[0])*(p1[1]-p0[1]))
-
-
-def Graham_scan(points):
-    # output a vertex set by anticlockwise of convex hull
-
-    bottom_index = get_bottom_point(points)
-    bottom_point = points.pop(bottom_index)
-    sorted_points = sort_polar_angle_cos(points, bottom_point)
-
-    m = len(sorted_points)
-
-    stack = []
-    stack.append(bottom_point)
-    stack.append(sorted_points[0])
-    stack.append(sorted_points[1])
-
-    for i in range(2, m):
-        length = len(stack)
-        top = stack[length-1]
-        next_top = stack[length-2]
-        v1 = [sorted_points[i][0]-next_top[0], sorted_points[i][1]-next_top[1]]
-        v2 = [top[0]-next_top[0], top[1]-next_top[1]]
-        v0 = [0, 0]
-
-        while Cross(v1, v2, v0) >= 0:
-            stack.pop()
-            length = len(stack)
-            top = stack[length-1]
-            next_top = stack[length-2]
-            v1 = [sorted_points[i][0] - next_top[0], sorted_points[i][1] - next_top[1]]
-            v2 = [top[0] - next_top[0], top[1] - next_top[1]]
-
-        stack.append(sorted_points[i])
-
-    return stack
-
-
-def Check(CH, n, p_che):
-    # get vertex from Graham_scan, if checking point is in the hull, 
-     #its multicross with vertex by sort must be positive
-    for i in range(n-1):
-        if (Cross(CH[i], CH[i+1], p_che)) < 0:
-            return False
-    if (Cross(CH[n-1], CH[0], p_che)) > 0:
-        return True
-    else:
-        return False
-
-
-def get_area_points(area_file, pixel_size):
-    '''
-    Support .mod or .point file as input
-    '''
-    P = []
-    # s = 'model2point area.mod area.point'
-    # os.system(s)
-    if area_file.endswith('.mod'):
-        cmd = 'model2point {} {}'.format(area_file, area_file.replace('.mod', '.point'))
-        os.system(cmd)
-        area_file = area_file.replace('.mod', '.point')
-    else:
-        area_file = area_file
-
-    with open(area_file,'r') as f:
-        line = f.read()
-        line = line.split()
-        point = np.reshape(line,(-1, 3))
-        p = np.delete(point, 2, axis=1) # delete z value
-        tmp = p.tolist()
-        ratio = pixel_size/17.142
-        for poi in tmp:
-            poi = list(map(float, poi))
-            poi[0] = poi[0]*ratio
-            poi[1] = poi[1]*ratio
-            poi = list(map(int, poi))
-            P.append(poi)
-    return P
-
+def dis(m,n):
+    d=np.linalg.norm(m-n)
+    return d
 
 def compute_M(data):
     cols = np.arange(data.size)
@@ -423,45 +463,54 @@ if __name__ == "__main__":
     import json
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--tomo', type=str, default=None, help='tomo file')
+    parser.add_argument('--tomo_file', type=str, default=None, help='the isonet_corrected tomo file')
     parser.add_argument('--mask_file', type=str, default=None, help='the output vesicle mask file name')
-    parser.add_argument('--render', type=str, default=None, help='if draw fitted vesicles on a new tomo')
-    parser.add_argument('--render_in', type=str, default=None, help='if draw fitted vesicles which in presyn on a new tomo')
-    parser.add_argument('--min_radius', type=int, default=10, help='minimal radius of targeting vesicles')
-    parser.add_argument('--area_file', type=str, default='area.point', help='.point file which defines interested area')
+    #parser.add_argument('--render', type=str, default=None, help='if draw fitted vesicles on a new tomo')
+    parser.add_argument('--label', type=str, default=None, help='draw fitted vesicles as labels')
+    parser.add_argument('--min_radius', type=int, default=8, help='minimal radius of targeting vesicles')
+    parser.add_argument('--area_file', type=str, default=None, help='.point or .mod file which defines interested area')
     parser.add_argument('--output_file', type=str, default=None, help='output vesicles file name (xxx.json)')
-    parser.add_argument('--output_file_in_area', type=str, default=None, help='output vesicles in presyn file name (xxx.json)')
-    parser.add_argument('--sup',  type=str, default=True, help='whether need supplement info by ellipse fit(True or False)')
+
+    #parser.add_argument('--sup',  type=str, default=True, help='whether need supplement info by ellipse fit(True or False)')
     args = parser.parse_args()
 
     # set some default files 
+    if args.tomo_file is None:
+        args.output_file = args.tomo + '_wbp_corrected.mrc'
     if args.mask_file is None:
-        args.mask_file = args.tomo + '-bin8-wbp_corrected-mask.mrc'
-    if args.render is None:
-        args.render = args.tomo + '-vesicles.mrc'
-    if args.render_in is None:
-        args.render_in = args.tomo + '-vesicles-in.mrc'
+        args.mask_file = args.tomo + '_segment.mrc'
+    #if args.render is None:
+    #    args.render = args.tomo + '_vesicles.mrc'
+    if args.label is None:
+        args.label = args.tomo + '_label_vesicle.mrc'
     if args.output_file is None:
         args.output_file = args.tomo + '_vesicle.json'
-    if args.output_file_in_area is None:
-        args.output_file_in_area = args.tomo + '_vesicle_in.json'
+    
 
-    min_radius = args.min_radius
     # save raw vesicle mask
     with mrcfile.open(args.mask_file) as m:
         bimask =  m.data
     shape = bimask.shape
     print('begin morph process')
-    vesicle_list, vesicle_list_sup, shape = morph_process(args.mask_file,radius=min_radius)
+    vesicle_list, shape = morph_process(args.mask_file,args.area_file,radius=args.min_radius)
     print('done morph process')
-    [vesicle_info, in_vesicle_info] = vesicle_measure(vesicle_list, vesicle_list_sup, shape, min_radius, args.output_file, args.output_file_in_area, area_file=args.area_file)
+
+    with mrcfile.open(args.tomo_file) as m:
+        data_iso = m.data
+    vesicle_info = vesicle_measure(data_iso,vesicle_list, shape, args.min_radius, args.output_file, area_file=args.area_file)
     print('done vesicle measuring')
 
-    if args.render is not None:
+    if args.label is not None:
         ves_tomo = vesicle_rendering(args.output_file,shape)
-        with mrcfile.new(args.render,overwrite=True) as n:
-            n.set_data(ves_tomo)
+        #labels = label(ves_tomo).astype(np.float32)
+        with mrcfile.new(args.label,overwrite=True) as n:
+            n.set_data(ves_tomo.astype(np.float32))
+    # vdata=vesicle_info['vesicles']
+    # for i in range(len(vdata)):
+    #     with open('vesicles.coord','a') as coo:
+    #         center=np.array(vdata[i]['center'])+1
+    #         coo.write(' '.join(str(center[x]) for x in [2,1,0]))
+    #         coo.write('\n')
+    # os.system('point2model vesicles.coord vesicles.mod')
+    # os.system('rm -r vesicles.coord')
     
-    if args.render_in is not None:
-        ves_in_tomo = vesicle_rendering(args.output_file_in_area, shape)
-        with mrcfile.new(args.render_in, overwrite=True) as n_in:
-            n_in.set_data(ves_in_tomo)
