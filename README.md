@@ -1,33 +1,35 @@
-# Vesicle Segmentation
+# segVesicle
+
+DL-based vesicle segmentation program for cryo electron tomography images.
 
 ## Installation
 
-1. Manage environment with conda
+1. Install basic dependencies
 
-```shell
-conda create --name=tomoSgmt python=3.6
+```bash
+conda env create -f environment.yml
+conda activate segVesicle
 ```
 
-2. Require tensorflow >= 2.0 
+2. `segVesicle` relies on tensorflow-gpu2, the specific version of `tensorflow-gpu` should be determined by the version of `cuda` . For the correspondence, see https://www.tensorflow.org/install/source?hl=en#gpu. For example, if you use `cuda-11.2`, `tensorflow-gpu` 2.5.0 to 2.11.0 is ok. `cudnn` with proper version should also be installed. 
 
-Please check your cuda and cudnn version and find a corresponding version for tensorflow
-
-For example, you should install tensorflow with version 2.3.0 if you use cuda 10.1 
-
-```shell
-pip install tensorflow==2.3.0
+```bash
+pip install tensorflow-gpu==2.x.x
 ```
 
-3. Install other dependencies
+3. Source code installation. Both `segVesicle` and `IsoNet` are needed. [IsoNet](https://github.com/IsoNet-cryoET/IsoNet) is used for missing wedge restoration and denoising to improve the segmentation performance. 
 
-```shell
-pip install -r requirements.txt
+```bash
+git clone git@github.com:IsoNet-cryoET/IsoNet.git
+git clone git@github.com:SynET-Bilab/segVesicle.git
 ```
 
 4. Add environment variables
 
-```shell
-vi ~/.bashrc
-export PATH=PATH_OF_THIS_FOLDER/bin/:$PATH
-export PYTHONPATH=PARENT_PATH_OF_THIS_FOLDER/:$PYTHONPATH
+```bash
+export PATH=PATH_TO_ISONET_FOLDER/bin:$PATH 
+export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_ISONET_FOLDER:$PYTHONPATH
+
+export PATH=PATH_TO_SEGVESICLE_FOLDER/bin:$PATH
+export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_SEGVESICLE_FOLDER:$PYTHONPATH
 ```
