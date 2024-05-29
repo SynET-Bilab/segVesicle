@@ -3,7 +3,7 @@
 DL-based vesicle segmentation program for cryo electron tomography images, with user-friendly GUI based on [napari](https://napari.org/stable/) for manual correction.
 
 <p align='center'>
-<video src="images/segVesicle_demo.mp4" controls="controls" width="800px">
+<video src="https://github.com/SynET-Bilab/segVesicle/assets/81632333/28faff9e-360e-4aa1-8fa6-db1d87d6ba4c" controls="controls" width="800px">
 </p>
 
 ## Installation
