@@ -176,16 +176,20 @@ def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
 
 
 def main(tomo_dir):
-    
-    root_dir = os.path.abspath(tomo_dir).split(tomo_dir)[0] + 'label/'
+    pid = os.getpid()
+    root_dir = os.path.abspath('temp') + '/'
     if not os.path.exists(root_dir):
         os.makedirs(root_dir)
     ori_tomo_path = os.path.abspath(tomo_dir + '_wbp.mrc')
+    deconv_tomo_path = os.path.abspath('tomoset/' + tomo_dir + '_dec.mrc')
     isonet_tomo_path = os.path.abspath(tomo_dir + '_wbp_corrected.mrc')
     segment_path = os.path.abspath(tomo_dir + '_segment.mrc')
     label_path = os.path.abspath(tomo_dir + '_label_vesicle.mrc')
     json_file_path = os.path.abspath(tomo_dir + '_vesicle.json')
-    new_json_file_path = json_file_path.split(tomo_dir)[0] + 'label/' + tomo_dir + '_vesicle_new_{}.json'.format(os.getpid())
+    new_json_file_path = root_dir + 'vesicle_new_{}.json'.format(pid)
+    new_label_file_path = root_dir + 'label_{}.mrc'.format(pid)
+    final_json_file_path = os.path.abspath(tomo_dir + '_vesicle_final.json')
+    final_label_path = os.path.abspath(tomo_dir + '_label_vesicle_final.mrc')
     
     cmd_cp = 'cp {} {}'.format(json_file_path, new_json_file_path)
     os.system(cmd_cp)
@@ -209,6 +213,12 @@ def main(tomo_dir):
     register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add(viewer, root_dir, new_json_file_path)
     napari.run()
+    
+    os.system('mv {} {}'.format(new_json_file_path, final_json_file_path))
+    os.system('cp {} {}'.format(final_json_file_path, json_file_path))
+    os.system('mv {} {}'.format(new_label_file_path, final_label_path))
+    os.system('cp {} {}'.format(final_label_path, label_path))
+    os.system('rm -r {}'.format(root_dir))
 
 
 if __name__ == '__main__':
