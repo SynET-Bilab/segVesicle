@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 import json
 import fire
@@ -105,7 +107,7 @@ def update_json_file(viewer, point, json_file, mode, vesicle_to_add):
     elif mode == 'Added':
         vesicles.append(vesicle_to_add)
     vesicle_info = {'vesicles': vesicles}
-    with open(json_file, "w") as out:
+    with open(json_file, "w", encoding='utf-8') as out:
         json.dump(vesicle_info, out)
 
 
