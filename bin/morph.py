@@ -141,7 +141,6 @@ def morph_process(mask, area_file, elem_len=1, radius=10, save_labeled=None):
 def density_fit(data_iso,center,radius):
     '''input center(x,y,z), output center(z,y.x), both in array
     '''
-
     shape = data_iso.shape
     padwidth = int(max(-min(center-radius), -min(np.array(shape)[::-1]-1-center-radius),0))+5
     maxvalue=np.max(data_iso)
@@ -171,6 +170,8 @@ def density_fit(data_iso,center,radius):
     open=opening(cube_m_mask)
     databool=open >0
     opened=remove_small_objects(databool, min_size=50).astype(np.int16)
+    if np.sum(opened) < 1000:
+        return [None, None, None, 0]
     #erded=erosion(opened,cube(2))
     idx=get_indices_sparse(opened)
     
