@@ -179,7 +179,6 @@ def density_fit(data_iso,center,radius):
     [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
 
 
-
     tm = template(radii, center_cube, evecs, cube_.shape)
     ccf = CCF(cube_normalize,tm)
     [center_fit, evecs_fit, radii_fit]=[center[::-1]-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
@@ -200,7 +199,7 @@ def template(radii, center, evecs, shape, d=3):
     cube_ellip = np.zeros((shape[2]+50,shape[1]+50,shape[0]+50))
 
 
-    if np.min(center+25-np.max(radii))<=0 or np.min(shape[0]+25-center-radii)<=0:
+    if cube_ellip.shape[0] <= np.max(ellip):
         tm = 1-cube_ellip
     else:
         cube_ellip[ellip[:,0],ellip[:,1],ellip[:,2]] = 1
@@ -216,7 +215,7 @@ def template_2d(radii, center, evecs, shape, d=3):
     cube_ellip = np.zeros((shape[2]+50,shape[1]+50,shape[0]+50))
 
 
-    if np.min(center+25-np.max(radii))<=0 or np.min(shape[0]+25-center-radii)<=0:
+    if cube_ellip.shape[0] <= np.max(ellip):
         tm = 1-cube_ellip
         tm = tm[tm.shape[0]//2]
     else:
