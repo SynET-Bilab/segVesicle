@@ -13,7 +13,7 @@ from skimage.morphology import closing, cube
 from napari.utils.notifications import show_info
 
 from segVesicle.utils import make_ellipsoid as mk
-from morph import density_fit, dis
+from morph import density_fit, density_fit_2d, fit_6pts, dis
 
 
 
@@ -39,15 +39,19 @@ def vesicle_rendering(vesicle_info, tomo_dims, idx):
     return vesicle_tomo[0:tomo_dims[0], 0:tomo_dims[1], 0:tomo_dims[2]]
 
 
-def add_vesicle(data_iso, points, label_idx):
+def add_vesicle(data_iso, points, label_idx, add_mode = '3d'):
     
     shape = data_iso.shape
-    points = points[:, ::-1]  # zyx to xyz
     center_manual = points[0]
     radius_point = points[1]
 
     radius = dis(center_manual, radius_point)
-    [center, evecs, radii, ccf] = density_fit(data_iso, center_manual, radius)
+    if add_mode == '3d':
+        [center, evecs, radii, ccf] = density_fit(data_iso, center_manual, radius)
+    elif add_mode == '2d':
+        [center, evecs, radii, ccf] = density_fit_2d(data_iso, center_manual, radius)
+    elif add_mode == '6pts':
+        [center, evecs, radii, ccf] = fit_6pts(data_iso, points)
     info = {'name':'vesicle_'+str(label_idx), 'center':center.tolist(), 'radii':radii.tolist(), 'evecs':evecs.tolist(), 'CCF':str(ccf)}
     
     result_to_show = [info]
@@ -67,6 +71,9 @@ def save_point_layer(viewer, layer_idx, mode):
         elif mode == 'Added':
             image_data = image_layer.data[-2:]
             added_vesicle_num += 1  # to label new added vesicles
+        elif mode == 'Added_6pts':
+            image_data = image_layer.data[-6:]
+            added_vesicle_num += 1
     else:
         show_info('no points added')
     
@@ -111,13 +118,13 @@ def update_json_file(viewer, point, json_file, mode, vesicle_to_add):
         json.dump(vesicle_info, out)
 
 
-def add_vesicle_show(viewer, point):
+def add_vesicle_show(viewer, point, add_mode):
     '''calculate the added vesicle
     '''
     ori_tomo = viewer.layers[-2].data
     
     label_idx = LABEL_START + added_vesicle_num
-    data_to_add, new_added_vesicle = add_vesicle(ori_tomo, point, label_idx)
+    data_to_add, new_added_vesicle = add_vesicle(ori_tomo, point, label_idx, add_mode)
     return data_to_add.astype(np.int16), new_added_vesicle
 
 
@@ -162,18 +169,48 @@ def save_and_update_add(viewer, root_dir, new_json_file_path):
         show_info('Please add two points to define a vesicle')
     else:
         point = save_point_layer(viewer, POINT_LAYER_IDX, mode='Added')
-        data_to_add, new_added_vesicle = add_vesicle_show(viewer, point)
+        data_to_add, new_added_vesicle = add_vesicle_show(viewer, point, add_mode='3d')
         add_picked_vesicle(viewer, data_to_add)
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
 
+def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
+    if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
+        show_info('Please add two points to define a vesicle')
+    else:
+        point = save_point_layer(viewer, POINT_LAYER_IDX, mode='Added')
+        data_to_add, new_added_vesicle = add_vesicle_show(viewer, point, add_mode='2d')
+        add_picked_vesicle(viewer, data_to_add)
+        viewer.layers[POINT_LAYER_IDX].data = None
+        save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
+        update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
+
+def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
+    if len(viewer.layers[POINT_LAYER_IDX].data) < 6:
+        show_info('Please add 6 points to fit a vesicle')
+    else:
+        point = save_point_layer(viewer, POINT_LAYER_IDX, mode='Added_6pts')
+        data_to_add, new_added_vesicle = add_vesicle_show(viewer, point, add_mode='6pts')
+        add_picked_vesicle(viewer, data_to_add)
+        viewer.layers[POINT_LAYER_IDX].data = None
+        save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
+        update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
 
 def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('g', overwrite=True)
     def save_point_image(viewer):
         threading.Thread(target=save_and_update_add, args=(viewer, root_dir, new_json_file_path)).start()
 
+def register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path):
+    @viewer.bind_key('f', overwrite=True)
+    def save_point_image(viewer):
+        threading.Thread(target=save_and_update_add_2d, args=(viewer, root_dir, new_json_file_path)).start()
+
+def register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path):
+    @viewer.bind_key('p', overwrite=True)
+    def save_point_image(viewer):
+        threading.Thread(target=save_and_update_add_6pts, args=(viewer, root_dir, new_json_file_path)).start()
 
 def main(tomo_dir):
     pid = os.getpid()
@@ -212,6 +249,8 @@ def main(tomo_dir):
 
     register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
     napari.run()
     
     os.system('mv {} {}'.format(new_json_file_path, final_json_file_path))

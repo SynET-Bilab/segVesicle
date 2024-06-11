@@ -139,16 +139,16 @@ def morph_process(mask, area_file, elem_len=1, radius=10, save_labeled=None):
 
 
 def density_fit(data_iso,center,radius):
-    '''input center(x,y,z), output center(z,y.x), both in array
+    '''input center(z,y,x), output center(z,y.x), both in array
     '''
     shape = data_iso.shape
-    padwidth = int(max(-min(center-radius), -min(np.array(shape)[::-1]-1-center-radius),0))+5
+    padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
 
     center = np.round(center+padwidth).astype(np.int16)
-    cube_=data_pad[center[2]-int(radius)-5: center[2]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[0]-int(radius)-5: center[0]+int(radius)+5+1]
+    cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
     cube_ = ndimage.gaussian_filter(cube_,sigma=1)
     cube_reverse = -cube_
     cube_normalize = (cube_reverse - np.min(cube_reverse))/(np.max(cube_reverse)-np.min(cube_reverse))
@@ -181,7 +181,7 @@ def density_fit(data_iso,center,radius):
 
     tm = template(radii, center_cube, evecs, cube_.shape)
     ccf = CCF(cube_normalize,tm)
-    [center_fit, evecs_fit, radii_fit]=[center[::-1]-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
+    [center_fit, evecs_fit, radii_fit]=[center-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
 
     return [center_fit, evecs_fit, radii_fit, ccf]
 
@@ -239,17 +239,17 @@ def CCF(img,template):
     return ccf
 
 def density_fit_2d(data_iso,center,radius):
-    '''input center(x,y,z), output center(z,y.x), both in array
+    '''input center(z,y,x), output center(z,y.x), both in array
     '''
 
     shape = data_iso.shape
-    padwidth = int(max(-min(center-radius), -min(np.array(shape)[::-1]-1-center-radius),0))+5
+    padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
 
     center = np.round(center+padwidth).astype(np.int16)
-    cube_=data_pad[center[2]-int(radius)-5: center[2]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[0]-int(radius)-5: center[0]+int(radius)+5+1]
+    cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
     img = cube_[cube_.shape[0]//2,:,:]
     img = ndimage.gaussian_filter(img,sigma=1)
     img_reverse = -img
@@ -277,9 +277,34 @@ def density_fit_2d(data_iso,center,radius):
 
     tm = template_2d(radii, center_cube, evecs, cube_.shape)
     ccf = CCF(img_normalize,tm)
-    [center_fit, evecs_fit, radii_fit]=[center[::-1]-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
+    [center_fit, evecs_fit, radii_fit]=[center-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
 
     return [center_fit, evecs_fit, radii_fit, ccf]
+
+def fit_6pts(data_iso, points):
+    x=[]
+    y=[]
+    z=points[0][0]
+    for i in range(len(points)):
+        x.append(points[i][2])
+        y.append(points[i][1])
+    [center_cube, evecs, radii]=ef.ellipse_fit(x,y,z)
+    radius = np.max(radii).astype(np.int8)
+    cube_shape=(2*radius + 50,2*radius + 50,2*radius + 50)
+    tm = template_2d(radii, center_cube, evecs, cube_shape)
+
+    shape = data_iso.shape
+    padwidth = int(max(-min(center_cube-radius), -min(np.array(shape)-1-center_cube-radius),0))+5
+    maxvalue=np.max(data_iso)
+    data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
+    center = np.round(center_cube+padwidth).astype(np.int16)
+    cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
+    img = cube_[cube_.shape[0]//2,:,:]
+    img = ndimage.gaussian_filter(img,sigma=1)
+    img_reverse = -img
+    img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
+    ccf = CCF(img_normalize,tm)
+    return [center_cube, evecs, radii, ccf]
 
 def vesicle_measure(data, vesicle_list, shape, min_radius, outfile, area_file=None):
     '''
