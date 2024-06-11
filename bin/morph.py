@@ -11,7 +11,7 @@ from scipy import ndimage
 from scipy.sparse import csr_matrix
 from skimage.measure import label
 from skimage.morphology import opening, closing, erosion, dilation, remove_small_objects
-from skimage.morphology import cube, ball
+from skimage.morphology import cube, ball, disk, square
 
 from segVesicle.bin.boundary_mask import boundary_mask
 from segVesicle.utils import make_ellipsoid as mk
@@ -200,15 +200,32 @@ def template(radii, center, evecs, shape, d=3):
 
 
     if np.min(center+25-np.max(radii))<=0 or np.min(shape[0]+25-center-radii)<=0:
-        return 1-cube_ellip
+        tm = 1-cube_ellip
     else:
         cube_ellip[ellip[:,0],ellip[:,1],ellip[:,2]] = 1
-        cube_ellip=closing(cube_ellip,cube(3))
+        cube_ellip=closing(cube_ellip,cube(d))
         circle = dilation(cube_ellip,cube(d)) - erosion(cube_ellip,cube(d))
         tm = ndimage.gaussian_filter(circle,sigma=1).astype(np.float32)
-        tm = tm[25:-25,25:-25,25:-25]
+    tm = tm[25:-25,25:-25,25:-25]
     return tm
 
+def template_2d(radii, center, evecs, shape, d=3):
+    #generate a circle shape template
+    ellip = mk.ellipsoid_point(radii, center+np.array([25,25,25]), evecs)
+    cube_ellip = np.zeros((shape[2]+50,shape[1]+50,shape[0]+50))
+
+
+    if np.min(center+25-np.max(radii))<=0 or np.min(shape[0]+25-center-radii)<=0:
+        tm = 1-cube_ellip
+        tm = tm[tm.shape[0]//2]
+    else:
+        cube_ellip[ellip[:,0],ellip[:,1],ellip[:,2]] = 1
+        img = cube_ellip[cube_ellip.shape[0]//2]
+        img = closing(img,square(d))
+        circle = dilation(img,square(d)) - erosion(img,square(d))
+        tm = ndimage.gaussian_filter(circle,sigma=1).astype(np.float32)
+    tm = tm[25:-25,25:-25]
+    return tm
 
 def CCF(img,template):
     '''
@@ -221,6 +238,48 @@ def CCF(img,template):
         ccf = np.sum((img - img_mean) * (template - tm_mean)) / np.sqrt(np.sum((img - img_mean)**2) * np.sum((template - tm_mean)**2))
     return ccf
 
+def density_fit_2d(data_iso,center,radius):
+    '''input center(x,y,z), output center(z,y.x), both in array
+    '''
+
+    shape = data_iso.shape
+    padwidth = int(max(-min(center-radius), -min(np.array(shape)[::-1]-1-center-radius),0))+5
+    maxvalue=np.max(data_iso)
+    data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
+
+
+    center = np.round(center+padwidth).astype(np.int16)
+    cube_=data_pad[center[2]-int(radius)-5: center[2]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[0]-int(radius)-5: center[0]+int(radius)+5+1]
+    img = cube_[cube_.shape[0]//2,:,:]
+    img = ndimage.gaussian_filter(img,sigma=1)
+    img_reverse = -img
+    img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
+
+    mask = disk(cube_.shape[1]//2)
+    mask_circle=img.copy()
+    p=np.percentile(img, 50)
+    mask_circle[img<p]=1
+    mask_circle[img>=p]=0
+    mean_circle=np.sum(mask_circle * img)/np.sum(mask_circle)
+
+    img_m=img.copy()
+    img_m[img<mean_circle]=1
+    img_m[img>=mean_circle]=0
+    img_m_mask=mask*img_m
+    cube_m_mask=np.zeros_like(cube_)
+    cube_m_mask[cube_.shape[0]//2]=img_m_mask
+
+    cloud=np.where(cube_m_mask>0)
+    x = np.asarray(cloud[2])
+    y = np.asarray(cloud[1])
+    z = np.asarray(cloud[0])[0]
+    [center_cube, evecs, radii]=ef.ellipse_fit(x,y,z)
+
+    tm = template_2d(radii, center_cube, evecs, cube_.shape)
+    ccf = CCF(img_normalize,tm)
+    [center_fit, evecs_fit, radii_fit]=[center[::-1]-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
+
+    return [center_fit, evecs_fit, radii_fit, ccf]
 
 def vesicle_measure(data, vesicle_list, shape, min_radius, outfile, area_file=None):
     '''

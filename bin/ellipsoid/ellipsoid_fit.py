@@ -2,7 +2,7 @@ import numpy as np
 import math 
 import scipy
 from scipy.sparse import csr_matrix
-
+from numpy.linalg import eig, inv
 
 #A*x.^2 + B*x.*y + C*y.^2 + D*x + E*y + F
 def solve_ellipse(A,B,C,D,E,F):
@@ -180,56 +180,41 @@ def ellipsoid_fit(X):
     
     return center, evecs, radii
 
-
 def ellipse_fit(x, y, Zc):
-    # ellipse fitting by least square method
-    [a, b, c, d, e, f] = [False, False, False, False, False, False]
-    D = np.array([x*x,
-                x*y,
-                y*y,
-                x,
-                y,
-                1 - 0*x])
-    H = np.zeros((6, 6)) 
-    H[0, 2] = 2
-    H[2, 0] = 2
-    H[1, 1] = -1
-    S = np.dot(D, D.T)
-    L, V = scipy.linalg.eig(S, H)
+    """
+    ellipse fitting by least square method
+    http://nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
+    """
+    x=np.array(x,dtype=np.double)
+    y=np.array(y,dtype=np.double)
+    x = x[:,np.newaxis]
+    y = y[:,np.newaxis]
+    D =  np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
+    S = np.dot(D.T,D)
+    C = np.zeros([6,6])
+    C[0,2] = C[2,0] = 2; C[1,1] = -1
+    E, V =  eig(np.dot(inv(S), C))
+    n = np.argmax(np.abs(E))
+    a = V[:,n]
 
-    for i in range(6):
-        if L[i] <= 0:
-            continue
+    b,c,d,f,g,a = a[1]/2, a[2], a[3]/2, a[4]/2, a[5], a[0]
+    num = b*b-a*c
+    x0=(c*d-b*f)/num
+    y0=(a*f-b*d)/num
+    center = np.array([Zc,y0,x0])
 
-        W = V[:, i]
-        if np.dot(np.dot(W.T, H), W) < 0:
-            continue
+    up = 2*(a*f*f+c*d*d+g*b*b-2*b*d*f-a*c*g)
+    down1=(b*b-a*c)*( (c-a)*np.sqrt(1+4*b*b/((a-c)*(a-c)))-(c+a))
+    down2=(b*b-a*c)*( (a-c)*np.sqrt(1+4*b*b/((a-c)*(a-c)))-(c+a))
+    res1=np.sqrt(up/down1)
+    res2=np.sqrt(up/down2)
+    radii = np.array([0.01, res2, res1])
 
-        W = np.dot(math.sqrt(1/(np.dot(np.dot(W.T, H), W))), W)
-        [a, b, c, d, e, f] = W
-    
-    if a and b and c and d and e and f:
-        if 4*a*c-b*b > 0:
-            Xc = (b*e - 2*c*d)/(4*a*c - b*b)
-            Yc = (b*d - 2*a*e)/(4*a*c - b*b)
-            MA = math.sqrt(2*(a*Xc*Xc + c*Yc*Yc + b*Xc*Yc - f)/(a + c + math.sqrt((a - c)*(a - c) + b*b)))
-            SMA = math.sqrt(2*(a*Xc*Xc + c*Yc*Yc + b*Xc*Yc - f)/(a + c - math.sqrt((a - c)*(a - c) + b*b)))
-            R_pre = (MA + SMA)/2 # just to unify the formal, never use it to analyse any info of the vesicle
-
-            center = np.array([Zc, Yc, Xc])
-            radii = np.array([MA, SMA, R_pre])
-            evecs = np.reshape(np.zeros(9), (3, 3)) # just to unity the formal
-        else:
-            center = np.array([0,0,0])
-            radii = np.array([0,0,0.1])
-            evecs = np.reshape(np.zeros(9), (3, 3))
-
-    else:
-        center = np.array([0,0,0])
-        radii = np.array([0,0,0.1])
-        evecs = np.reshape(np.zeros(9), (3, 3))
-
+    angle = 0.5*np.arctan(2*b/(a-c))
+    evecs = np.array([[1,0,0], [0, np.cos(angle), -np.sin(angle)],[0, np.sin(angle), np.cos(angle)]])
+    #zyx.dot(mat)
     return center, evecs, radii
+
 
 
 def ellispoid_fit_RSS(center,evecs,radii,X):
