@@ -342,8 +342,8 @@ def vesicle_measure(data, vesicle_list, shape, min_radius, outfile, area_file=No
             continue
 
 
-        [center, evecs, radii, ccf]=density_fit(data,center0[::-1],np.max(radii))
-        #[center, evecs, radii]=density_fit(data,center0[::-1],np.max(radii))
+        [center, evecs, radii, ccf]=density_fit(data,center0,np.max(radii))
+        #[center, evecs, radii]=density_fit(data,center0,np.max(radii))
         if ccf < 0.3: #delete wrong segments
             continue
 

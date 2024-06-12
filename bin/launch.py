@@ -225,11 +225,12 @@ def main(tomo_dir):
     json_file_path = os.path.abspath(tomo_dir + '_vesicle.json')
     new_json_file_path = root_dir + 'vesicle_new_{}.json'.format(pid)
     new_label_file_path = root_dir + 'label_{}.mrc'.format(pid)
-    final_json_file_path = os.path.abspath(tomo_dir + '_vesicle_final.json')
-    final_label_path = os.path.abspath(tomo_dir + '_label_vesicle_final.mrc')
+    ori_json_file_path = os.path.abspath(tomo_dir + '_vesicle_ori.json')
+    ori_label_path = os.path.abspath(tomo_dir + '_label_vesicle_ori.mrc')
     
-    cmd_cp = 'cp {} {}'.format(json_file_path, new_json_file_path)
-    os.system(cmd_cp)
+    os.system('cp {} {}'.format(json_file_path, new_json_file_path))
+    os.system('cp {} {}'.format(label_path, ori_label_path))
+    os.system('cp {} {}'.format(json_file_path, ori_json_file_path))
     
     # calculate contrast limits
     lambda_scale = 0.35
@@ -253,10 +254,8 @@ def main(tomo_dir):
     register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
     napari.run()
     
-    os.system('mv {} {}'.format(new_json_file_path, final_json_file_path))
-    os.system('cp {} {}'.format(final_json_file_path, json_file_path))
-    os.system('mv {} {}'.format(new_label_file_path, final_label_path))
-    os.system('cp {} {}'.format(final_label_path, label_path))
+    os.system('mv {} {}'.format(new_json_file_path, json_file_path))
+    os.system('mv {} {}'.format(new_label_file_path, label_path))
     os.system('rm -r {}'.format(root_dir))
 
 
