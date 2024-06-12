@@ -227,10 +227,11 @@ def main(tomo_dir):
     new_label_file_path = root_dir + 'label_{}.mrc'.format(pid)
     ori_json_file_path = os.path.abspath(tomo_dir + '_vesicle_ori.json')
     ori_label_path = os.path.abspath(tomo_dir + '_label_vesicle_ori.mrc')
-    
+
     os.system('cp {} {}'.format(json_file_path, new_json_file_path))
-    os.system('cp {} {}'.format(label_path, ori_label_path))
-    os.system('cp {} {}'.format(json_file_path, ori_json_file_path))
+    if not os.path.exists(ori_label_path):
+        os.system('cp {} {}'.format(label_path, ori_label_path))
+        os.system('cp {} {}'.format(json_file_path, ori_json_file_path))
     
     # calculate contrast limits
     lambda_scale = 0.35
