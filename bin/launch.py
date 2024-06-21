@@ -13,6 +13,7 @@ from scipy.spatial import KDTree
 from skimage.morphology import closing, cube
 from napari import Viewer
 from napari.settings import get_settings
+from napari.resources import ICONS
 from napari.utils.notifications import show_info
 from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
@@ -160,6 +161,18 @@ def save_and_update_delete(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Deleted', vesicle_to_add=None)
 
+def create_delete_button(viewer):
+    '''Creates a delete button with the specified icon and inserts it into the viewer's layout'''
+    del_button = QtViewerPushButton('delete label')
+    del_icon_path = ICONS.get('delete')
+    del_icon = change_icon_color(del_icon_path, 'yellow')
+    del_button.setIcon(del_icon)
+    
+    # 将按钮插入到布局中
+    layer_buttons = viewer.window.qt_viewer.layerButtons
+    layer_buttons.layout().insertWidget(6, del_button)
+    
+    return del_button
 
 def register_save_shortcut_delete(viewer, root_dir, new_json_file_path):
     '''press 'd' to save the point to delete and save the new label layer
@@ -167,6 +180,8 @@ def register_save_shortcut_delete(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('d', overwrite=True)
     def save_label_image(viewer):
         threading.Thread(target=save_and_update_delete, args=(viewer, root_dir, new_json_file_path)).start()
+    del_button = create_button(viewer, 'delete label', 'delete', 'yellow', 6)
+    del_button.clicked.connect(lambda: save_label_image(viewer))
 
 
 def save_and_update_add(viewer, root_dir, new_json_file_path):
@@ -206,16 +221,65 @@ def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('g', overwrite=True)
     def save_point_image(viewer):
         threading.Thread(target=save_and_update_add, args=(viewer, root_dir, new_json_file_path)).start()
-
+    # 创建添加按钮并将其点击事件与 save_point_image 函数绑定
+    add_button = create_button(viewer, 'add 3D label', 'add', 'yellow', 3)
+    add_button.clicked.connect(lambda: save_point_image(viewer))
+    
 def register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('f', overwrite=True)
     def save_point_image(viewer):
         threading.Thread(target=save_and_update_add_2d, args=(viewer, root_dir, new_json_file_path)).start()
+    # 创建添加 2D 按钮并将其点击事件与 save_point_image 函数绑定
+    add_2d_button = create_button(viewer, 'add 2D label', 'add', 'white', 4)
+    add_2d_button.clicked.connect(lambda: save_point_image(viewer))
+
 
 def register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('p', overwrite=True)
     def save_point_image(viewer):
         threading.Thread(target=save_and_update_add_6pts, args=(viewer, root_dir, new_json_file_path)).start()
+    # 创建添加 6pts 按钮并将其点击事件与 save_and_update_add_6pts 函数绑定
+    add_6pts_button = create_button(viewer, 'add 6pts label', 'polygon_lasso', 'yellow', 5)
+    add_6pts_button.clicked.connect(lambda: threading.Thread(target=save_and_update_add_6pts, args=(viewer, root_dir, new_json_file_path)).start())
+
+
+def create_button(viewer, label, icon_key, icon_color, position):
+    '''Creates a button with the specified label, icon, and color, and inserts it into the viewer's layout'''
+    button = QtViewerPushButton(label)
+    icon_path = ICONS.get(icon_key)
+    icon = change_icon_color(icon_path, icon_color)
+    button.setIcon(icon)
+    
+    # 将按钮插入到布局中
+    layer_buttons = viewer.window.qt_viewer.layerButtons
+    layer_buttons.layout().insertWidget(position, button)
+    
+    return button
+
+def change_icon_color(icon_path, color):
+    from qtpy.QtGui import QPixmap, QPainter, QColor, QIcon
+    pixmap = QPixmap(icon_path)
+    painter = QPainter(pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+    painter.fillRect(pixmap.rect(), QColor(color))
+    painter.end()
+    return QIcon(pixmap)
+
+def add_button_and_register_add_and_delete(viewer, root_dir, new_json_file_path):
+    register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
+    
+    layer_buttons = viewer.window.qt_viewer.layerButtons
+
+    # 删除位置在1，2，3的按钮
+    for i in [2, 1, 0]:
+        item = layer_buttons.layout().takeAt(i)
+        if item is not None:
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
 def main(tomo_dir):
     pid = os.getpid()
@@ -268,10 +332,7 @@ def main(tomo_dir):
     viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
     viewer.layers['edit vesicles'].mode = 'ADD'
 
-    register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
+    add_button_and_register_add_and_delete(viewer, root_dir, new_json_file_path)
     napari.run()
     
     os.system('mv {} {}'.format(new_json_file_path, json_file_path))
