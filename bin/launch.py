@@ -8,13 +8,18 @@ import mrcfile
 import threading
 import numpy as np
 
+from qtpy import QtCore, QtWidgets
 from scipy.spatial import KDTree
 from skimage.morphology import closing, cube
+from napari import Viewer
+from napari.settings import get_settings
 from napari.utils.notifications import show_info
+from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
+from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
-
+import center_cross
 
 
 def get_tomo(path):
@@ -238,12 +243,26 @@ def main(tomo_dir):
     tomo = get_tomo(isonet_tomo_path)
     mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
 
+    # change increment dims shortcuts
+    settings = get_settings()
+    settings.shortcuts.shortcuts['napari:increment_dims_left'] = ['PageUp']
+    settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageDown']
     # set default interface
-    viewer = napari.Viewer()
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
+    viewer = Viewer()
+    main_viewer = viewer.window.qt_viewer.parentWidget()
+    dock_widget = MultipleViewerWidget(viewer)
+    cross = CrossWidget(viewer)
+    main_viewer.layout().addWidget(dock_widget)
+    viewer.window.add_dock_widget(cross, name="Cross", area="left")
     
     viewer.add_labels(get_tomo(label_path).astype(np.int16), name='label')  # add label layer
     viewer.add_image(get_tomo(isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
     viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
+    
+    # ls： The window will not automatically adjust for now; manually resize to set an appropriate value
+    dock_widget.viewer_model1.camera.zoom = 1.95
+    dock_widget.viewer_model2.camera.zoom = 1.5
     
     viewer.layers['corrected_tomo'].opacity = 0.5
     viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
