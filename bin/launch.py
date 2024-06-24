@@ -25,6 +25,11 @@ from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath
 import center_cross
 
 
+# 定义一个全局的 print_in_widget 函数
+def print_in_widget(message):
+    if dock_widget:
+        dock_widget.message_signal.emit(message)
+
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
@@ -161,6 +166,7 @@ def save_and_update_delete(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Deleted', vesicle_to_add=None)
+        print_in_widget("Delete label.")
 
 def create_delete_button(viewer):
     '''Creates a delete button with the specified icon and inserts it into the viewer's layout'''
@@ -195,6 +201,7 @@ def save_and_update_add(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
+        print_in_widget("Add 3d label.")
 
 def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
     if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
@@ -206,6 +213,7 @@ def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
+        print_in_widget("Add 2d label.")
 
 def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
     if len(viewer.layers[POINT_LAYER_IDX].data) < 6:
@@ -217,6 +225,7 @@ def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
+        print_in_widget("Add 6pts label.")
 
 def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('g', overwrite=True)
@@ -266,7 +275,7 @@ def change_icon_color(icon_path, color):
     painter.end()
     return QIcon(pixmap)
 
-def add_button_and_register_add_and_delete(viewer, root_dir, new_json_file_path):
+def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_file_path):
     register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
@@ -305,8 +314,10 @@ def main(tomo_dir):
     settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageDown']
     # set default interface
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
+    # viewer = Viewer()
     viewer = Viewer()
     main_viewer = viewer.window.qt_viewer.parentWidget()
+    global dock_widget
     dock_widget = MultipleViewerWidget(viewer)
     cross = CrossWidget(viewer)
     main_viewer.layout().addWidget(dock_widget)
@@ -324,13 +335,16 @@ def main(tomo_dir):
     viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
     viewer.layers['edit vesicles'].mode = 'ADD'
 
+    dock_widget.utils_widget.print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
+    dock_widget.utils_widget.print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+    
     add_button_and_register_add_and_delete(viewer, root_dir, tomo_path.new_json_file_path)
+    
     napari.run()
     
     os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
     os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
     os.system('rm -r {}'.format(root_dir))
-
 
 if __name__ == '__main__':
     

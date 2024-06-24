@@ -2,6 +2,7 @@ import sys
 from packaging.version import parse as parse_version
 from copy import deepcopy
 import numpy as np
+from datetime import datetime
 from qtpy.QtWidgets import (
     QCheckBox,
     QGridLayout,
@@ -12,7 +13,7 @@ from qtpy.QtWidgets import (
     QMainWindow
 )
 from qtpy.QtCore import QProcess, QByteArray, Qt, QEvent, Signal, QObject
-from qtpy import uic, QtGui
+from qtpy import uic, QtGui, QtCore
 from superqt.utils import qthrottled
 import napari
 from napari.components.layerlist import Extent
@@ -24,11 +25,14 @@ from napari.utils.events.event import WarningEmitter
 from napari.utils.action_manager import action_manager
 from resource.Ui_utils_widge import Ui_Form
 
-class EmittingStream(QObject):
-    textWritten = Signal(str)
+# class EmittingStream(QObject):
+#     textWritten = Signal(str)
 
-    def write(self, text):
-        self.textWritten.emit(str(text))
+#     def write(self, text):
+#         self.textWritten.emit(str(text))
+        
+#     def flush(self):
+#         pass  # We don't need to implement flush for this example
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
@@ -42,18 +46,28 @@ class UtilWidge(QWidget):
         self.update_progress_stage()
         # self.start_terminal_process()
         
-        sys.stdout = EmittingStream(textWritten=self.write_to_terminal)
-        sys.stderr = EmittingStream(textWritten=self.write_to_terminal)
-
+        # sys.stdout = EmittingStream(textWritten=self.write_to_terminal)
+        # sys.stderr = EmittingStream(textWritten=self.write_to_terminal)
+        
+        # Example usage
+        print("Welcome to the Vesicle Segmentation Software, version 0.1.")
+        print("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+        
     def update_progress_stage(self):
         # 将全局变量的内容显示在 QTextEdit 中
         from launch import TOMO_SEGMENTATION_PROGRESS
         self.ui.progressStage.setText(str(TOMO_SEGMENTATION_PROGRESS))
         
-    def write_to_terminal(self, text):
-        self.ui.terminal.append(text)
-        self.ui.terminal.moveCursor(QtGui.QTextCursor.End)
-        self.ui.terminal.ensureCursorVisible()
+    @QtCore.Slot(str)  # 标记这个方法是一个槽
+    def print_in_widget(self, text):
+        # self.ui.terminal.append(text)
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.ui.terminal.append(f"[{current_time}] {text}")
+        
+    # def write_to_terminal(self, text):
+    #     self.ui.terminal.append(text)
+    #     self.ui.terminal.moveCursor(QtGui.QTextCursor.End)
+    #     self.ui.terminal.ensureCursorVisible()
     
 
 def copy_layer_le_4_16(layer: Layer, name: str = ""):
@@ -203,6 +217,7 @@ class CrossWidget(QCheckBox):
 
 
 class MultipleViewerWidget(QWidget):
+    message_signal = QtCore.Signal(str)  # 定义一个信号
     def __init__(self, viewer: napari.Viewer) -> None:
         super().__init__()
         self.viewer = viewer
@@ -242,6 +257,12 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model1.events.status.connect(self._status_update)
         self.viewer_model2.events.status.connect(self._status_update)
         self.viewer_model3.events.status.connect(self._status_update)
+        
+        # 连接信号到槽
+        self.message_signal.connect(self.utils_widget.print_in_widget)
+        
+    def print_in_widget(self, text):
+        self.utils_widget.print_in_widget(text)
         
 
     def show_deconvolution_widget(self):
