@@ -12,7 +12,8 @@ from qtpy.QtWidgets import (
     QApplication, 
     QVBoxLayout, 
     QMainWindow,
-    QTextBrowser
+    QTextBrowser,
+    QTextEdit
 )
 from qtpy.QtCore import QProcess, QByteArray, Qt, QEvent, Signal, QObject
 from qtpy import uic, QtGui, QtCore
@@ -27,36 +28,13 @@ from napari.utils.events.event import WarningEmitter
 from napari.utils.action_manager import action_manager
 from resource.Ui_utils_widge import Ui_Form
 
-# class EmittingStream(QObject):
-#     textWritten = Signal(str)
-
-#     def write(self, text):
-#         self.textWritten.emit(str(text))
-        
-#     def flush(self):
-#         pass  # We don't need to implement flush for this example
-
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
-
-class HelpWindow(QWidget):
-    def __init__(self, markdown_file):
-        super().__init__()
-        self.setWindowTitle("Help Documentation")
-        self.setGeometry(100, 100, 600, 400)
-
-        layout = QVBoxLayout()
-        self.text_browser = QTextBrowser()
-        layout.addWidget(self.text_browser)
-
-        self.setLayout(layout)
-
-        with open(markdown_file, 'r') as file:
-            markdown_content = file.read()
-            self.text_browser.setMarkdown(markdown_content)
+      
 class UtilWidge(QWidget):
-    def __init__(self):
+    def __init__(self, viewer: napari.Viewer) -> None:
         super().__init__()
+        self.viewer = viewer
         self.ui = Ui_Form()
         self.ui.setupUi(self)
         self.update_progress_stage()
@@ -76,10 +54,37 @@ class UtilWidge(QWidget):
     def show_help(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         markdown_file = os.path.join(script_dir, 'resource', 'help.md')
-        help_window = HelpWindow(markdown_file)
-        help_window.show()
-        help_window.raise_()  # 确保窗口出现在最前面
-        self.help_windows.append(help_window)  # 防止窗口被垃圾回收
+
+        # 创建一个新的 QMainWindow
+        self.help_window = QMainWindow(self.viewer.window.qt_viewer)
+        self.help_window.setWindowTitle("Help Documentation")
+        self.help_window.setGeometry(100, 100, 600, 400)
+
+        # 创建一个空的 QWidget
+        central_widget = QWidget(self.help_window)
+        self.help_window.setCentralWidget(central_widget)
+
+        # 创建布局
+        layout = QVBoxLayout(central_widget)
+
+        # 创建 QTextBrowser 显示 .md 文件内容
+        text_browser = QTextBrowser(self.help_window)
+        
+        # 读取 .md 文件内容
+        with open(markdown_file, 'r') as file:
+            markdown_content = file.read()
+        
+        # 设置 .md 文件内容到 QTextBrowser
+        text_browser.setMarkdown(markdown_content)
+
+        # 添加 QTextBrowser 到布局
+        layout.addWidget(text_browser)
+
+        # 显示窗口
+        self.help_window.show()
+        self.help_window.raise_()  # 确保窗口出现在最前面
+        self.help_windows.append(self.help_window)  # 防止窗口被垃圾回收
+
     
     help_windows = []
 
@@ -244,7 +249,7 @@ class MultipleViewerWidget(QWidget):
         self.qt_viewer3 = viewer.window.qt_viewer
         
         # self.utils_widget = QWidget()
-        self.utils_widget = UtilWidge()
+        self.utils_widget = UtilWidge(self.viewer)
         # uic.loadUi('resource/utils_widge.ui', self.utils_widget)
         
         grid_layout = QGridLayout()
