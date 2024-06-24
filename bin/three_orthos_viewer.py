@@ -1,4 +1,5 @@
 import sys
+import os
 from packaging.version import parse as parse_version
 from copy import deepcopy
 import numpy as np
@@ -10,7 +11,8 @@ from qtpy.QtWidgets import (
     QPushButton,
     QApplication, 
     QVBoxLayout, 
-    QMainWindow
+    QMainWindow,
+    QTextBrowser
 )
 from qtpy.QtCore import QProcess, QByteArray, Qt, QEvent, Signal, QObject
 from qtpy import uic, QtGui, QtCore
@@ -37,21 +39,28 @@ from resource.Ui_utils_widge import Ui_Form
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
 
+class HelpWindow(QWidget):
+    def __init__(self, markdown_file):
+        super().__init__()
+        self.setWindowTitle("Help Documentation")
+        self.setGeometry(100, 100, 600, 400)
 
+        layout = QVBoxLayout()
+        self.text_browser = QTextBrowser()
+        layout.addWidget(self.text_browser)
+
+        self.setLayout(layout)
+
+        with open(markdown_file, 'r') as file:
+            markdown_content = file.read()
+            self.text_browser.setMarkdown(markdown_content)
 class UtilWidge(QWidget):
     def __init__(self):
         super().__init__()
         self.ui = Ui_Form()
         self.ui.setupUi(self)
         self.update_progress_stage()
-        # self.start_terminal_process()
-        
-        # sys.stdout = EmittingStream(textWritten=self.write_to_terminal)
-        # sys.stderr = EmittingStream(textWritten=self.write_to_terminal)
-        
-        # Example usage
-        print("Welcome to the Vesicle Segmentation Software, version 0.1.")
-        print("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+        self.ui.help.clicked.connect(self.show_help)
         
     def update_progress_stage(self):
         # 将全局变量的内容显示在 QTextEdit 中
@@ -64,11 +73,15 @@ class UtilWidge(QWidget):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.ui.terminal.append(f"[{current_time}] {text}")
         
-    # def write_to_terminal(self, text):
-    #     self.ui.terminal.append(text)
-    #     self.ui.terminal.moveCursor(QtGui.QTextCursor.End)
-    #     self.ui.terminal.ensureCursorVisible()
+    def show_help(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        markdown_file = os.path.join(script_dir, 'resource', 'help.md')
+        help_window = HelpWindow(markdown_file)
+        help_window.show()
+        help_window.raise_()  # 确保窗口出现在最前面
+        self.help_windows.append(help_window)  # 防止窗口被垃圾回收
     
+    help_windows = []
 
 def copy_layer_le_4_16(layer: Layer, name: str = ""):
     """
