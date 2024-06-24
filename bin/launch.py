@@ -24,8 +24,6 @@ from morph import density_fit, density_fit_2d, fit_6pts, dis
 from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath
 import center_cross
 
-
-# 定义一个全局的 print_in_widget 函数
 def print_in_widget(message):
     if dock_widget:
         dock_widget.message_signal.emit(message)
@@ -335,8 +333,8 @@ def main(tomo_dir):
     viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
     viewer.layers['edit vesicles'].mode = 'ADD'
 
-    dock_widget.utils_widget.print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
-    dock_widget.utils_widget.print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+    print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
+    print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
     
     add_button_and_register_add_and_delete(viewer, root_dir, tomo_path.new_json_file_path)
     
