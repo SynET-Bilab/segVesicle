@@ -17,9 +17,11 @@ from napari.resources import ICONS
 from napari.utils.notifications import show_info
 from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
+from enum import Enum
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
+from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath
 import center_cross
 
 
@@ -27,7 +29,6 @@ def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
     return data
-
 
 def vesicle_rendering(vesicle_info, tomo_dims, idx):
     
@@ -286,25 +287,16 @@ def main(tomo_dir):
     root_dir = os.path.abspath('temp') + '/'
     if not os.path.exists(root_dir):
         os.makedirs(root_dir)
-    ori_tomo_path = os.path.abspath(tomo_dir + '_wbp.mrc')
-    deconv_tomo_path = os.path.abspath('tomoset/' + tomo_dir + '_dec.mrc')
-    isonet_tomo_path = os.path.abspath(tomo_dir + '_wbp_corrected.mrc')
-    segment_path = os.path.abspath(tomo_dir + '_segment.mrc')
-    label_path = os.path.abspath(tomo_dir + '_label_vesicle.mrc')
-    json_file_path = os.path.abspath(tomo_dir + '_vesicle.json')
-    new_json_file_path = root_dir + 'vesicle_new_{}.json'.format(pid)
-    new_label_file_path = root_dir + 'label_{}.mrc'.format(pid)
-    ori_json_file_path = os.path.abspath(tomo_dir + '_vesicle_ori.json')
-    ori_label_path = os.path.abspath(tomo_dir + '_label_vesicle_ori.mrc')
+    tomo_path=TomoPath(tomo_dir, root_dir, pid)
 
-    os.system('cp {} {}'.format(json_file_path, new_json_file_path))
-    if not os.path.exists(ori_label_path):
-        os.system('cp {} {}'.format(label_path, ori_label_path))
-        os.system('cp {} {}'.format(json_file_path, ori_json_file_path))
+    os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.new_json_file_path))
+    if not os.path.exists(tomo_path.ori_label_path):
+        os.system('cp {} {}'.format(tomo_path.label_path, tomo_path.ori_label_path))
+        os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.ori_json_file_path))
     
     # calculate contrast limits
     lambda_scale = 0.35
-    tomo = get_tomo(isonet_tomo_path)
+    tomo = get_tomo(tomo_path.isonet_tomo_path)
     mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
 
     # change increment dims shortcuts
@@ -320,11 +312,11 @@ def main(tomo_dir):
     main_viewer.layout().addWidget(dock_widget)
     viewer.window.add_dock_widget(cross, name="Cross", area="left")
     
-    viewer.add_labels(get_tomo(label_path).astype(np.int16), name='label')  # add label layer
-    viewer.add_image(get_tomo(isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
+    viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+    viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
     viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
     
-    # ls： The window will not automatically adjust for now; manually resize to set an appropriate value
+    # ls： The window will not automatically adjust for now; manually zoom to set an appropriate value
     dock_widget.viewer_model1.camera.zoom = 1.95
     dock_widget.viewer_model2.camera.zoom = 1.5
     
@@ -332,11 +324,11 @@ def main(tomo_dir):
     viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
     viewer.layers['edit vesicles'].mode = 'ADD'
 
-    add_button_and_register_add_and_delete(viewer, root_dir, new_json_file_path)
+    add_button_and_register_add_and_delete(viewer, root_dir, tomo_path.new_json_file_path)
     napari.run()
     
-    os.system('mv {} {}'.format(new_json_file_path, json_file_path))
-    os.system('mv {} {}'.format(new_label_file_path, label_path))
+    os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
+    os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
     os.system('rm -r {}'.format(root_dir))
 
 
@@ -349,5 +341,6 @@ if __name__ == '__main__':
     NUM_POINT = 0
     global added_vesicle_num
     added_vesicle_num = 0
+    
 
     fire.Fire(main)
