@@ -1,3 +1,4 @@
+import sys
 from packaging.version import parse as parse_version
 from copy import deepcopy
 import numpy as np
@@ -10,7 +11,8 @@ from qtpy.QtWidgets import (
     QVBoxLayout, 
     QMainWindow
 )
-from qtpy import uic
+from qtpy.QtCore import QProcess, QByteArray, Qt, QEvent, Signal, QObject
+from qtpy import uic, QtGui
 from superqt.utils import qthrottled
 import napari
 from napari.components.layerlist import Extent
@@ -20,10 +22,39 @@ from napari.qt import QtViewer
 from napari.utils.notifications import show_info
 from napari.utils.events.event import WarningEmitter
 from napari.utils.action_manager import action_manager
+from resource.Ui_utils_widge import Ui_Form
+
+class EmittingStream(QObject):
+    textWritten = Signal(str)
+
+    def write(self, text):
+        self.textWritten.emit(str(text))
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
 
+
+class UtilWidge(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.ui = Ui_Form()
+        self.ui.setupUi(self)
+        self.update_progress_stage()
+        # self.start_terminal_process()
+        
+        sys.stdout = EmittingStream(textWritten=self.write_to_terminal)
+        sys.stderr = EmittingStream(textWritten=self.write_to_terminal)
+
+    def update_progress_stage(self):
+        # 将全局变量的内容显示在 QTextEdit 中
+        from launch import TOMO_SEGMENTATION_PROGRESS
+        self.ui.progressStage.setText(str(TOMO_SEGMENTATION_PROGRESS))
+        
+    def write_to_terminal(self, text):
+        self.ui.terminal.append(text)
+        self.ui.terminal.moveCursor(QtGui.QTextCursor.End)
+        self.ui.terminal.ensureCursorVisible()
+    
 
 def copy_layer_le_4_16(layer: Layer, name: str = ""):
     """
@@ -135,7 +166,7 @@ class CrossWidget(QCheckBox):
         '''
         if self.layer in self.viewer.layers:
             self.viewer.layers.remove(self.layer)
-        self.layer = Vectors(name=".cross", ndim=event.value, vector_style='line')
+        self.layer = Vectors(name=".cross", ndim=event.value, vector_style='line', edge_color='yellow')
         self.layer.edge_width = 1.5
         self.update_cross()
 
@@ -145,6 +176,7 @@ class CrossWidget(QCheckBox):
         """
         if state:
             self.viewer.layers.append(self.layer)
+            self.viewer.layers.move(self.viewer.layers.index(self.layer), 0)
         else:
             self.viewer.layers.remove(self.layer)
         self.update_cross()
@@ -182,15 +214,13 @@ class MultipleViewerWidget(QWidget):
         self.qt_viewer1 = QtViewerWrap(viewer, self.viewer_model1)
         self.qt_viewer2 = QtViewerWrap(viewer, self.viewer_model2)
         self.qt_viewer3 = viewer.window.qt_viewer
-        empty_widget = QWidget()
-        # 添加按钮到 empty_widget 中
-        self.button = QPushButton("Open Deconvolution Widget", empty_widget)
-        self.empty_widget_layout = QGridLayout(empty_widget)
-        self.empty_widget_layout.addWidget(self.button, 0, 0)
         
-        # uic.loadUi('/Users/shor/Documents/napari_demo/resourse/deconvolution.ui', empty_widget)
+        # self.utils_widget = QWidget()
+        self.utils_widget = UtilWidge()
+        # uic.loadUi('resource/utils_widge.ui', self.utils_widget)
+        
         grid_layout = QGridLayout()
-        grid_layout.addWidget(empty_widget, 0, 1)
+        grid_layout.addWidget(self.utils_widget, 0, 1)
         grid_layout.addWidget(self.qt_viewer1, 0, 0)
         grid_layout.addWidget(self.qt_viewer2, 1, 1)
         grid_layout.addWidget(self.qt_viewer3, 1, 0)
@@ -213,8 +243,6 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model2.events.status.connect(self._status_update)
         self.viewer_model3.events.status.connect(self._status_update)
         
-        # 连接按钮点击信号到槽函数
-        self.button.clicked.connect(self.show_deconvolution_widget)
 
     def show_deconvolution_widget(self):
         # # 创建空的 QWidget
