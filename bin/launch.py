@@ -388,8 +388,8 @@ def main(tomo_dir):
 
     # change increment dims shortcuts
     settings = get_settings()
-    settings.shortcuts.shortcuts['napari:increment_dims_left'] = ['PageUp']
-    settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageDown']
+    settings.shortcuts.shortcuts['napari:increment_dims_left'] = ['PageDown']
+    settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageUp']
     # set default interface
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
     global global_viewer
