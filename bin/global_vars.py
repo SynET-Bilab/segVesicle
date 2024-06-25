@@ -51,4 +51,4 @@ class TomoPath:
 
 # 全局变量
 TOMO_SEGMENTATION_PROGRESS = ProgressStage.ISO_NET
-viewer = None
+global_viewer = None

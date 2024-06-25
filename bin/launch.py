@@ -22,7 +22,7 @@ from enum import Enum
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
-from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, viewer
+from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, global_viewer
 import center_cross
 
 # 定义一个类来管理标签层的历史状态
@@ -271,6 +271,7 @@ def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
     add_button = create_button(viewer, 'add 3D label', 'add', 'yellow', 3)
     add_button.clicked.connect(lambda: save_point_image(viewer))
     
+    
 def register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('f', overwrite=True)
     def save_point_image(viewer):
@@ -391,41 +392,37 @@ def main(tomo_dir):
     settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageDown']
     # set default interface
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
-    global viewer
-    viewer = Viewer()
-    main_viewer = viewer.window.qt_viewer.parentWidget()
+    global global_viewer
+    global_viewer = Viewer()
+    main_viewer = global_viewer.window.qt_viewer.parentWidget()
     global dock_widget
-    dock_widget = MultipleViewerWidget(viewer)
-    cross = CrossWidget(viewer)
+    dock_widget = MultipleViewerWidget(global_viewer)
+    cross = CrossWidget(global_viewer)
     main_viewer.layout().addWidget(dock_widget)
-    viewer.window.add_dock_widget(cross, name="Cross", area="left")
+    global_viewer.window.add_dock_widget(cross, name="Cross", area="left")
     
     # viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
-    label_layer = viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+    label_layer = global_viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
     global label_history
     label_history = LabelHistory(label_layer)
     
-    # 在标签层数据更改时保存历史状态
-    @label_layer.mouse_drag_callbacks.append
-    def save_state_on_edit(layer, event):
-        label_history.save_state()
-    
+    label_history.save_state()
     
     # 监听键盘事件，实现撤销和重做操作
-    @viewer.bind_key('Control-z')
+    @global_viewer.bind_key('Control-z')
     def undo(viewer):
         label_history.undo()
 
-    @viewer.bind_key('Control-Shift-z')
+    @global_viewer.bind_key('Control-Shift-z')
     def redo(viewer):
         label_history.redo()
     
-    viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
-    viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
+    global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
+    global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
     
-    viewer.layers['corrected_tomo'].opacity = 0.5
-    viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
-    viewer.layers['edit vesicles'].mode = 'ADD'
+    global_viewer.layers['corrected_tomo'].opacity = 0.5
+    global_viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
+    global_viewer.layers['edit vesicles'].mode = 'ADD'
     # viewer.add_image(get_tomo(tomo_path.ori_tomo_path), name='ori_tomo')
     # viewer.layers[ORI_LAYER_IDX].opacity = 0.5
     # viewer.layers[ORI_LAYER_IDX].contrast_limits = [mi, ma]
@@ -437,7 +434,7 @@ def main(tomo_dir):
     print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
     print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
     
-    add_button_and_register_add_and_delete(viewer, root_dir, tomo_path.new_json_file_path)
+    add_button_and_register_add_and_delete(global_viewer, root_dir, tomo_path.new_json_file_path)
     
     napari.run()
     
