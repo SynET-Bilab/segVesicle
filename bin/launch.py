@@ -17,12 +17,37 @@ from napari.resources import ICONS
 from napari.utils.notifications import show_info
 from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
+from IsoNet.util.deconvolution import deconv_one
 from enum import Enum
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
-from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath
+from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, viewer
 import center_cross
+
+# 定义一个类来管理标签层的历史状态
+class LabelHistory:
+    def __init__(self, layer):
+        self.layer = layer
+        self.history = []
+        self.index = -1
+        self.max_history = 10  # 可以根据需要调整历史记录的最大数量
+
+    def save_state(self):
+        if len(self.history) >= self.max_history:
+            self.history.pop(0)
+        self.history.append(self.layer.data.copy())
+        self.index = len(self.history) - 1
+
+    def undo(self):
+        if self.index > 0:
+            self.index -= 1
+            self.layer.data = self.history[self.index]
+
+    def redo(self):
+        if self.index < len(self.history) - 1:
+            self.index += 1
+            self.layer.data = self.history[self.index]
 
 def print_in_widget(message):
     if dock_widget:
@@ -165,6 +190,9 @@ def save_and_update_delete(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Deleted', vesicle_to_add=None)
         print_in_widget("Delete label.")
+        global label_history
+        label_history.save_state()
+
 
 def create_delete_button(viewer):
     '''Creates a delete button with the specified icon and inserts it into the viewer's layout'''
@@ -178,6 +206,7 @@ def create_delete_button(viewer):
     layer_buttons.layout().insertWidget(6, del_button)
     
     return del_button
+
 
 def register_save_shortcut_delete(viewer, root_dir, new_json_file_path):
     '''press 'd' to save the point to delete and save the new label layer
@@ -200,6 +229,9 @@ def save_and_update_add(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 3d label.")
+        global label_history
+        label_history.save_state()
+
 
 def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
     if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
@@ -212,7 +244,10 @@ def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 2d label.")
-
+        global label_history
+        label_history.save_state()
+        
+        
 def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
     if len(viewer.layers[POINT_LAYER_IDX].data) < 6:
         show_info('Please add 6 points to fit a vesicle')
@@ -224,6 +259,9 @@ def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 6pts label.")
+        global label_history
+        label_history.save_state()
+
 
 def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('g', overwrite=True)
@@ -353,6 +391,7 @@ def main(tomo_dir):
     settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageDown']
     # set default interface
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
+    global viewer
     viewer = Viewer()
     main_viewer = viewer.window.qt_viewer.parentWidget()
     global dock_widget
@@ -361,17 +400,39 @@ def main(tomo_dir):
     main_viewer.layout().addWidget(dock_widget)
     viewer.window.add_dock_widget(cross, name="Cross", area="left")
     
-    viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+    # viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+    label_layer = viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+    global label_history
+    label_history = LabelHistory(label_layer)
+    
+    # 在标签层数据更改时保存历史状态
+    @label_layer.mouse_drag_callbacks.append
+    def save_state_on_edit(layer, event):
+        label_history.save_state()
+    
+    
+    # 监听键盘事件，实现撤销和重做操作
+    @viewer.bind_key('Control-z')
+    def undo(viewer):
+        label_history.undo()
+
+    @viewer.bind_key('Control-Shift-z')
+    def redo(viewer):
+        label_history.redo()
+    
     viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
     viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
-    
-    # ls： The window will not automatically adjust for now; manually zoom to set an appropriate value
-    dock_widget.viewer_model1.camera.zoom = 1.95
-    dock_widget.viewer_model2.camera.zoom = 1.5
     
     viewer.layers['corrected_tomo'].opacity = 0.5
     viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
     viewer.layers['edit vesicles'].mode = 'ADD'
+    # viewer.add_image(get_tomo(tomo_path.ori_tomo_path), name='ori_tomo')
+    # viewer.layers[ORI_LAYER_IDX].opacity = 0.5
+    # viewer.layers[ORI_LAYER_IDX].contrast_limits = [mi, ma]
+    
+    # ls： The window will not automatically adjust for now; manually zoom to set an appropriate value
+    dock_widget.viewer_model1.camera.zoom = 1.95
+    dock_widget.viewer_model2.camera.zoom = 1.5
 
     print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
     print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
@@ -392,9 +453,10 @@ if __name__ == '__main__':
     # POINT_LAYER_IDX = 2
     LABEL_LAYER_IDX = 'label'
     POINT_LAYER_IDX = 'edit vesicles'
+    ORI_LAYER_IDX = 'ori_tomo'
     NUM_POINT = 0
     global added_vesicle_num
     added_vesicle_num = 0
-    
+    label_history = None
 
     fire.Fire(main)
