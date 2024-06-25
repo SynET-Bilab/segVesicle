@@ -27,6 +27,7 @@ from napari.utils.notifications import show_info
 from napari.utils.events.event import WarningEmitter
 from napari.utils.action_manager import action_manager
 from resource.Ui_utils_widge import Ui_Form
+from global_vars import global_viewer
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")

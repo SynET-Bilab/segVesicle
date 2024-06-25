@@ -214,7 +214,7 @@ def register_save_shortcut_delete(viewer, root_dir, new_json_file_path):
     @viewer.bind_key('d', overwrite=True)
     def save_label_image(viewer):
         threading.Thread(target=save_and_update_delete, args=(viewer, root_dir, new_json_file_path)).start()
-    del_button = create_button(viewer, 'delete label', 'delete', 'yellow', 6)
+    del_button = create_button(viewer, 'Delete label (Shortcut: d)', 'delete', 'yellow', 6)
     del_button.clicked.connect(lambda: save_label_image(viewer))
 
 
@@ -268,7 +268,7 @@ def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
     def save_point_image(viewer):
         threading.Thread(target=save_and_update_add, args=(viewer, root_dir, new_json_file_path)).start()
     # 创建添加按钮并将其点击事件与 save_point_image 函数绑定
-    add_button = create_button(viewer, 'add 3D label', 'add', 'yellow', 3)
+    add_button = create_button(viewer, 'Ddd 3D label (Shortcut: g)', 'add', 'yellow', 3)
     add_button.clicked.connect(lambda: save_point_image(viewer))
     
     
@@ -277,7 +277,7 @@ def register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path):
     def save_point_image(viewer):
         threading.Thread(target=save_and_update_add_2d, args=(viewer, root_dir, new_json_file_path)).start()
     # 创建添加 2D 按钮并将其点击事件与 save_point_image 函数绑定
-    add_2d_button = create_button(viewer, 'add 2D label', 'add', 'white', 4)
+    add_2d_button = create_button(viewer, 'Ddd 2D label (Shortcut: f)', 'add', 'white', 4)
     add_2d_button.clicked.connect(lambda: save_point_image(viewer))
 
 
@@ -286,7 +286,7 @@ def register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path):
     def save_point_image(viewer):
         threading.Thread(target=save_and_update_add_6pts, args=(viewer, root_dir, new_json_file_path)).start()
     # 创建添加 6pts 按钮并将其点击事件与 save_and_update_add_6pts 函数绑定
-    add_6pts_button = create_button(viewer, 'add 6pts label', 'polygon_lasso', 'yellow', 5)
+    add_6pts_button = create_button(viewer, 'add 6pts label (Shortcut: p)', 'polygon_lasso', 'yellow', 5)
     add_6pts_button.clicked.connect(lambda: threading.Thread(target=save_and_update_add_6pts, args=(viewer, root_dir, new_json_file_path)).start())
 
 
