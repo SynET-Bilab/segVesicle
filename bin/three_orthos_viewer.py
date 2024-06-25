@@ -15,7 +15,7 @@ from qtpy.QtWidgets import (
     QTextBrowser,
     QTextEdit
 )
-from qtpy.QtCore import QProcess, QByteArray, Qt, QEvent, Signal, QObject
+from qtpy.QtCore import QProcess, QByteArray, Qt, QEvent, Signal, QObject, QThread
 from qtpy import uic, QtGui, QtCore
 from superqt.utils import qthrottled
 import napari
@@ -32,6 +32,19 @@ from global_vars import global_viewer
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
       
+class Worker(QThread):
+    data_signal = Signal(object)
+
+    def __init__(self, func, *args, **kwargs):
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def run(self):
+        result = self.func(*self.args, **self.kwargs)
+        self.data_signal.emit(result)
+
 class UtilWidge(QWidget):
     def __init__(self, viewer: napari.Viewer) -> None:
         super().__init__()
@@ -277,6 +290,26 @@ class MultipleViewerWidget(QWidget):
         # 连接信号到槽
         self.message_signal.connect(self.utils_widget.print_in_widget)
         
+        self._threads = []
+        
+    def closeEvent(self, event):
+        self._stop_threads()
+        event.accept()
+        
+    def _execute_in_thread(self, func, *args):
+        worker = Worker(func, *args)
+        worker.data_signal.connect(self._thread_finished)
+        self._threads.append(worker)
+        worker.start()
+
+    def _stop_threads(self):
+        for thread in self._threads:
+            thread.quit()
+            thread.wait()
+
+    def _thread_finished(self, result):
+        pass
+    
     def print_in_widget(self, text):
         self.utils_widget.print_in_widget(text)
         
@@ -342,15 +375,31 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model3.layers.selection.active = self.viewer_model3.layers[event.value.name]
 
     def _point_update(self, event):
+        self._execute_in_thread(self._update_points, event)
+        
+    def _thread_finished(self, result):
+        # 处理线程完成后的结果
+        pass
+        
+    def _update_points(self, event):
         '''
         更新当前步数: 将事件的当前步数值赋给3个 viewer 模型。
         '''
-        for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
-            if model.dims is event.source:
-                continue
-            if len(self.viewer.layers) != len(model.layers):
-                continue
-            model.dims.current_step = event.value
+        if self._block:
+            return
+        self._block = True
+        try:
+            for model in [self.viewer_model1, self.viewer_model2, self.viewer_model3]:
+                if model.dims is not event.source and len(self.viewer.layers) == len(model.layers):
+                    model.dims.current_step = event.value
+        finally:
+            self._block = False
+        # for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
+        #     if model.dims is event.source:
+        #         continue
+        #     if len(self.viewer.layers) != len(model.layers):
+        #         continue
+        #     model.dims.current_step = event.value
 
     def _order_update(self):
         '''
