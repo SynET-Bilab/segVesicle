@@ -290,25 +290,25 @@ class MultipleViewerWidget(QWidget):
         # 连接信号到槽
         self.message_signal.connect(self.utils_widget.print_in_widget)
         
-        self._threads = []
+        # self._threads = []
         
-    def closeEvent(self, event):
-        self._stop_threads()
-        event.accept()
+    # def closeEvent(self, event):
+    #     self._stop_threads()
+    #     event.accept()
         
-    def _execute_in_thread(self, func, *args):
-        worker = Worker(func, *args)
-        worker.data_signal.connect(self._thread_finished)
-        self._threads.append(worker)
-        worker.start()
+    # def _execute_in_thread(self, func, *args):
+    #     worker = Worker(func, *args)
+    #     worker.data_signal.connect(self._thread_finished)
+    #     self._threads.append(worker)
+    #     worker.start()
 
-    def _stop_threads(self):
-        for thread in self._threads:
-            thread.quit()
-            thread.wait()
+    # def _stop_threads(self):
+    #     for thread in self._threads:
+    #         thread.quit()
+    #         thread.wait()
 
-    def _thread_finished(self, result):
-        pass
+    # def _thread_finished(self, result):
+    #     pass
     
     def print_in_widget(self, text):
         self.utils_widget.print_in_widget(text)
@@ -375,13 +375,10 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model3.layers.selection.active = self.viewer_model3.layers[event.value.name]
 
     def _point_update(self, event):
-        self._execute_in_thread(self._update_points, event)
+    #     self._execute_in_thread(self._update_points, event)
         
-    def _thread_finished(self, result):
-        # 处理线程完成后的结果
-        pass
         
-    def _update_points(self, event):
+    # def _update_points(self, event):
         '''
         更新当前步数: 将事件的当前步数值赋给3个 viewer 模型。
         '''
