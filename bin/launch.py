@@ -264,6 +264,7 @@ def create_button(viewer, label, icon_key, icon_color, position):
     
     return button
 
+
 def change_icon_color(icon_path, color):
     from qtpy.QtGui import QPixmap, QPainter, QColor, QIcon
     pixmap = QPixmap(icon_path)
@@ -273,11 +274,51 @@ def change_icon_color(icon_path, color):
     painter.end()
     return QIcon(pixmap)
 
+
+# def crop_image_with_two_points(viewer:Viewer):
+#     # 获取两个点的坐标
+#     if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
+#         show_info('Please add two points to define a vesicle')
+#     else:
+#         points = save_point_layer(viewer, POINT_LAYER_IDX, mode='Added')
+#         # 计算剪裁区域
+#         p1 = points[0]  # 点的格式是 (z, y, x)
+#         p2 = points[1]
+#         z_val = int(round(p1[0]))  # 两个点的 Z 值相同
+#         min_y, min_x = np.min([p1[1:], p2[1:]], axis=0)
+#         max_y, max_x = np.max([p1[1:], p2[1:]], axis=0)
+#                 # 确保坐标是整数
+#         min_y, min_x = int(min_y), int(min_x)
+#         max_y, max_x = int(max_y), int(max_x)
+#         # 获取图像数据
+#         image_data = viewer.layers['corrected_tomo'].data
+#         # 确定 Z 轴上的剪裁范围
+#         min_z = max(0, z_val - 50)
+#         max_z = min(image_data.shape[0], z_val + 50)
+#         z_size = image_data.shape[0]
+#         # 确定 Z 轴上的剪裁范围
+#         min_z = max(0, z_val - 25)
+#         max_z = min(z_size, z_val + 25 + 1)  # 加1以确保包含第z_val + 50切片
+#         # 剪裁图像
+#         cropped_image = image_data[min_z:max_z, min_y:max_y + 1, min_x:max_x + 1]
+#         # 显示剪裁后的图像
+#         viewer.add_image(cropped_image, name='Cropped Image')
+#         # 清空点坐标
+#         viewer.layers['edit vesicles'].data = np.empty((0, 3))  # 适应包含三个值的点格式
+
+
+# def register_shortcut_crop_image(viewer):
+#     @viewer.bind_key('l', overwrite=True)
+#     def save_point_image(viewer):
+#         crop_image_with_two_points(viewer)
+#         # threading.Thread(target=crop_image_with_two_points, args=(viewer,)).start()
+
 def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_file_path):
     register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
+    # register_shortcut_crop_image(viewer)
     
     layer_buttons = viewer.window.qt_viewer.layerButtons
 
@@ -312,7 +353,6 @@ def main(tomo_dir):
     settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageDown']
     # set default interface
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
-    # viewer = Viewer()
     viewer = Viewer()
     main_viewer = viewer.window.qt_viewer.parentWidget()
     global dock_widget
@@ -348,8 +388,10 @@ if __name__ == '__main__':
     
     # set default params
     LABEL_START = 10000  # large enough to avoid overlap with original label
-    LABEL_LAYER_IDX = 0
-    POINT_LAYER_IDX = 2
+    # LABEL_LAYER_IDX = 0
+    # POINT_LAYER_IDX = 2
+    LABEL_LAYER_IDX = 'label'
+    POINT_LAYER_IDX = 'edit vesicles'
     NUM_POINT = 0
     global added_vesicle_num
     added_vesicle_num = 0

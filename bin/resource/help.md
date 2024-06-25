@@ -1,6 +1,6 @@
 # Help Documentation
 
-This is the help documentation for the napari plugin.
+This is the help documentation.
 
 ## Features
 

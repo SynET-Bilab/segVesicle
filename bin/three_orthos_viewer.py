@@ -83,10 +83,7 @@ class UtilWidge(QWidget):
         # 显示窗口
         self.help_window.show()
         self.help_window.raise_()  # 确保窗口出现在最前面
-        self.help_windows.append(self.help_window)  # 防止窗口被垃圾回收
 
-    
-    help_windows = []
 
 def copy_layer_le_4_16(layer: Layer, name: str = ""):
     """
