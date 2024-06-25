@@ -19,7 +19,8 @@ class TomoPath:
         self.pid = pid
 
         # 初始化路径
-        self.ori_tomo_path = os.path.abspath(tomo_dir + '_wbp.mrc')
+        # self.ori_tomo_path = os.path.abspath(tomo_dir + '_wbp.mrc')
+        self.ori_tomo_path = os.path.abspath(os.path.join(os.pardir, tomo_dir + '-bin4-wbp.rec'))
         self.deconv_tomo_path = os.path.abspath('tomoset/' + tomo_dir + '_dec.mrc')
         self.isonet_tomo_path = os.path.abspath(tomo_dir + '_wbp_corrected.mrc')
         self.segment_path = os.path.abspath(tomo_dir + '_segment.mrc')
@@ -50,3 +51,4 @@ class TomoPath:
 
 # 全局变量
 TOMO_SEGMENTATION_PROGRESS = ProgressStage.ISO_NET
+viewer = None
