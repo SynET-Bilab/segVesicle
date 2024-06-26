@@ -1,6 +1,6 @@
 from enum import Enum
 import os
-
+import napari
 class ProgressStage(Enum):
     ISO_NET = 1
     ISO_NET_DECONV = 1.1
@@ -13,23 +13,23 @@ class ProgressStage(Enum):
         return self.name.replace("_", " ")
 
 class TomoPath:
-    def __init__(self, tomo_dir, root_dir, pid):
-        self.tomo_dir = tomo_dir
+    def __init__(self, tomo_name, root_dir, pid):
+        self.tomo_name = tomo_name
         self.root_dir = root_dir
         self.pid = pid
 
         # 初始化路径
         # self.ori_tomo_path = os.path.abspath(tomo_dir + '_wbp.mrc')
-        self.ori_tomo_path = os.path.abspath(os.path.join(os.pardir, tomo_dir + '-bin4-wbp.rec'))
-        self.deconv_tomo_path = os.path.abspath('tomoset/' + tomo_dir + '_dec.mrc')
-        self.isonet_tomo_path = os.path.abspath(tomo_dir + '_wbp_corrected.mrc')
-        self.segment_path = os.path.abspath(tomo_dir + '_segment.mrc')
-        self.label_path = os.path.abspath(tomo_dir + '_label_vesicle.mrc')
-        self.json_file_path = os.path.abspath(tomo_dir + '_vesicle.json')
+        self.ori_tomo_path = os.path.abspath(tomo_name + '/' + tomo_name + '-bin4-wbp.rec')
+        self.deconv_tomo_path = os.path.abspath(tomo_name  + '/ves_seg/' + 'tomoset/' + tomo_name + '_dec.mrc')
+        self.isonet_tomo_path = os.path.abspath(tomo_name  + '/ves_seg/'  + tomo_name + '_wbp_corrected.mrc')
+        self.segment_path = os.path.abspath(tomo_name  + '/ves_seg/'  + tomo_name + '_segment.mrc')
+        self.label_path = os.path.abspath(tomo_name  + '/ves_seg/'  + tomo_name + '_label_vesicle.mrc')
+        self.json_file_path = os.path.abspath(tomo_name  + '/ves_seg/'  + tomo_name + '_vesicle.json')
         self.new_json_file_path = os.path.join(root_dir, 'vesicle_new_{}.json'.format(pid))
         self.new_label_file_path = os.path.join(root_dir, 'label_{}.mrc'.format(pid))
-        self.ori_json_file_path = os.path.abspath(tomo_dir + '_vesicle_ori.json')
-        self.ori_label_path = os.path.abspath(tomo_dir + '_label_vesicle_ori.mrc')
+        self.ori_json_file_path = os.path.abspath(tomo_name  + '/ves_seg/'  + tomo_name + '_vesicle_ori.json')
+        self.ori_label_path = os.path.abspath(tomo_name  + '/ves_seg/'  + tomo_name + '_label_vesicle_ori.mrc')
 
         # 初始化进度
         self.determine_progress()
@@ -51,4 +51,4 @@ class TomoPath:
 
 # 全局变量
 TOMO_SEGMENTATION_PROGRESS = ProgressStage.ISO_NET
-global_viewer = None
+global_viewer = napari.Viewer()
