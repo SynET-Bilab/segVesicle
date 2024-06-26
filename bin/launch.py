@@ -363,7 +363,7 @@ def main():
     settings.shortcuts.shortcuts['napari:increment_dims_left'] = ['PageDown']
     settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageUp']
 
-    global global_viewer
+    # global global_viewer
     # global_viewer = Viewer()
 
     # 获取当前路径
@@ -378,14 +378,14 @@ def main():
     
     # label_history.save_state()
     
-    # 监听键盘事件，实现撤销和重做操作
-    @global_viewer.bind_key('Control-z')
-    def undo(viewer):
-        label_history.undo()
+    # # 监听键盘事件，实现撤销和重做操作
+    # @global_viewer.bind_key('Control-z')
+    # def undo(viewer):
+    #     label_history.undo()
 
-    @global_viewer.bind_key('Control-Shift-z')
-    def redo(viewer):
-        label_history.redo()
+    # @global_viewer.bind_key('Control-Shift-z')
+    # def redo(viewer):
+    #     label_history.redo()
     
     # global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
     # global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer

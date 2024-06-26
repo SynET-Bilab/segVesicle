@@ -30,28 +30,28 @@ global added_vesicle_num
 added_vesicle_num = 0
 label_history = None
 
-class LabelHistory:
-    def __init__(self, layer):
-        self.layer = layer
-        self.history = []
-        self.index = -1
-        self.max_history = 10  # 可以根据需要调整历史记录的最大数量
+# class LabelHistory:
+#     def __init__(self, layer):
+#         self.layer = layer
+#         self.history = []
+#         self.index = -1
+#         self.max_history = 10  # 可以根据需要调整历史记录的最大数量
 
-    def save_state(self):
-        if len(self.history) >= self.max_history:
-            self.history.pop(0)
-        self.history.append(self.layer.data.copy())
-        self.index = len(self.history) - 1
+#     def save_state(self):
+#         if len(self.history) >= self.max_history:
+#             self.history.pop(0)
+#         self.history.append(self.layer.data.copy())
+#         self.index = len(self.history) - 1
 
-    def undo(self):
-        if self.index > 0:
-            self.index -= 1
-            self.layer.data = self.history[self.index]
+#     def undo(self):
+#         if self.index > 0:
+#             self.index -= 1
+#             self.layer.data = self.history[self.index]
 
-    def redo(self):
-        if self.index < len(self.history) - 1:
-            self.index += 1
-            self.layer.data = self.history[self.index]
+#     def redo(self):
+#         if self.index < len(self.history) - 1:
+#             self.index += 1
+#             self.layer.data = self.history[self.index]
 
 def print_in_widget(message):
     pass
@@ -195,8 +195,8 @@ def save_and_update_delete(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Deleted', vesicle_to_add=None)
         print_in_widget("Delete label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
 
 
 def create_delete_button(viewer):
@@ -234,8 +234,8 @@ def save_and_update_add(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 3d label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
 
 
 def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
@@ -249,8 +249,8 @@ def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 2d label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
         
         
 def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
@@ -264,8 +264,8 @@ def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 6pts label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
 
 
 def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
@@ -380,6 +380,8 @@ class FolderListWidget(QWidget):
 
     def on_item_double_click(self, item):
         # 清除之前的层
+        global label_history
+        label_history = None
         def remove_layer_if_exists(viewer, layer_name):
             if layer_name in viewer.layers:
                 viewer.layers.remove(layer_name)
@@ -390,16 +392,16 @@ class FolderListWidget(QWidget):
         
         pid = os.getpid()
         item_name = item.text().strip()
-        root_dir = os.path.abspath(item_name) + '/temp/'
+        root_dir = os.path.abspath(item_name) + '/ves_seg/temp/'
         
-        # if not os.path.exists(root_dir):
-        #     os.makedirs(root_dir)
-        
+        if not os.path.exists(root_dir):
+            os.makedirs(root_dir)
         tomo_path=TomoPath(item_name, root_dir, pid)
         
-        print(tomo_path)
-        
-        # calculate contrast limits
+        os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.new_json_file_path))
+        if not os.path.exists(tomo_path.ori_label_path):
+            os.system('cp {} {}'.format(tomo_path.label_path, tomo_path.ori_label_path))
+            os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.ori_json_file_path))
         lambda_scale = 0.35
         tomo = get_tomo(tomo_path.isonet_tomo_path)
         mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
@@ -409,12 +411,21 @@ class FolderListWidget(QWidget):
         global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
         global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
     
+        # label_history = LabelHistory(label_layer)
+        # label_history.save_state()
+    
+        # # 监听键盘事件，实现撤销和重做操作
+        # @global_viewer.bind_key('Control-z')
+        # def undo(viewer):
+        #     label_history.undo()
+
+        # @global_viewer.bind_key('Control-Shift-z')
+        # def redo(viewer):
+        #     label_history.redo()
+    
         global_viewer.layers['corrected_tomo'].opacity = 0.5
         global_viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
         global_viewer.layers['edit vesicles'].mode = 'ADD'
         
         add_button_and_register_add_and_delete(global_viewer, root_dir, tomo_path.new_json_file_path)
         
-        # os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
-        # os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
-        # os.system('rm -r {}'.format(root_dir))
