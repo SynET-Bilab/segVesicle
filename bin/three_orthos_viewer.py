@@ -31,36 +31,6 @@ from global_vars import global_viewer
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
-      
-class ThreadedWorker(QObject):
-    data_signal = Signal(object)
-
-    def __init__(self):
-        super().__init__()
-        self._thread = QThread()
-        self.moveToThread(self._thread)
-        self._thread.started.connect(self._run_in_thread)
-        self.func = None
-        self.args = None
-
-    def run(self):
-        pass
-
-    def execute(self, func, *args):
-        self.func = func
-        self.args = args
-        self._thread.start()
-
-    def _run_in_thread(self):
-        result = self.func(*self.args)
-        self.data_signal.emit(result)
-        self._thread.quit()
-
-    def stop(self):
-        self._thread.quit()
-        self._thread.wait()
-
-
 
 class UtilWidge(QWidget):
     def __init__(self, viewer: napari.Viewer) -> None:
@@ -306,11 +276,6 @@ class MultipleViewerWidget(QWidget):
         
         # 连接信号到槽
         self.message_signal.connect(self.utils_widget.print_in_widget)
-        
-    def closeEvent(self, event):
-        self._stop_threads()
-        event.accept()
-    
     
     def print_in_widget(self, text):
         self.utils_widget.print_in_widget(text)
@@ -436,20 +401,6 @@ class MultipleViewerWidget(QWidget):
                 layer.events.set_data.connect(self._set_data_refresh)
             if event.value.name != ".cross":
                 layer.events.data.connect(self._sync_data)
-        # self.viewer_model1.layers.insert(event.index, copy_layer(event.value, "model1"))
-        # self.viewer_model2.layers.insert(event.index, copy_layer(event.value, "model2"))
-        # self.viewer_model3.layers.insert(event.index, copy_layer(event.value, "model3"))
-        # for name in get_property_names(event.value):
-        #     getattr(event.value.events, name).connect(own_partial(self._property_sync, name))
-        # if isinstance(event.value, Labels):
-        #     event.value.events.set_data.connect(self._set_data_refresh)
-        #     self.viewer_model1.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-        #     self.viewer_model2.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-        #     self.viewer_model3.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-        # if event.value.name != ".cross":
-        #     self.viewer_model1.layers[event.value.name].events.data.connect(self._sync_data)
-        #     self.viewer_model2.layers[event.value.name].events.data.connect(self._sync_data)
-        #     self.viewer_model3.layers[event.value.name].events.data.connect(self._sync_data)
         event.value.events.name.connect(self._sync_name)
         self._order_update()
 
@@ -466,17 +417,6 @@ class MultipleViewerWidget(QWidget):
         '''
         同步图层数据: 同步3个 viewer 模型中图层的数据。
         '''
-        # if self._block:
-        #     return
-        # for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
-        #     layer = model.layers[event.source.name]
-        #     if layer is event.source:
-        #         continue
-        #     try:
-        #         self._block = True
-        #         layer.data = event.source.data
-        #     finally:
-        #         self._block = False
         if self._block:
             return
         
@@ -533,6 +473,7 @@ class MultipleViewerWidget(QWidget):
             setattr(self.viewer_model3.layers[event.source.name], name, getattr(event.source, name))
         finally:
             self._block = False
+
 
 
 class own_partial:

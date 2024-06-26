@@ -7,6 +7,7 @@ import napari
 import mrcfile
 import threading
 import numpy as np
+import pstats
 
 from qtpy import QtCore, QtWidgets
 from scipy.spatial import KDTree
@@ -24,6 +25,8 @@ from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
 from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, global_viewer
 import center_cross
+
+import cProfile
 
 # 定义一个类来管理标签层的历史状态
 class LabelHistory:
@@ -437,7 +440,7 @@ def main(tomo_dir):
     add_button_and_register_add_and_delete(global_viewer, root_dir, tomo_path.new_json_file_path)
     
     napari.run()
-    
+
     os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
     os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
     os.system('rm -r {}'.format(root_dir))
