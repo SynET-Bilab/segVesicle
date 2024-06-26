@@ -50,8 +50,9 @@ class LabelHistory:
             self.layer.data = self.history[self.index]
 
 def print_in_widget(message):
-    if dock_widget:
-        dock_widget.message_signal.emit(message)
+    pass
+    # if dock_widget:
+    #     dock_widget.message_signal.emit(message)
 
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
@@ -391,15 +392,15 @@ def main(tomo_dir):
     settings.shortcuts.shortcuts['napari:increment_dims_left'] = ['PageDown']
     settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageUp']
     # set default interface
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
+    # QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
     global global_viewer
     global_viewer = Viewer()
-    main_viewer = global_viewer.window.qt_viewer.parentWidget()
-    global dock_widget
-    dock_widget = MultipleViewerWidget(global_viewer)
-    cross = CrossWidget(global_viewer)
-    main_viewer.layout().addWidget(dock_widget)
-    global_viewer.window.add_dock_widget(cross, name="Cross", area="left")
+    # main_viewer = global_viewer.window.qt_viewer.parentWidget()
+    # global dock_widget
+    # dock_widget = MultipleViewerWidget(global_viewer)
+    # cross = CrossWidget(global_viewer)
+    # main_viewer.layout().addWidget(dock_widget)
+    # global_viewer.window.add_dock_widget(cross, name="Cross", area="left")
     
     # viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
     label_layer = global_viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
@@ -428,8 +429,8 @@ def main(tomo_dir):
     # viewer.layers[ORI_LAYER_IDX].contrast_limits = [mi, ma]
     
     # ls： The window will not automatically adjust for now; manually zoom to set an appropriate value
-    dock_widget.viewer_model1.camera.zoom = 1.95
-    dock_widget.viewer_model2.camera.zoom = 1.5
+    # dock_widget.viewer_model1.camera.zoom = 1.95
+    # dock_widget.viewer_model2.camera.zoom = 1.5
 
     print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
     print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
