@@ -32,18 +32,35 @@ from global_vars import global_viewer
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
       
-class Worker(QThread):
+class ThreadedWorker(QObject):
     data_signal = Signal(object)
 
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self):
         super().__init__()
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
+        self._thread = QThread()
+        self.moveToThread(self._thread)
+        self._thread.started.connect(self._run_in_thread)
+        self.func = None
+        self.args = None
 
     def run(self):
-        result = self.func(*self.args, **self.kwargs)
+        pass
+
+    def execute(self, func, *args):
+        self.func = func
+        self.args = args
+        self._thread.start()
+
+    def _run_in_thread(self):
+        result = self.func(*self.args)
         self.data_signal.emit(result)
+        self._thread.quit()
+
+    def stop(self):
+        self._thread.quit()
+        self._thread.wait()
+
+
 
 class UtilWidge(QWidget):
     def __init__(self, viewer: napari.Viewer) -> None:
@@ -290,25 +307,10 @@ class MultipleViewerWidget(QWidget):
         # 连接信号到槽
         self.message_signal.connect(self.utils_widget.print_in_widget)
         
-        self._threads = []
-        
     def closeEvent(self, event):
         self._stop_threads()
         event.accept()
-        
-    def _execute_in_thread(self, func, *args):
-        worker = Worker(func, *args)
-        worker.data_signal.connect(self._thread_finished)
-        self._threads.append(worker)
-        worker.start()
-
-    def _stop_threads(self):
-        for thread in self._threads:
-            thread.quit()
-            thread.wait()
-
-    def _thread_finished(self, result):
-        pass
+    
     
     def print_in_widget(self, text):
         self.utils_widget.print_in_widget(text)
@@ -375,25 +377,25 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model3.layers.selection.active = self.viewer_model3.layers[event.value.name]
 
     def _point_update(self, event):
-        self._execute_in_thread(self._update_points, event)
-        
-    def _thread_finished(self, result):
-        # 处理线程完成后的结果
-        pass
-        
-    def _update_points(self, event):
-        '''
-        更新当前步数: 将事件的当前步数值赋给3个 viewer 模型。
-        '''
         if self._block:
             return
         self._block = True
         try:
+            current_steps = [self.viewer.dims.current_step,
+                            self.viewer_model1.dims.current_step,
+                            self.viewer_model2.dims.current_step,
+                            self.viewer_model3.dims.current_step]
+            
+            # 如果当前步数相同，不进行同步
+            if all(step == event.value for step in current_steps):
+                return
+            
             for model in [self.viewer_model1, self.viewer_model2, self.viewer_model3]:
                 if model.dims is not event.source and len(self.viewer.layers) == len(model.layers):
                     model.dims.current_step = event.value
         finally:
             self._block = False
+        
         # for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
         #     if model.dims is event.source:
         #         continue
@@ -418,23 +420,36 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model2.dims.order = order
 
     def _layer_added(self, event):
-        '''
-        添加图层: 将新图层添加到3个 viewer 模型中，并连接相应的事件处理方法。
-        '''
-        self.viewer_model1.layers.insert(event.index, copy_layer(event.value, "model1"))
-        self.viewer_model2.layers.insert(event.index, copy_layer(event.value, "model2"))
-        self.viewer_model3.layers.insert(event.index, copy_layer(event.value, "model3"))
-        for name in get_property_names(event.value):
-            getattr(event.value.events, name).connect(own_partial(self._property_sync, name))
-        if isinstance(event.value, Labels):
-            event.value.events.set_data.connect(self._set_data_refresh)
-            self.viewer_model1.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-            self.viewer_model2.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-            self.viewer_model3.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-        if event.value.name != ".cross":
-            self.viewer_model1.layers[event.value.name].events.data.connect(self._sync_data)
-            self.viewer_model2.layers[event.value.name].events.data.connect(self._sync_data)
-            self.viewer_model3.layers[event.value.name].events.data.connect(self._sync_data)
+        new_layers = [
+            copy_layer(event.value, "model1"),
+            copy_layer(event.value, "model2"),
+            copy_layer(event.value, "model3")
+        ]
+        self.viewer_model1.layers.insert(event.index, new_layers[0])
+        self.viewer_model2.layers.insert(event.index, new_layers[1])
+        self.viewer_model3.layers.insert(event.index, new_layers[2])
+        for layer, model in zip(new_layers, [self.viewer_model1, self.viewer_model2, self.viewer_model3]):
+            for name in get_property_names(event.value):
+                getattr(event.value.events, name).connect(own_partial(self._property_sync, name))
+            if isinstance(event.value, Labels):
+                event.value.events.set_data.connect(self._set_data_refresh)
+                layer.events.set_data.connect(self._set_data_refresh)
+            if event.value.name != ".cross":
+                layer.events.data.connect(self._sync_data)
+        # self.viewer_model1.layers.insert(event.index, copy_layer(event.value, "model1"))
+        # self.viewer_model2.layers.insert(event.index, copy_layer(event.value, "model2"))
+        # self.viewer_model3.layers.insert(event.index, copy_layer(event.value, "model3"))
+        # for name in get_property_names(event.value):
+        #     getattr(event.value.events, name).connect(own_partial(self._property_sync, name))
+        # if isinstance(event.value, Labels):
+        #     event.value.events.set_data.connect(self._set_data_refresh)
+        #     self.viewer_model1.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
+        #     self.viewer_model2.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
+        #     self.viewer_model3.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
+        # if event.value.name != ".cross":
+        #     self.viewer_model1.layers[event.value.name].events.data.connect(self._sync_data)
+        #     self.viewer_model2.layers[event.value.name].events.data.connect(self._sync_data)
+        #     self.viewer_model3.layers[event.value.name].events.data.connect(self._sync_data)
         event.value.events.name.connect(self._sync_name)
         self._order_update()
 
@@ -451,8 +466,26 @@ class MultipleViewerWidget(QWidget):
         '''
         同步图层数据: 同步3个 viewer 模型中图层的数据。
         '''
+        # if self._block:
+        #     return
+        # for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
+        #     layer = model.layers[event.source.name]
+        #     if layer is event.source:
+        #         continue
+        #     try:
+        #         self._block = True
+        #         layer.data = event.source.data
+        #     finally:
+        #         self._block = False
         if self._block:
             return
+        
+        # 检查数据是否真的发生变化，如果没有变化则不进行同步
+        data_changed = any(event.source.data != model.layers[event.source.name].data
+                        for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3])
+        if not data_changed:
+            return
+        
         for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
             layer = model.layers[event.source.name]
             if layer is event.source:
