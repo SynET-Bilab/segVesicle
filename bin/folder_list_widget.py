@@ -326,21 +326,33 @@ def add_folder_list_widget(viewer, path):
 
 
 def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_file_path):
-    register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
-    # register_shortcut_crop_image(viewer)
-    
     layer_buttons = viewer.window.qt_viewer.layerButtons
+    # 获取layer_buttons的布局
+    layout = layer_buttons.layout()
 
-    # 删除位置在1，2，3的按钮
-    for i in [2, 1, 0]:
-        item = layer_buttons.layout().takeAt(i)
+    # 通过遍历布局中的所有项目来删除所有按钮
+    while layout.count():
+        item = layout.takeAt(0)  # 每次都从布局中取出第一个项目
         if item is not None:
             widget = item.widget()
             if widget is not None:
-                widget.deleteLater()
+                widget.deleteLater()  # 删除小部件
+    
+    register_save_shortcut_add(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
+    # register_shortcut_crop_image(viewer)
+    
+    # layer_buttons = viewer.window.qt_viewer.layerButtons
+
+    # # 删除位置在1，2，3的按钮
+    # for i in [4, 2, 1, 0]:
+    #     item = layer_buttons.layout().takeAt(i)
+    #     if item is not None:
+    #         widget = item.widget()
+    #         if widget is not None:
+    #             widget.deleteLater()
 
 class FolderListWidget(QWidget):
     def __init__(self, path):
