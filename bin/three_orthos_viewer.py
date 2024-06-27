@@ -224,7 +224,7 @@ class CrossWidget(QCheckBox):
         self.pending_update = False
         
         self.update_timer = QTimer()
-        self.update_timer.setInterval(50)  # 100毫秒更新一次
+        self.update_timer.setInterval(3000)  # 100毫秒更新一次
         self.update_timer.timeout.connect(self._process_pending_updates)
         
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
