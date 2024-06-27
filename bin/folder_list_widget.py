@@ -7,7 +7,7 @@ import mrcfile
 import threading
 
 from scipy.spatial import KDTree
-from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QHBoxLayout, QLabel, QApplication
+from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox
 from qtpy.QtCore import Qt
 from skimage.morphology import closing, cube
 from napari import Viewer
@@ -17,10 +17,9 @@ from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 from napari.qt.threading import thread_worker
 
 from global_vars import TomoPath, global_viewer
-from enum import Enum
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
-from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, global_viewer
+from global_vars import TomoPath, global_viewer
 
 LABEL_START = 10000  # large enough to avoid overlap with original labe
 LABEL_LAYER_IDX = 'label'
@@ -31,29 +30,6 @@ global added_vesicle_num
 added_vesicle_num = 0
 label_history = None
 tomo_path = None
-
-# class LabelHistory:
-#     def __init__(self, layer):
-#         self.layer = layer
-#         self.history = []
-#         self.index = -1
-#         self.max_history = 10  # 可以根据需要调整历史记录的最大数量
-
-#     def save_state(self):
-#         if len(self.history) >= self.max_history:
-#             self.history.pop(0)
-#         self.history.append(self.layer.data.copy())
-#         self.index = len(self.history) - 1
-
-#     def undo(self):
-#         if self.index > 0:
-#             self.index -= 1
-#             self.layer.data = self.history[self.index]
-
-#     def redo(self):
-#         if self.index < len(self.history) - 1:
-#             self.index += 1
-#             self.layer.data = self.history[self.index]
 
 def print_in_widget(message):
     pass
@@ -395,9 +371,6 @@ class FolderListWidget(QWidget):
         self.progress_dialog.setWindowModality(Qt.WindowModal)
         self.progress_dialog.setValue(0)
         self.progress_dialog.show()
-
-        # global label_history
-        # label_history = None
         
         # 清除上一个文件夹的缓存
         global tomo_path
@@ -432,24 +405,13 @@ class FolderListWidget(QWidget):
         mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
         
         self.progress_dialog.setValue(40)
-        # global global_viewer
+
         global_viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
         self.progress_dialog.setValue(60)
         global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
         self.progress_dialog.setValue(80)
         global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
         self.progress_dialog.setValue(90)
-        # label_history = LabelHistory(label_layer)
-        # label_history.save_state()
-    
-        # # 监听键盘事件，实现撤销和重做操作
-        # @global_viewer.bind_key('Control-z')
-        # def undo(viewer):
-        #     label_history.undo()
-
-        # @global_viewer.bind_key('Control-Shift-z')
-        # def redo(viewer):
-        #     label_history.redo()
     
         global_viewer.layers['corrected_tomo'].opacity = 0.5
         global_viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
