@@ -7,13 +7,14 @@ import mrcfile
 import threading
 
 from scipy.spatial import KDTree
-from qtpy.QtWidgets import QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QHBoxLayout, QLabel, QApplication
+from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QHBoxLayout, QLabel, QApplication
 from qtpy.QtCore import Qt
 from skimage.morphology import closing, cube
 from napari import Viewer
 from napari.resources import ICONS
 from napari.utils.notifications import show_info
 from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
+from napari.qt.threading import thread_worker
 
 from global_vars import TomoPath, global_viewer
 from enum import Enum
@@ -21,7 +22,7 @@ from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
 from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, global_viewer
 
-LABEL_START = 10000  # large enough to avoid overlap with original label
+LABEL_START = 10000  # large enough to avoid overlap with original labe
 LABEL_LAYER_IDX = 'label'
 POINT_LAYER_IDX = 'edit vesicles'
 ORI_LAYER_IDX = 'ori_tomo'
@@ -29,6 +30,7 @@ NUM_POINT = 0
 global added_vesicle_num
 added_vesicle_num = 0
 label_history = None
+tomo_path = None
 
 # class LabelHistory:
 #     def __init__(self, layer):
@@ -372,20 +374,29 @@ class FolderListWidget(QWidget):
             self.list_widget.addItem(list_item)
             checkbox = QCheckBox()
             self.list_widget.setItemWidget(list_item, checkbox)
-            
-            # 设置列表项文本右移
-            # list_item.setSizeHint(list_item.sizeHint() + QSize(10, 0))
 
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
 
     def on_item_double_click(self, item):
+        self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)
+        self.progress_dialog.setWindowTitle('Opening')
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setValue(0)
+        self.progress_dialog.show()
+
+        # global label_history
+        # label_history = None
+        
+        # 清除上一个文件夹的缓存
+        global tomo_path
+        if tomo_path != None:
+            os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
+            os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
+            os.system('rm -r {}'.format(tomo_path.root_dir))
         # 清除之前的层
-        global label_history
-        label_history = None
         def remove_layer_if_exists(viewer, layer_name):
             if layer_name in viewer.layers:
                 viewer.layers.remove(layer_name)
-
         layer_names = ['label', 'corrected_tomo', 'edit vesicles']
         for name in layer_names:
             remove_layer_if_exists(global_viewer, name)
@@ -393,24 +404,29 @@ class FolderListWidget(QWidget):
         pid = os.getpid()
         item_name = item.text().strip()
         root_dir = os.path.abspath(item_name) + '/ves_seg/temp/'
-        
+        self.progress_dialog.setValue(20)
         if not os.path.exists(root_dir):
             os.makedirs(root_dir)
         tomo_path=TomoPath(item_name, root_dir, pid)
         
+        self.progress_dialog.setValue(30)
         os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.new_json_file_path))
         if not os.path.exists(tomo_path.ori_label_path):
             os.system('cp {} {}'.format(tomo_path.label_path, tomo_path.ori_label_path))
             os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.ori_json_file_path))
+        
         lambda_scale = 0.35
         tomo = get_tomo(tomo_path.isonet_tomo_path)
         mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
         
+        self.progress_dialog.setValue(40)
         # global global_viewer
         global_viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+        self.progress_dialog.setValue(60)
         global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
+        self.progress_dialog.setValue(80)
         global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
-    
+        self.progress_dialog.setValue(90)
         # label_history = LabelHistory(label_layer)
         # label_history.save_state()
     
@@ -428,4 +444,5 @@ class FolderListWidget(QWidget):
         global_viewer.layers['edit vesicles'].mode = 'ADD'
         
         add_button_and_register_add_and_delete(global_viewer, root_dir, tomo_path.new_json_file_path)
-        
+        self.progress_dialog.setValue(100)
+        self.progress_dialog.close()
