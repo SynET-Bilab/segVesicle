@@ -67,6 +67,28 @@ class Worker(QObject):
             self._block = False
         self.finished.emit()
 
+class WorkerForCross(QObject):
+    finished = Signal()
+    extent_updated = Signal(object)
+
+    def __init__(self, viewer, layer):
+        super().__init__()
+        self.viewer = viewer
+        self.layer = layer
+
+    def run(self):
+        if NAPARI_GE_4_16:
+            layers = [layer for layer in self.viewer.layers if layer is not self.layer]
+            extent = self.viewer.layers.get_extent(layers)
+        else:
+            extent_list = [layer.extent for layer in self.viewer.layers if layer is not self.layer]
+            extent = Extent(
+                data=None,
+                world=self.viewer.layers._get_extent_world(extent_list),
+                step=self.viewer.layers._get_step_size(extent_list),
+            )
+        self.extent_updated.emit(extent)
+        self.finished.emit()
 
 class UtilWidge(QWidget):
     def __init__(self, viewer: napari.Viewer) -> None:
@@ -198,62 +220,70 @@ class CrossWidget(QCheckBox):
         # 当复选框状态改变时，调用 _update_cross_visibility 方法。
         self.stateChanged.connect(self._update_cross_visibility)
         self.layer = None
-        # 视图维度顺序改变时，调用 update_cross 方法。
-        self.viewer.dims.events.order.connect(self.update_cross)
-        
-        # 视图维度数目改变时，调用 _update_ndim 方法。
-        self.pending_update = False
-        self.pending_event = None
-        self.viewer.dims.events.ndim.connect(self._schedule_update_ndim)
-        # self.viewer.dims.events.ndim.connect(self._update_ndim)
-        
-        # 视图当前步数改变时，调用 update_cross 方法。
-        self.viewer.dims.events.current_step.connect(self.update_cross)
         self._extent = None
-        self._update_extent()
-        # 视图维度事件发生时，调用 _update_extent 方法。
-        self.viewer.dims.events.connect(self._update_extent)
+        self.pending_update = False
         
         self.update_timer = QTimer()
-        self.update_timer.setInterval(100)  # 100毫秒更新一次
+        self.update_timer.setInterval(50)  # 100毫秒更新一次
         self.update_timer.timeout.connect(self._process_pending_updates)
+        
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+        
+        # 视图维度顺序改变时，调用 update_cross 方法。
+        self.viewer.dims.events.order.connect(self.update_cross)
+        # self.viewer.dims.events.order.connect(self._schedule_update_extent)
+
+        # 视图维度数目改变时，调用 _update_ndim 方法。
+        self.viewer.dims.events.ndim.connect(self._update_ndim)
+        # 视图当前步数改变时，调用 update_cross 方法。
+        # self.viewer.dims.events.current_step.connect(self.update_cross)
+        self.viewer.dims.events.current_step.connect(self.update_cross)
+        # 视图维度事件发生时，调用 _update_extent 方法。
+        # self.viewer.dims.events.connect(self._update_extent)
+        self.viewer.dims.events.connect(self._schedule_update_extent)
+        
+        # self._update_extent()
 
 
-    @qthrottled(leading=False) # 装饰器，限制方法的调用频率，防止频繁调用导致性能问题。
-    def _update_extent(self):
-        '''
-        更新视图的范围信息
-        '''
-        if NAPARI_GE_4_16:
-            layers = [layer for layer in self.viewer.layers if layer is not self.layer]
-            self._extent = self.viewer.layers.get_extent(layers)
-        else:
-            extent_list = [layer.extent for layer in self.viewer.layers if layer is not self.layer]
-            self._extent = Extent(
-                data=None,
-                world=self.viewer.layers._get_extent_world(extent_list),
-                step=self.viewer.layers._get_step_size(extent_list),
-            )
-        self.update_cross()
-
-    def _schedule_update_ndim(self, event):
+    def _schedule_update_extent(self, event=None):
         self.pending_update = True
-        self.pending_event = event
         if not self.update_timer.isActive():
             self.update_timer.start()
 
     def _process_pending_updates(self):
-        if self.pending_update and self.pending_event is not None:
+        if self.pending_update:
             self.pending_update = False
-            self._update_ndim(self.pending_event)
-            self.pending_event = None
+            self._run_update_extent()
 
-    def _update_ndim(self, event):
-        if self.layer in self.viewer.layers:
-            self.viewer.layers.remove(self.layer)
-        self.layer = Vectors(name=".cross", ndim=event.value, vector_style='line', edge_color='yellow')
-        self.layer.edge_width = 1.5
+    def _run_update_extent(self):
+        worker = WorkerForCross(self.viewer, self.layer)
+        worker.extent_updated.connect(self._on_extent_updated)
+        worker.finished.connect(self._on_worker_finished)
+        self.executor.submit(worker.run)
+
+    def _on_extent_updated(self, extent):
+        self._extent = extent
+
+    def _on_worker_finished(self):
         self.update_cross()
+
+    # @qthrottled(leading=False) # 装饰器，限制方法的调用频率，防止频繁调用导致性能问题。
+    # def _update_extent(self):
+    #     '''
+    #     更新视图的范围信息
+    #     '''
+    #     if NAPARI_GE_4_16:
+    #         layers = [layer for layer in self.viewer.layers if layer is not self.layer]
+    #         self._extent = self.viewer.layers.get_extent(layers)
+    #     else:
+    #         extent_list = [layer.extent for layer in self.viewer.layers if layer is not self.layer]
+    #         self._extent = Extent(
+    #             data=None,
+    #             world=self.viewer.layers._get_extent_world(extent_list),
+    #             step=self.viewer.layers._get_step_size(extent_list),
+    #         )
+    #     self.update_cross()
 
     def _update_ndim(self, event):
         '''
@@ -277,10 +307,7 @@ class CrossWidget(QCheckBox):
         self.update_cross()
 
     def update_cross(self):
-        """
-        更新交叉层的数据和显示。
-        """
-        if self.layer not in self.viewer.layers:
+        if self.layer not in self.viewer.layers or self._extent is None:
             return
         point = self.viewer.dims.current_step
         vec = []
@@ -295,6 +322,26 @@ class CrossWidget(QCheckBox):
         if np.any(self.layer.scale != self._extent.step):
             self.layer.scale = self._extent.step
         self.layer.data = vec
+
+    # def update_cross(self):
+    #     """
+    #     更新交叉层的数据和显示。
+    #     """
+    #     if self.layer not in self.viewer.layers:
+    #         return
+    #     point = self.viewer.dims.current_step
+    #     vec = []
+    #     for i, (lower, upper) in enumerate(self._extent.world.T):
+    #         if (upper - lower) / self._extent.step[i] == 1:
+    #             continue
+    #         point1 = list(point)
+    #         point1[i] = (lower + self._extent.step[i] / 2) / self._extent.step[i]
+    #         point2 = [0 for _ in point]
+    #         point2[i] = (upper - lower) / self._extent.step[i]
+    #         vec.append((point1, point2))
+    #     if np.any(self.layer.scale != self._extent.step):
+    #         self.layer.scale = self._extent.step
+    #     self.layer.data = vec
 
 
 class MultipleViewerWidget(QWidget):
