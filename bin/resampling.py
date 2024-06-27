@@ -30,7 +30,7 @@ def generate_new_tomo(resample_tomo, out_name, outspacing):
         m.voxel_size = [outspacing, outspacing, outspacing]
 
 
-def resample_image(tomo, pixel_size, outspacing=17.142):
+def resample_image(tomo, pixel_size, out_name=None, outspacing=17.142):
 
     tomo_sitk = sitk.ReadImage(tomo)
     #out_spacing = prepare_resample(tomo, pixel_size, outspacing)
@@ -59,8 +59,10 @@ def resample_image(tomo, pixel_size, outspacing=17.142):
     resample.SetInterpolator(sitk.sitkLinear)
 
     resample_tomo = resample.Execute(tomo_sitk)
-        
-    out_name = tomo.split('.')[0] + '-resample.' + tomo.split('.')[1]
+
+    if out_name is None:
+        out_name = tomo[:-4] + '-resample' + tomo[-4:]
+        #out_name = tomo.split('.')[:-1] + '-resample.' + tomo.split('.')[1]
     generate_new_tomo(resample_tomo, out_name, outspacing)
 
     return resample_tomo
