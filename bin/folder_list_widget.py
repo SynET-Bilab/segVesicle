@@ -39,6 +39,7 @@ def print_in_widget(message):
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
+    data = np.flip(data, axis=1)
     return data
 
 def vesicle_rendering(vesicle_info, tomo_dims, idx):
@@ -104,8 +105,12 @@ def save_label_layer(viewer, root_dir, layer_idx):
     save_path = root_dir + 'label_{}.mrc'.format(os.getpid())
     if len(viewer.layers) > 0:
         image_layer = viewer.layers[layer_idx]
+        data = np.asarray(image_layer.data).astype(np.float32)
+        data = np.flip(data, axis=1)
         with mrcfile.new(save_path, overwrite=True) as mrc:
-            mrc.set_data(np.asarray(image_layer.data).astype(np.float32))
+            mrc.set_data(data)
+        # with mrcfile.new(save_path, overwrite=True) as mrc:
+        #     mrc.set_data(np.asarray(image_layer.data).astype(np.float32))
     show_info('Saved at {}'.format(os.path.abspath(save_path)))
     
 
@@ -418,5 +423,6 @@ class FolderListWidget(QWidget):
         global_viewer.layers['edit vesicles'].mode = 'ADD'
         
         add_button_and_register_add_and_delete(global_viewer, root_dir, tomo_path.new_json_file_path)
+        
         self.progress_dialog.setValue(100)
         self.progress_dialog.close()
