@@ -8,6 +8,7 @@ import mrcfile
 import threading
 import numpy as np
 import pstats
+from skimage import exposure
 
 from qtpy import QtCore, QtWidgets
 from scipy.spatial import KDTree
@@ -372,6 +373,18 @@ def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_fi
             if widget is not None:
                 widget.deleteLater()
 
+# def adjust_contrast_limits(data, opacity):
+#     # 计算基本的对比度限制
+#     min_val = np.percentile(data, 0.1)
+#     max_val = np.percentile(data, 98)
+    
+#     # 根据透明度调整对比度限制
+#     adjustment_factor = 1 - opacity
+#     # min_val += adjustment_factor * (np.percentile(data, 50) - min_val)
+#     max_val -= adjustment_factor * (max_val - np.percentile(data, 50))
+    
+#     return min_val, max_val
+
 def main(tomo_dir):
     pid = os.getpid()
     root_dir = os.path.abspath('temp') + '/'
@@ -384,10 +397,16 @@ def main(tomo_dir):
         os.system('cp {} {}'.format(tomo_path.label_path, tomo_path.ori_label_path))
         os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.ori_json_file_path))
     
-    # calculate contrast limits
-    lambda_scale = 0.35
     tomo = get_tomo(tomo_path.isonet_tomo_path)
-    mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
+    # mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
+    # mean_val = tomo.mean()
+    # std_val = tomo.std()
+    # min_val = mean_val - 2 * std_val
+    # max_val = mean_val + 2 * std_val
+    min_val = np.percentile(tomo, 0.4)  # 计算第2百分位数
+    max_val = np.percentile(tomo, 98) # 计算第98百分位数
+    # min_val, max_val = adjust_contrast_limits(tomo, 0.5)
+    
 
     # change increment dims shortcuts
     settings = get_settings()
@@ -423,8 +442,9 @@ def main(tomo_dir):
     global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
     global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
     
-    global_viewer.layers['corrected_tomo'].opacity = 0.5
-    global_viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
+    
+    # global_viewer.layers['corrected_tomo'].opacity = 0.5
+    global_viewer.layers['corrected_tomo'].contrast_limits = [min_val, max_val]
     global_viewer.layers['edit vesicles'].mode = 'ADD'
     # viewer.add_image(get_tomo(tomo_path.ori_tomo_path), name='ori_tomo')
     # viewer.layers[ORI_LAYER_IDX].opacity = 0.5
