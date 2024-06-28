@@ -433,7 +433,7 @@ def main(tomo_dir):
     # ls： The window will not automatically adjust for now; manually zoom to set an appropriate value
     dock_widget.viewer_model1.camera.zoom = 1.95
     dock_widget.viewer_model2.camera.zoom = 1.5
-
+    
     print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
     print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
     

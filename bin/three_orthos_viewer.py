@@ -224,7 +224,7 @@ class CrossWidget(QCheckBox):
         self.pending_update = False
         
         self.update_timer = QTimer()
-        self.update_timer.setInterval(3000)  # 100毫秒更新一次
+        self.update_timer.setInterval(100)  # 100毫秒更新一次
         self.update_timer.timeout.connect(self._process_pending_updates)
         
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -381,10 +381,14 @@ class MultipleViewerWidget(QWidget):
         # self.viewer_model1.dims.events.current_step.connect(self._point_update)
         # self.viewer_model2.dims.events.current_step.connect(self._point_update)
         # self.viewer_model3.dims.events.current_step.connect(self._point_update)
-        self.viewer.dims.events.current_step.connect(self._schedule_update)
-        self.viewer_model1.dims.events.current_step.connect(self._schedule_update)
-        self.viewer_model2.dims.events.current_step.connect(self._schedule_update)
-        self.viewer_model3.dims.events.current_step.connect(self._schedule_update)
+        # self.viewer.dims.events.current_step.connect(self._schedule_update)
+        # self.viewer_model1.dims.events.current_step.connect(self._schedule_update)
+        # self.viewer_model2.dims.events.current_step.connect(self._schedule_update)
+        # self.viewer_model3.dims.events.current_step.connect(self._schedule_update)
+        self.viewer.dims.events.current_step.connect(self._run_point_update)
+        # self.viewer_model1.dims.events.current_step.connect(self._run_point_update)
+        # self.viewer_model2.dims.events.current_step.connect(self._run_point_update)
+        self.viewer_model3.dims.events.current_step.connect(self._run_point_update)
         
         self.viewer.dims.events.order.connect(self._order_update)
         self.viewer.events.reset_view.connect(self._reset_view)
@@ -392,13 +396,13 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model2.events.status.connect(self._status_update)
         self.viewer_model3.events.status.connect(self._status_update)
         
-        self._block = False
-        self._last_update_time = 0
-        self.update_timer = QTimer()
-        self.update_timer.setInterval(50)  # 100毫秒更新一次
-        self.update_timer.timeout.connect(self._process_pending_updates)
-        self.pending_update = False
-        self.pending_event = None
+        # self._block = False
+        # self._last_update_time = 0
+        # self.update_timer = QTimer()
+        # # self.update_timer.setInterval(50)  # 100毫秒更新一次
+        # self.update_timer.timeout.connect(self._process_pending_updates)
+        # self.pending_update = False
+        # self.pending_event = None
         
         # 连接信号到槽
         self.message_signal.connect(self.utils_widget.print_in_widget)
@@ -470,17 +474,28 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model2.layers.selection.active = self.viewer_model2.layers[event.value.name]
         self.viewer_model3.layers.selection.active = self.viewer_model3.layers[event.value.name]
 
-    def _schedule_update(self, event):
-        self.pending_update = True
-        self.pending_event = event
-        if not self.update_timer.isActive():
-            self.update_timer.start()
+    # def _schedule_update(self, event):
+    #     self.pending_update = True
+    #     self.pending_event = event
+    #     if not self.update_timer.isActive():
+    #         self.update_timer.start()
 
-    def _process_pending_updates(self):
-        if self.pending_update and self.pending_event is not None:
-            self.pending_update = False
-            self._run_point_update(self.pending_event)
-            self.pending_event = None
+    # def _process_pending_updates(self):
+    #     if self.pending_update and self.pending_event is not None:
+    #         self.pending_update = False
+    #         self._run_point_update(self.pending_event)
+    #         self.pending_event = None
+
+    # def _schedule_update(self, event):
+    #     if not self.pending_update:
+    #         self.pending_update = True
+    #         self.pending_event = event
+    #         self._run_point_update(event)
+    #         self.update_timer.start(100)  # 设置阻塞时间（例如1000毫秒）
+
+    # def _process_pending_updates(self):
+    #     self.pending_update = False
+    #     self.update_timer.stop()
 
     def _run_point_update(self, event):
         worker = Worker(self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3)
