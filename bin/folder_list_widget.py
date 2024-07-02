@@ -344,9 +344,22 @@ class FolderListWidget(QWidget):
         self.layout.addWidget(self.list_widget)
         self.setLayout(self.layout)
         
+        self.state_file = os.path.join(path, 'segVesicle_QCheckBox_state.json')
+        self.checkbox_states = self.load_checkbox_states()
+        
         self.populate_list(path)
         
         self.dock_widget = dock_widget
+
+    def load_checkbox_states(self):
+        if os.path.exists(self.state_file):
+            with open(self.state_file, 'r') as f:
+                return json.load(f)
+        return {}
+
+    def save_checkbox_states(self):
+        with open(self.state_file, 'w') as f:
+            json.dump(self.checkbox_states, f)
 
     def populate_list(self, path):
         # 自定义排序函数
@@ -366,21 +379,24 @@ class FolderListWidget(QWidget):
             key=sort_key
         )
         
-        # # 获取所有以 "pp" 开头的文件夹，并按名称排序
-        # folders = sorted(
-        #     [item for item in os.listdir(path) 
-        #     if os.path.isdir(os.path.join(path, item)) 
-        #     and item.startswith("p")],
-        #     key=sort_key
-        # )
-        
         for item in folders:
             list_item = QListWidgetItem("        " + item)
             self.list_widget.addItem(list_item)
             checkbox = QCheckBox()
+            
+            # 设置 QCheckBox 的状态
+            if item in self.checkbox_states:
+                checkbox.setChecked(self.checkbox_states[item])
+            
+            # 当状态改变时更新状态字典并保存到文件
+            checkbox.stateChanged.connect(lambda state, item=item: self.update_checkbox_state(state, item))
             self.list_widget.setItemWidget(list_item, checkbox)
 
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
+
+    def update_checkbox_state(self, state, item):
+        self.checkbox_states[item] = (state == 2)
+        self.save_checkbox_states()
 
     def on_item_double_click(self, item):
         self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)

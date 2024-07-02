@@ -61,9 +61,10 @@ def main():
     napari.run()
     
     from folder_list_widget import tomo_path
-    os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
-    os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
-    os.system('rm -r {}'.format(tomo_path.root_dir))
+    if tomo_path != None:
+        os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
+        os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
+        os.system('rm -r {}'.format(tomo_path.root_dir))
 
 if __name__ == '__main__':
     
