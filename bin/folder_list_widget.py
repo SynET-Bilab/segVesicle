@@ -33,10 +33,8 @@ added_vesicle_num = 0
 label_history = None
 tomo_path = None
 
-def print_in_widget(message):
-    pass
-    # if dock_widget:
-    #     dock_widget.message_signal.emit(message)
+def print_in_widget(dock_widget, message):
+    dock_widget.message_signal.emit(message)
 
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
@@ -111,8 +109,6 @@ def save_label_layer(viewer, root_dir, layer_idx):
         data = np.flip(data, axis=1)
         with mrcfile.new(save_path, overwrite=True) as mrc:
             mrc.set_data(data)
-        # with mrcfile.new(save_path, overwrite=True) as mrc:
-        #     mrc.set_data(np.asarray(image_layer.data).astype(np.float32))
     show_info('Saved at {}'.format(os.path.abspath(save_path)))
     
 
@@ -323,17 +319,6 @@ def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_fi
     register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
     register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
-    # register_shortcut_crop_image(viewer)
-    
-    # layer_buttons = viewer.window.qt_viewer.layerButtons
-
-    # # 删除位置在1，2，3的按钮
-    # for i in [8, 2, 1, 0]:
-    #     item = layer_buttons.layout().takeAt(i)
-    #     if item is not None:
-    #         widget = item.widget()
-    #         if widget is not None:
-    #             widget.deleteLater()
 
 class FolderListWidget(QWidget):
     def __init__(self, path, dock_widget):
@@ -350,6 +335,8 @@ class FolderListWidget(QWidget):
         self.populate_list(path)
         
         self.dock_widget = dock_widget
+        self.dock_widget.print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
+        self.dock_widget.print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
 
     def load_checkbox_states(self):
         if os.path.exists(self.state_file):
