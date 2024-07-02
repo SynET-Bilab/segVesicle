@@ -357,13 +357,22 @@ class FolderListWidget(QWidget):
                 return (prefix, int(number))
             return (item, 0)
         
-        # 获取所有以 "pp" 开头的文件夹，并按名称排序
+        batch_file_path = os.path.join(path, 'segVesicle.batch')
+        with open(batch_file_path, 'r') as file:
+            lines = file.readlines()
+        
         folders = sorted(
-            [item for item in os.listdir(path) 
-            if os.path.isdir(os.path.join(path, item)) 
-            and item.startswith("p")],
+            {os.path.dirname(line.strip()) for line in lines},
             key=sort_key
         )
+        
+        # # 获取所有以 "pp" 开头的文件夹，并按名称排序
+        # folders = sorted(
+        #     [item for item in os.listdir(path) 
+        #     if os.path.isdir(os.path.join(path, item)) 
+        #     and item.startswith("p")],
+        #     key=sort_key
+        # )
         
         for item in folders:
             list_item = QListWidgetItem("        " + item)
