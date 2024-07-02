@@ -4,9 +4,10 @@ import numpy as np
 from skimage.morphology import dilation, cube
 
 
-def boundary_mask(tomo, mask_boundary, binning = 2):
+def boundary_mask(tomo, mask_boundary, pixelsize = 17.14):
 
     out = np.zeros(tomo.shape, dtype = np.int8)
+    binning = 17.14/pixelsize
     import logging
     import os
     import sys

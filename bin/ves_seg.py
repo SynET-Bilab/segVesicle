@@ -17,11 +17,13 @@ class Ves_seg:
     '''
     def resample(self,tomo,
                    pixel_size,
+                   out_name=None,
                    outspacing=17.142):
         '''
 
         '''
-        from tomoSgmt.bin.resampling import resample_image, measure
+        from resampling import resample_image, measure
+        # from resampling import main, measure
 
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
                             datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
@@ -32,7 +34,7 @@ class Ves_seg:
         logging.info("resample_tomo: {}| original_spacing: {}| original_size: {}| out_spacing: {}| out_size: {}".format(
             tomo, original_spacing, original_size, out_spacing, out_size
         ))
-        resample_image(tomo, pixel_size, outspacing)
+        resample_image(tomo, pixel_size, out_name, outspacing)
         logging.info("\n######Done resampling process######\n")
 
 
@@ -48,7 +50,7 @@ class Ves_seg:
 
         '''
         import mrcfile
-        from tomoSgmt.bin.sgmt_predict import predict_new
+        from sgmt_predict import predict_new
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
                             datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
 
@@ -94,7 +96,7 @@ class Ves_seg:
         '''
 
         '''
-        from tomoSgmt.bin.morph import morph_process, vesicle_measure, vesicle_rendering
+        from morph import morph_process, vesicle_measure, vesicle_rendering
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
                             datefmt="%m-%d %H:%M:%S", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
         root_name = mask_file.split('/')[-1].split('-')[0]
