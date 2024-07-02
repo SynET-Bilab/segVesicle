@@ -1,61 +1,35 @@
-#!/usr/bin/env python
-
 import os
 import json
-import fire
-import napari
+import sys
+import re
+import numpy as np
 import mrcfile
 import threading
-import numpy as np
 
-from qtpy import QtCore, QtWidgets
 from scipy.spatial import KDTree
+from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox
+from qtpy.QtCore import Qt
 from skimage.morphology import closing, cube
 from napari import Viewer
-from napari.settings import get_settings
 from napari.resources import ICONS
 from napari.utils.notifications import show_info
 from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
+from napari.qt.threading import thread_worker
 
-from IsoNet.util.deconvolution import deconv_one
-from folder_list_widget import FolderListWidget
-from enum import Enum
-from three_orthos_viewer import CrossWidget, MultipleViewerWidget
+from global_vars import TomoPath, global_viewer
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
-from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, global_viewer
-import center_cross
+from global_vars import TomoPath, global_viewer
 
-
-def add_folder_list_widget(viewer, path):
-    folder_list_widget = FolderListWidget(path)
-    viewer.window.add_dock_widget(folder_list_widget, area='right')
-    
-    
-"""
-# 定义一个类来管理标签层的历史状态
-class LabelHistory:
-    def __init__(self, layer):
-        self.layer = layer
-        self.history = []
-        self.index = -1
-        self.max_history = 10  # 可以根据需要调整历史记录的最大数量
-
-    def save_state(self):
-        if len(self.history) >= self.max_history:
-            self.history.pop(0)
-        self.history.append(self.layer.data.copy())
-        self.index = len(self.history) - 1
-
-    def undo(self):
-        if self.index > 0:
-            self.index -= 1
-            self.layer.data = self.history[self.index]
-
-    def redo(self):
-        if self.index < len(self.history) - 1:
-            self.index += 1
-            self.layer.data = self.history[self.index]
+LABEL_START = 10000  # large enough to avoid overlap with original labe
+LABEL_LAYER_IDX = 'label'
+POINT_LAYER_IDX = 'edit vesicles'
+ORI_LAYER_IDX = 'ori_tomo'
+NUM_POINT = 0
+global added_vesicle_num
+added_vesicle_num = 0
+label_history = None
+tomo_path = None
 
 def print_in_widget(message):
     pass
@@ -65,6 +39,7 @@ def print_in_widget(message):
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
+    data = np.flip(data, axis=1)
     return data
 
 def vesicle_rendering(vesicle_info, tomo_dims, idx):
@@ -130,8 +105,12 @@ def save_label_layer(viewer, root_dir, layer_idx):
     save_path = root_dir + 'label_{}.mrc'.format(os.getpid())
     if len(viewer.layers) > 0:
         image_layer = viewer.layers[layer_idx]
+        data = np.asarray(image_layer.data).astype(np.float32)
+        data = np.flip(data, axis=1)
         with mrcfile.new(save_path, overwrite=True) as mrc:
-            mrc.set_data(np.asarray(image_layer.data).astype(np.float32))
+            mrc.set_data(data)
+        # with mrcfile.new(save_path, overwrite=True) as mrc:
+        #     mrc.set_data(np.asarray(image_layer.data).astype(np.float32))
     show_info('Saved at {}'.format(os.path.abspath(save_path)))
     
 
@@ -199,8 +178,8 @@ def save_and_update_delete(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Deleted', vesicle_to_add=None)
         print_in_widget("Delete label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
 
 
 def create_delete_button(viewer):
@@ -238,8 +217,8 @@ def save_and_update_add(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 3d label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
 
 
 def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
@@ -253,8 +232,8 @@ def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 2d label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
         
         
 def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
@@ -268,8 +247,8 @@ def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
         print_in_widget("Add 6pts label.")
-        global label_history
-        label_history.save_state()
+        # global label_history
+        # label_history.save_state()
 
 
 def register_save_shortcut_add(viewer, root_dir, new_json_file_path):
@@ -322,107 +301,128 @@ def change_icon_color(icon_path, color):
     painter.end()
     return QIcon(pixmap)
 
+def add_folder_list_widget(viewer, path):
+    folder_list_widget = FolderListWidget(path)
+    viewer.window.add_dock_widget(folder_list_widget, area='right')
+
 
 def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_file_path):
-    register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
-    register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
-    # register_shortcut_crop_image(viewer)
-    
     layer_buttons = viewer.window.qt_viewer.layerButtons
+    # 获取layer_buttons的布局
+    layout = layer_buttons.layout()
 
-    # 删除位置在1，2，3的按钮
-    for i in [2, 1, 0]:
-        item = layer_buttons.layout().takeAt(i)
+    # 通过遍历布局中的所有项目来删除所有按钮
+    while layout.count():
+        item = layout.takeAt(0)  # 每次都从布局中取出第一个项目
         if item is not None:
             widget = item.widget()
             if widget is not None:
-                widget.deleteLater()
-"""
-# def main(tomo_dir):
-def main():
-    pid = os.getpid()
-    # root_dir = os.path.abspath('temp') + '/'
-    # if not os.path.exists(root_dir):
-    #     os.makedirs(root_dir)
-    # tomo_path=TomoPath(tomo_dir, root_dir, pid)
-
-    # os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.new_json_file_path))
-    # if not os.path.exists(tomo_path.ori_label_path):
-    #     os.system('cp {} {}'.format(tomo_path.label_path, tomo_path.ori_label_path))
-    #     os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.ori_json_file_path))
+                widget.deleteLater()  # 删除小部件
     
-    # calculate contrast limits
-    # lambda_scale = 0.35
-    # tomo = get_tomo(tomo_path.isonet_tomo_path)
-    # mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
-
-    # change increment dims shortcuts
-    settings = get_settings()
-    settings.shortcuts.shortcuts['napari:increment_dims_left'] = ['PageDown']
-    settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageUp']
-
-    # global global_viewer
-    # global_viewer = Viewer()
-
-    # 获取当前路径
-    current_path = os.getcwd()
-
-    # 将文件夹列表小部件添加到视图中
-    add_folder_list_widget(global_viewer, current_path)
-
-    # label_layer = global_viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
-    # global label_history
-    # label_history = LabelHistory(label_layer)
+    register_save_shortcut_add(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
+    register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
+    # register_shortcut_crop_image(viewer)
     
-    # label_history.save_state()
-    
-    # # 监听键盘事件，实现撤销和重做操作
-    # @global_viewer.bind_key('Control-z')
-    # def undo(viewer):
-    #     label_history.undo()
+    # layer_buttons = viewer.window.qt_viewer.layerButtons
 
-    # @global_viewer.bind_key('Control-Shift-z')
-    # def redo(viewer):
-    #     label_history.redo()
-    
-    # global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
-    # global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
-    
-    # global_viewer.layers['corrected_tomo'].opacity = 0.5
-    # global_viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
-    # global_viewer.layers['edit vesicles'].mode = 'ADD'
-    # viewer.add_image(get_tomo(tomo_path.ori_tomo_path), name='ori_tomo')
-    # viewer.layers[ORI_LAYER_IDX].opacity = 0.5
-    # viewer.layers[ORI_LAYER_IDX].contrast_limits = [mi, ma]
-    
-    # ls： The window will not automatically adjust for now; manually zoom to set an appropriate value
-    # dock_widget.viewer_model1.camera.zoom = 1.95
-    # dock_widget.viewer_model2.camera.zoom = 1.5
+    # # 删除位置在1，2，3的按钮
+    # for i in [4, 2, 1, 0]:
+    #     item = layer_buttons.layout().takeAt(i)
+    #     if item is not None:
+    #         widget = item.widget()
+    #         if widget is not None:
+    #             widget.deleteLater()
 
-    # print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
-    # print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
-    
-    # add_button_and_register_add_and_delete(global_viewer, root_dir, tomo_path.new_json_file_path)
-    
-    napari.run()
-    
-    from folder_list_widget import tomo_path
-    os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
-    os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
-    os.system('rm -r {}'.format(tomo_path.root_dir))
+class FolderListWidget(QWidget):
+    def __init__(self, path):
+        super().__init__()
+        self.path = path  # 保存路径为实例变量
+        self.layout = QVBoxLayout()
+        self.list_widget = QListWidget()
+        self.layout.addWidget(self.list_widget)
+        self.setLayout(self.layout)
+        
+        self.populate_list(path)
 
-if __name__ == '__main__':
-    
-    # set default params
-    LABEL_START = 10000  # large enough to avoid overlap with original label
-    LABEL_LAYER_IDX = 'label'
-    POINT_LAYER_IDX = 'edit vesicles'
-    ORI_LAYER_IDX = 'ori_tomo'
-    NUM_POINT = 0
-    global added_vesicle_num
-    added_vesicle_num = 0
-    label_history = None
+    def populate_list(self, path):
+        # 自定义排序函数
+        def sort_key(item):
+            match = re.match(r"(pp?)(\d+)", item)
+            if match:
+                prefix, number = match.groups()
+                return (prefix, int(number))
+            return (item, 0)
+        # 获取所有以 "pp" 开头的文件夹，并按名称排序
+        folders = sorted(
+            [item for item in os.listdir(path) 
+            if os.path.isdir(os.path.join(path, item)) 
+            and item.startswith("p")],
+            key=sort_key
+        )
+        
+        for item in folders:
+            list_item = QListWidgetItem("        " + item)
+            self.list_widget.addItem(list_item)
+            checkbox = QCheckBox()
+            self.list_widget.setItemWidget(list_item, checkbox)
 
-    fire.Fire(main)
+        self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
+
+    def on_item_double_click(self, item):
+        self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)
+        self.progress_dialog.setWindowTitle('Opening')
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setValue(0)
+        self.progress_dialog.show()
+        
+        # 清除上一个文件夹的缓存
+        global tomo_path
+        if tomo_path != None:
+            os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
+            os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
+            os.system('rm -r {}'.format(tomo_path.root_dir))
+        # 清除之前的层
+        def remove_layer_if_exists(viewer, layer_name):
+            if layer_name in viewer.layers:
+                viewer.layers.remove(layer_name)
+        layer_names = ['label', 'corrected_tomo', 'edit vesicles']
+        for name in layer_names:
+            remove_layer_if_exists(global_viewer, name)
+        
+        pid = os.getpid()
+        item_name = item.text().strip()
+        root_dir = os.path.abspath(item_name) + '/ves_seg/temp/'
+        self.progress_dialog.setValue(20)
+        if not os.path.exists(root_dir):
+            os.makedirs(root_dir)
+        tomo_path=TomoPath(item_name, root_dir, pid)
+        
+        self.progress_dialog.setValue(30)
+        os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.new_json_file_path))
+        if not os.path.exists(tomo_path.ori_label_path):
+            os.system('cp {} {}'.format(tomo_path.label_path, tomo_path.ori_label_path))
+            os.system('cp {} {}'.format(tomo_path.json_file_path, tomo_path.ori_json_file_path))
+        
+        lambda_scale = 0.35
+        tomo = get_tomo(tomo_path.isonet_tomo_path)
+        mi, ma = (tomo.max() - tomo.min()) * lambda_scale + tomo.min(), tomo.max() - (tomo.max() - tomo.min()) * lambda_scale
+        
+        self.progress_dialog.setValue(40)
+
+        global_viewer.add_labels(get_tomo(tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+        self.progress_dialog.setValue(60)
+        global_viewer.add_image(get_tomo(tomo_path.isonet_tomo_path), name='corrected_tomo')  # add isonet treated tomogram layer
+        self.progress_dialog.setValue(80)
+        global_viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
+        self.progress_dialog.setValue(90)
+    
+        global_viewer.layers['corrected_tomo'].opacity = 0.5
+        global_viewer.layers['corrected_tomo'].contrast_limits = [mi, ma]
+        global_viewer.layers['edit vesicles'].mode = 'ADD'
+        
+        add_button_and_register_add_and_delete(global_viewer, root_dir, tomo_path.new_json_file_path)
+        
+        self.progress_dialog.setValue(100)
+        self.progress_dialog.close()
