@@ -15,7 +15,7 @@ from qtpy.QtWidgets import (
     QTextBrowser,
     QTextEdit
 )
-from qtpy.QtCore import QProcess, QByteArray, Qt, QEvent, Signal, QObject, QThread
+from qtpy.QtCore import QTimer, QProcess, QByteArray, Qt, QEvent, Signal, QObject, QThread
 from qtpy import uic, QtGui, QtCore
 from superqt.utils import qthrottled
 import napari
@@ -31,19 +31,64 @@ from global_vars import global_viewer
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
-      
-class Worker(QThread):
-    data_signal = Signal(object)
 
-    def __init__(self, func, *args, **kwargs):
+import concurrent.futures
+from qtpy.QtCore import QTimer, Signal, QObject
+from qtpy.QtWidgets import QWidget, QGridLayout, QMainWindow
+import napari
+
+class Worker(QObject):
+    finished = Signal()
+    progress = Signal(int)
+
+    def __init__(self, viewer, viewer_model1, viewer_model2, viewer_model3):
         super().__init__()
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
+        self.viewer = viewer
+        self.viewer_model1 = viewer_model1
+        self.viewer_model2 = viewer_model2
+        self.viewer_model3 = viewer_model3
+        self._block = False
+
+    def run(self, event):
+        self._block = True
+        try:
+            current_steps = [self.viewer.dims.current_step,
+                             self.viewer_model1.dims.current_step,
+                             self.viewer_model2.dims.current_step,
+                             self.viewer_model3.dims.current_step]
+            
+            if all(step == self.viewer.dims.current_step for step in current_steps):
+                return
+
+            for model in [self.viewer_model1, self.viewer_model2, self.viewer_model3]:
+                if model.dims is not event.source and len(self.viewer.layers) == len(model.layers):
+                    model.dims.current_step = self.viewer.dims.current_step
+        finally:
+            self._block = False
+        self.finished.emit()
+
+class WorkerForCross(QObject):
+    finished = Signal()
+    extent_updated = Signal(object)
+
+    def __init__(self, viewer, layer):
+        super().__init__()
+        self.viewer = viewer
+        self.layer = layer
 
     def run(self):
-        result = self.func(*self.args, **self.kwargs)
-        self.data_signal.emit(result)
+        if NAPARI_GE_4_16:
+            layers = [layer for layer in self.viewer.layers if layer is not self.layer]
+            extent = self.viewer.layers.get_extent(layers)
+        else:
+            extent_list = [layer.extent for layer in self.viewer.layers if layer is not self.layer]
+            extent = Extent(
+                data=None,
+                world=self.viewer.layers._get_extent_world(extent_list),
+                step=self.viewer.layers._get_step_size(extent_list),
+            )
+        self.extent_updated.emit(extent)
+        self.finished.emit()
 
 class UtilWidge(QWidget):
     def __init__(self, viewer: napari.Viewer) -> None:
@@ -175,32 +220,52 @@ class CrossWidget(QCheckBox):
         # 当复选框状态改变时，调用 _update_cross_visibility 方法。
         self.stateChanged.connect(self._update_cross_visibility)
         self.layer = None
+        self._extent = None
+        self.pending_update = False
+        
+        self.update_timer = QTimer()
+        self.update_timer.setInterval(100)  # 100毫秒更新一次
+        self.update_timer.timeout.connect(self._process_pending_updates)
+        
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+        
         # 视图维度顺序改变时，调用 update_cross 方法。
         self.viewer.dims.events.order.connect(self.update_cross)
+        # self.viewer.dims.events.order.connect(self._schedule_update_extent)
+
         # 视图维度数目改变时，调用 _update_ndim 方法。
         self.viewer.dims.events.ndim.connect(self._update_ndim)
         # 视图当前步数改变时，调用 update_cross 方法。
+        # self.viewer.dims.events.current_step.connect(self.update_cross)
         self.viewer.dims.events.current_step.connect(self.update_cross)
-        self._extent = None
-        self._update_extent()
         # 视图维度事件发生时，调用 _update_extent 方法。
-        self.viewer.dims.events.connect(self._update_extent)
+        # self.viewer.dims.events.connect(self._update_extent)
+        self.viewer.dims.events.connect(self._schedule_update_extent)
+        
+        # self._update_extent()
 
-    @qthrottled(leading=False) # 装饰器，限制方法的调用频率，防止频繁调用导致性能问题。
-    def _update_extent(self):
-        '''
-        更新视图的范围信息
-        '''
-        if NAPARI_GE_4_16:
-            layers = [layer for layer in self.viewer.layers if layer is not self.layer]
-            self._extent = self.viewer.layers.get_extent(layers)
-        else:
-            extent_list = [layer.extent for layer in self.viewer.layers if layer is not self.layer]
-            self._extent = Extent(
-                data=None,
-                world=self.viewer.layers._get_extent_world(extent_list),
-                step=self.viewer.layers._get_step_size(extent_list),
-            )
+
+    def _schedule_update_extent(self, event=None):
+        self.pending_update = True
+        if not self.update_timer.isActive():
+            self.update_timer.start()
+
+    def _process_pending_updates(self):
+        if self.pending_update:
+            self.pending_update = False
+            self._run_update_extent()
+
+    def _run_update_extent(self):
+        worker = WorkerForCross(self.viewer, self.layer)
+        worker.extent_updated.connect(self._on_extent_updated)
+        worker.finished.connect(self._on_worker_finished)
+        self.executor.submit(worker.run)
+
+    def _on_extent_updated(self, extent):
+        self._extent = extent
+
+    def _on_worker_finished(self):
         self.update_cross()
 
     def _update_ndim(self, event):
@@ -209,8 +274,14 @@ class CrossWidget(QCheckBox):
         '''
         if self.layer in self.viewer.layers:
             self.viewer.layers.remove(self.layer)
+        # self.layer = Vectors(name=".cross", ndim=event.value, vector_style='line', edge_color='yellow')
+        # self.layer.edge_width = 1.5
+        # 创建 Vectors 图层
         self.layer = Vectors(name=".cross", ndim=event.value, vector_style='line', edge_color='yellow')
-        self.layer.edge_width = 1.5
+
+        # 设置图层属性
+        self.layer.edge_width = 2.5
+        self.layer.opacity = 1
         self.update_cross()
 
     def _update_cross_visibility(self, state):
@@ -225,10 +296,7 @@ class CrossWidget(QCheckBox):
         self.update_cross()
 
     def update_cross(self):
-        """
-        更新交叉层的数据和显示。
-        """
-        if self.layer not in self.viewer.layers:
+        if self.layer not in self.viewer.layers or self._extent is None:
             return
         point = self.viewer.dims.current_step
         vec = []
@@ -277,38 +345,39 @@ class MultipleViewerWidget(QWidget):
         self.viewer.layers.events.removed.connect(self._layer_removed)
         self.viewer.layers.events.moved.connect(self._layer_moved)
         self.viewer.layers.selection.events.active.connect(self._layer_selection_changed)
-        self.viewer.dims.events.current_step.connect(self._point_update)
-        self.viewer_model1.dims.events.current_step.connect(self._point_update)
-        self.viewer_model2.dims.events.current_step.connect(self._point_update)
-        self.viewer_model3.dims.events.current_step.connect(self._point_update)
+        
+        # self.viewer.dims.events.current_step.connect(self._point_update)
+        # self.viewer_model1.dims.events.current_step.connect(self._point_update)
+        # self.viewer_model2.dims.events.current_step.connect(self._point_update)
+        # self.viewer_model3.dims.events.current_step.connect(self._point_update)
+        # self.viewer.dims.events.current_step.connect(self._schedule_update)
+        # self.viewer_model1.dims.events.current_step.connect(self._schedule_update)
+        # self.viewer_model2.dims.events.current_step.connect(self._schedule_update)
+        # self.viewer_model3.dims.events.current_step.connect(self._schedule_update)
+        self.viewer.dims.events.current_step.connect(self._run_point_update)
+        # self.viewer_model1.dims.events.current_step.connect(self._run_point_update)
+        # self.viewer_model2.dims.events.current_step.connect(self._run_point_update)
+        self.viewer_model3.dims.events.current_step.connect(self._run_point_update)
+        
         self.viewer.dims.events.order.connect(self._order_update)
         self.viewer.events.reset_view.connect(self._reset_view)
         self.viewer_model1.events.status.connect(self._status_update)
         self.viewer_model2.events.status.connect(self._status_update)
         self.viewer_model3.events.status.connect(self._status_update)
         
+        # self._block = False
+        # self._last_update_time = 0
+        # self.update_timer = QTimer()
+        # # self.update_timer.setInterval(50)  # 100毫秒更新一次
+        # self.update_timer.timeout.connect(self._process_pending_updates)
+        # self.pending_update = False
+        # self.pending_event = None
+        
         # 连接信号到槽
         self.message_signal.connect(self.utils_widget.print_in_widget)
-        
-        # self._threads = []
-        
-    # def closeEvent(self, event):
-    #     self._stop_threads()
-    #     event.accept()
-        
-    # def _execute_in_thread(self, func, *args):
-    #     worker = Worker(func, *args)
-    #     worker.data_signal.connect(self._thread_finished)
-    #     self._threads.append(worker)
-    #     worker.start()
+    
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
-    # def _stop_threads(self):
-    #     for thread in self._threads:
-    #         thread.quit()
-    #         thread.wait()
-
-    # def _thread_finished(self, result):
-    #     pass
     
     def print_in_widget(self, text):
         self.utils_widget.print_in_widget(text)
@@ -374,29 +443,67 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model2.layers.selection.active = self.viewer_model2.layers[event.value.name]
         self.viewer_model3.layers.selection.active = self.viewer_model3.layers[event.value.name]
 
-    def _point_update(self, event):
-    #     self._execute_in_thread(self._update_points, event)
-        
-        
-    # def _update_points(self, event):
-        '''
-        更新当前步数: 将事件的当前步数值赋给3个 viewer 模型。
-        '''
-        if self._block:
-            return
-        self._block = True
-        try:
-            for model in [self.viewer_model1, self.viewer_model2, self.viewer_model3]:
-                if model.dims is not event.source and len(self.viewer.layers) == len(model.layers):
-                    model.dims.current_step = event.value
-        finally:
-            self._block = False
-        # for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
-        #     if model.dims is event.source:
-        #         continue
-        #     if len(self.viewer.layers) != len(model.layers):
-        #         continue
-        #     model.dims.current_step = event.value
+    # def _schedule_update(self, event):
+    #     self.pending_update = True
+    #     self.pending_event = event
+    #     if not self.update_timer.isActive():
+    #         self.update_timer.start()
+
+    # def _process_pending_updates(self):
+    #     if self.pending_update and self.pending_event is not None:
+    #         self.pending_update = False
+    #         self._run_point_update(self.pending_event)
+    #         self.pending_event = None
+
+    # def _schedule_update(self, event):
+    #     if not self.pending_update:
+    #         self.pending_update = True
+    #         self.pending_event = event
+    #         self._run_point_update(event)
+    #         self.update_timer.start(100)  # 设置阻塞时间（例如1000毫秒）
+
+    # def _process_pending_updates(self):
+    #     self.pending_update = False
+    #     self.update_timer.stop()
+
+    def _run_point_update(self, event):
+        worker = Worker(self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3)
+        worker.finished.connect(self._on_point_update_finished)
+        self.executor.submit(worker.run, event)
+
+    def _on_point_update_finished(self):
+        pass
+
+    # def _schedule_update(self, event):
+    #     self.pending_update = True
+    #     self.pending_event = event
+    #     if not self.update_timer.isActive():
+    #         self.update_timer.start()
+
+    # def _process_pending_updates(self):
+    #     if self.pending_update and self.pending_event is not None:
+    #         self.pending_update = False
+    #         self._point_update(self.pending_event)
+    #         self.pending_event = None
+    
+    # def _point_update(self, event):
+    #     if self._block:
+    #         return
+    #     self._block = True
+    #     try:
+    #         current_steps = [self.viewer.dims.current_step,
+    #                          self.viewer_model1.dims.current_step,
+    #                          self.viewer_model2.dims.current_step,
+    #                          self.viewer_model3.dims.current_step]
+            
+    #         if all(step == self.viewer.dims.current_step for step in current_steps):
+    #             return
+
+    #         for model in [self.viewer_model1, self.viewer_model2, self.viewer_model3]:
+    #             if model.dims is not event.source and len(self.viewer.layers) == len(model.layers):
+    #                 model.dims.current_step = self.viewer.dims.current_step
+    #     finally:
+    #         self._block = False
 
     def _order_update(self):
         '''
@@ -415,23 +522,22 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model2.dims.order = order
 
     def _layer_added(self, event):
-        '''
-        添加图层: 将新图层添加到3个 viewer 模型中，并连接相应的事件处理方法。
-        '''
-        self.viewer_model1.layers.insert(event.index, copy_layer(event.value, "model1"))
-        self.viewer_model2.layers.insert(event.index, copy_layer(event.value, "model2"))
-        self.viewer_model3.layers.insert(event.index, copy_layer(event.value, "model3"))
-        for name in get_property_names(event.value):
-            getattr(event.value.events, name).connect(own_partial(self._property_sync, name))
-        if isinstance(event.value, Labels):
-            event.value.events.set_data.connect(self._set_data_refresh)
-            self.viewer_model1.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-            self.viewer_model2.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-            self.viewer_model3.layers[event.value.name].events.set_data.connect(self._set_data_refresh)
-        if event.value.name != ".cross":
-            self.viewer_model1.layers[event.value.name].events.data.connect(self._sync_data)
-            self.viewer_model2.layers[event.value.name].events.data.connect(self._sync_data)
-            self.viewer_model3.layers[event.value.name].events.data.connect(self._sync_data)
+        new_layers = [
+            copy_layer(event.value, "model1"),
+            copy_layer(event.value, "model2"),
+            copy_layer(event.value, "model3")
+        ]
+        self.viewer_model1.layers.insert(event.index, new_layers[0])
+        self.viewer_model2.layers.insert(event.index, new_layers[1])
+        self.viewer_model3.layers.insert(event.index, new_layers[2])
+        for layer, model in zip(new_layers, [self.viewer_model1, self.viewer_model2, self.viewer_model3]):
+            for name in get_property_names(event.value):
+                getattr(event.value.events, name).connect(own_partial(self._property_sync, name))
+            if isinstance(event.value, Labels):
+                event.value.events.set_data.connect(self._set_data_refresh)
+                layer.events.set_data.connect(self._set_data_refresh)
+            if event.value.name != ".cross":
+                layer.events.data.connect(self._sync_data)
         event.value.events.name.connect(self._sync_name)
         self._order_update()
 
@@ -450,6 +556,13 @@ class MultipleViewerWidget(QWidget):
         '''
         if self._block:
             return
+        
+        # 检查数据是否真的发生变化，如果没有变化则不进行同步
+        data_changed = any(event.source.data != model.layers[event.source.name].data
+                        for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3])
+        if not data_changed:
+            return
+        
         for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
             layer = model.layers[event.source.name]
             if layer is event.source:
@@ -497,6 +610,7 @@ class MultipleViewerWidget(QWidget):
             setattr(self.viewer_model3.layers[event.source.name], name, getattr(event.source, name))
         finally:
             self._block = False
+
 
 
 class own_partial:

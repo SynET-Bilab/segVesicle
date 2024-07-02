@@ -17,6 +17,7 @@ class Ves_seg:
     '''
     def resample(self,tomo,
                    pixel_size,
+                   out_name=None,
                    outspacing=17.142):
         '''
 
@@ -33,7 +34,7 @@ class Ves_seg:
         logging.info("resample_tomo: {}| original_spacing: {}| original_size: {}| out_spacing: {}| out_size: {}".format(
             tomo, original_spacing, original_size, out_spacing, out_size
         ))
-        resample_image(tomo, pixel_size, outspacing)
+        resample_image(tomo, pixel_size, out_name, outspacing)
         logging.info("\n######Done resampling process######\n")
 
 

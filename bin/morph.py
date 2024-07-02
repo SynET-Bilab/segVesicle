@@ -19,7 +19,7 @@ from segVesicle.bin.ellipsoid import ellipsoid_fit as ef
 
 
 
-def morph_process(mask, area_file, elem_len=1, radius=10, save_labeled=None):
+def morph_process(mask, area_file, pixelsize=17.14, elem_len=1, radius=10, save_labeled=None):
     # 1. closing and opening process of vesicle mask. 2. label the vesicles.
     # 3. exclude false vesicles by counting their volumes and thresholding, return only vesicle binary mask
     # 4. extract boundaries and labels them
@@ -28,7 +28,7 @@ def morph_process(mask, area_file, elem_len=1, radius=10, save_labeled=None):
     with mrcfile.open(mask) as f:
         tomo_seg = f.data 
     tomo_mask = tomo_seg.copy().astype(np.int8)
-    area_mask = boundary_mask(tomo_mask, area_file,1)
+    area_mask = boundary_mask(tomo_mask, area_file,pixelsize)
     tomo_mask *= area_mask
     
     # transform mask into uint8
@@ -306,7 +306,7 @@ def fit_6pts(data_iso, points):
     ccf = CCF(img_normalize,tm)
     return [center_cube, evecs, radii, ccf]
 
-def vesicle_measure(data, vesicle_list, shape, min_radius, outfile, area_file=None):
+def vesicle_measure(data, vesicle_list, shape, min_radius, outfile):
     '''
     '''
     results = []
@@ -479,6 +479,7 @@ if __name__ == "__main__":
     #parser.add_argument('--render', type=str, default=None, help='if draw fitted vesicles on a new tomo')
     parser.add_argument('--label', type=str, default=None, help='draw fitted vesicles as labels')
     parser.add_argument('--min_radius', type=int, default=8, help='minimal radius of targeting vesicles')
+    parser.add_argument('--pixelsize', type=float, default=17.14, help='pixelsize(in Angstrom) of original tomo consistent with area file')
     parser.add_argument('--area_file', type=str, default=None, help='.point or .mod file which defines interested area')
     parser.add_argument('--output_file', type=str, default=None, help='output vesicles file name (xxx.json)')
 
@@ -487,7 +488,7 @@ if __name__ == "__main__":
 
     # set some default files 
     if args.tomo_file is None:
-        args.output_file = args.tomo + '_wbp_corrected.mrc'
+        args.tomo_file = args.tomo + '_wbp_corrected.mrc'
     if args.mask_file is None:
         args.mask_file = args.tomo + '_segment.mrc'
     #if args.render is None:
@@ -503,12 +504,12 @@ if __name__ == "__main__":
         bimask =  m.data
     shape = bimask.shape
     print('begin morph process')
-    vesicle_list, shape = morph_process(args.mask_file,args.area_file,radius=args.min_radius)
+    vesicle_list, shape = morph_process(args.mask_file,args.area_file, pixelsize=args.pixelsize, radius=args.min_radius)
     print('done morph process')
 
     with mrcfile.open(args.tomo_file) as m:
         data_iso = m.data
-    vesicle_info = vesicle_measure(data_iso,vesicle_list, shape, args.min_radius, args.output_file, area_file=args.area_file)
+    vesicle_info = vesicle_measure(data_iso,vesicle_list, shape, args.min_radius, args.output_file)
     print('done vesicle measuring')
 
     if args.label is not None:
