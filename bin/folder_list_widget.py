@@ -33,10 +33,8 @@ added_vesicle_num = 0
 label_history = None
 tomo_path = None
 
-def print_in_widget(message):
-    pass
-    # if dock_widget:
-    #     dock_widget.message_signal.emit(message)
+def print_in_widget(dock_widget, message):
+    dock_widget.message_signal.emit(message)
 
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
@@ -111,8 +109,6 @@ def save_label_layer(viewer, root_dir, layer_idx):
         data = np.flip(data, axis=1)
         with mrcfile.new(save_path, overwrite=True) as mrc:
             mrc.set_data(data)
-        # with mrcfile.new(save_path, overwrite=True) as mrc:
-        #     mrc.set_data(np.asarray(image_layer.data).astype(np.float32))
     show_info('Saved at {}'.format(os.path.abspath(save_path)))
     
 
@@ -179,7 +175,7 @@ def save_and_update_delete(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Deleted', vesicle_to_add=None)
-        print_in_widget("Delete label.")
+        # print_in_widget("Delete label.")
         # global label_history
         # label_history.save_state()
 
@@ -218,7 +214,7 @@ def save_and_update_add(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        print_in_widget("Add 3d label.")
+        # print_in_widget("Add 3d label.")
         # global label_history
         # label_history.save_state()
 
@@ -233,7 +229,7 @@ def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        print_in_widget("Add 2d label.")
+        # print_in_widget("Add 2d label.")
         # global label_history
         # label_history.save_state()
         
@@ -248,7 +244,7 @@ def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        print_in_widget("Add 6pts label.")
+        # print_in_widget("Add 6pts label.")
         # global label_history
         # label_history.save_state()
 
@@ -323,17 +319,6 @@ def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_fi
     register_save_shortcut_add_2d(viewer, root_dir, new_json_file_path)
     register_save_shortcut_add_6pts(viewer, root_dir, new_json_file_path)
     register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
-    # register_shortcut_crop_image(viewer)
-    
-    # layer_buttons = viewer.window.qt_viewer.layerButtons
-
-    # # 删除位置在1，2，3的按钮
-    # for i in [8, 2, 1, 0]:
-    #     item = layer_buttons.layout().takeAt(i)
-    #     if item is not None:
-    #         widget = item.widget()
-    #         if widget is not None:
-    #             widget.deleteLater()
 
 class FolderListWidget(QWidget):
     def __init__(self, path, dock_widget):
@@ -344,9 +329,24 @@ class FolderListWidget(QWidget):
         self.layout.addWidget(self.list_widget)
         self.setLayout(self.layout)
         
+        self.state_file = os.path.join(path, 'segVesicle_QCheckBox_state.json')
+        self.checkbox_states = self.load_checkbox_states()
+        
         self.populate_list(path)
         
         self.dock_widget = dock_widget
+        self.dock_widget.print_in_widget("Welcome to the Vesicle Segmentation Software, version 0.1.")
+        self.dock_widget.print_in_widget("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+
+    def load_checkbox_states(self):
+        if os.path.exists(self.state_file):
+            with open(self.state_file, 'r') as f:
+                return json.load(f)
+        return {}
+
+    def save_checkbox_states(self):
+        with open(self.state_file, 'w') as f:
+            json.dump(self.checkbox_states, f)
 
     def populate_list(self, path):
         # 自定义排序函数
@@ -357,11 +357,12 @@ class FolderListWidget(QWidget):
                 return (prefix, int(number))
             return (item, 0)
         
-        # 获取所有以 "pp" 开头的文件夹，并按名称排序
+        batch_file_path = os.path.join(path, 'segVesicle.batch')
+        with open(batch_file_path, 'r') as file:
+            lines = file.readlines()
+        
         folders = sorted(
-            [item for item in os.listdir(path) 
-            if os.path.isdir(os.path.join(path, item)) 
-            and item.startswith("p")],
+            {os.path.dirname(line.strip()) for line in lines},
             key=sort_key
         )
         
@@ -369,9 +370,20 @@ class FolderListWidget(QWidget):
             list_item = QListWidgetItem("        " + item)
             self.list_widget.addItem(list_item)
             checkbox = QCheckBox()
+            
+            # 设置 QCheckBox 的状态
+            if item in self.checkbox_states:
+                checkbox.setChecked(self.checkbox_states[item])
+            
+            # 当状态改变时更新状态字典并保存到文件
+            checkbox.stateChanged.connect(lambda state, item=item: self.update_checkbox_state(state, item))
             self.list_widget.setItemWidget(list_item, checkbox)
 
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
+
+    def update_checkbox_state(self, state, item):
+        self.checkbox_states[item] = (state == 2)
+        self.save_checkbox_states()
 
     def on_item_double_click(self, item):
         self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)

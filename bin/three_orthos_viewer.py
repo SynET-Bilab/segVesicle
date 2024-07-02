@@ -268,31 +268,20 @@ class CrossWidget(QCheckBox):
     def _on_worker_finished(self):
         self.update_cross()
 
-    # @qthrottled(leading=False) # 装饰器，限制方法的调用频率，防止频繁调用导致性能问题。
-    # def _update_extent(self):
-    #     '''
-    #     更新视图的范围信息
-    #     '''
-    #     if NAPARI_GE_4_16:
-    #         layers = [layer for layer in self.viewer.layers if layer is not self.layer]
-    #         self._extent = self.viewer.layers.get_extent(layers)
-    #     else:
-    #         extent_list = [layer.extent for layer in self.viewer.layers if layer is not self.layer]
-    #         self._extent = Extent(
-    #             data=None,
-    #             world=self.viewer.layers._get_extent_world(extent_list),
-    #             step=self.viewer.layers._get_step_size(extent_list),
-    #         )
-    #     self.update_cross()
-
     def _update_ndim(self, event):
         '''
         更新维度信息，当维度变化时，重新创建交叉层。
         '''
         if self.layer in self.viewer.layers:
             self.viewer.layers.remove(self.layer)
+        # self.layer = Vectors(name=".cross", ndim=event.value, vector_style='line', edge_color='yellow')
+        # self.layer.edge_width = 1.5
+        # 创建 Vectors 图层
         self.layer = Vectors(name=".cross", ndim=event.value, vector_style='line', edge_color='yellow')
-        self.layer.edge_width = 1.5
+
+        # 设置图层属性
+        self.layer.edge_width = 2.5
+        self.layer.opacity = 1
         self.update_cross()
 
     def _update_cross_visibility(self, state):
@@ -322,26 +311,6 @@ class CrossWidget(QCheckBox):
         if np.any(self.layer.scale != self._extent.step):
             self.layer.scale = self._extent.step
         self.layer.data = vec
-
-    # def update_cross(self):
-    #     """
-    #     更新交叉层的数据和显示。
-    #     """
-    #     if self.layer not in self.viewer.layers:
-    #         return
-    #     point = self.viewer.dims.current_step
-    #     vec = []
-    #     for i, (lower, upper) in enumerate(self._extent.world.T):
-    #         if (upper - lower) / self._extent.step[i] == 1:
-    #             continue
-    #         point1 = list(point)
-    #         point1[i] = (lower + self._extent.step[i] / 2) / self._extent.step[i]
-    #         point2 = [0 for _ in point]
-    #         point2[i] = (upper - lower) / self._extent.step[i]
-    #         vec.append((point1, point2))
-    #     if np.any(self.layer.scale != self._extent.step):
-    #         self.layer.scale = self._extent.step
-    #     self.layer.data = vec
 
 
 class MultipleViewerWidget(QWidget):

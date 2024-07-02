@@ -11,6 +11,7 @@ import pstats
 from skimage import exposure
 
 from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import QTimer, Qt
 from scipy.spatial import KDTree
 from skimage.morphology import closing, cube
 from napari import Viewer
@@ -28,6 +29,35 @@ from morph import density_fit, density_fit_2d, fit_6pts, dis
 from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, global_viewer
 import center_cross
 
+# 创建定时器
+timer = QTimer()
+timer.setInterval(100)  # 设置定时器间隔，单位为毫秒
+
+# 定义触发函数
+def increment_dims_left():
+    global_viewer.dims.set_current_step(0, global_viewer.dims.current_step[0] - 1)
+
+def increment_dims_right():
+    global_viewer.dims.set_current_step(0, global_viewer.dims.current_step[0] + 1)
+
+# 定义按键处理函数
+@global_viewer.bind_key('PageDown', overwrite=True)
+def hold_to_increment_left(global_viewer):
+    """Hold to increment dims left in the viewer."""
+    timer.timeout.connect(increment_dims_left)
+    timer.start()
+    yield
+    timer.stop()
+    timer.timeout.disconnect(increment_dims_left)
+
+@global_viewer.bind_key('PageUp', overwrite=True)
+def hold_to_increment_right(global_viewer):
+    """Hold to increment dims right in the viewer."""
+    timer.timeout.connect(increment_dims_right)
+    timer.start()
+    yield
+    timer.stop()
+    timer.timeout.disconnect(increment_dims_right)
 
 def add_folder_list_widget(viewer, path, dock_widget):
     folder_list_widget = FolderListWidget(path, dock_widget)
@@ -37,11 +67,6 @@ def add_folder_list_widget(viewer, path, dock_widget):
 # def main(tomo_dir):
 def main():
     pid = os.getpid()
-
-    # change increment dims shortcuts
-    settings = get_settings()
-    settings.shortcuts.shortcuts['napari:increment_dims_left'] = ['PageDown']
-    settings.shortcuts.shortcuts['napari:increment_dims_right'] = ['PageUp']
 
     # 获取当前路径
     current_path = os.getcwd()
@@ -61,9 +86,10 @@ def main():
     napari.run()
     
     from folder_list_widget import tomo_path
-    os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
-    os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
-    os.system('rm -r {}'.format(tomo_path.root_dir))
+    if tomo_path != None:
+        os.system('mv {} {}'.format(tomo_path.new_json_file_path, tomo_path.json_file_path))
+        os.system('mv {} {}'.format(tomo_path.new_label_file_path, tomo_path.label_path))
+        os.system('rm -r {}'.format(tomo_path.root_dir))
 
 if __name__ == '__main__':
     
