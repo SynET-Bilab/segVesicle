@@ -175,7 +175,7 @@ def save_and_update_delete(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Deleted', vesicle_to_add=None)
-        print_in_widget("Delete label.")
+        # print_in_widget("Delete label.")
         # global label_history
         # label_history.save_state()
 
@@ -214,7 +214,7 @@ def save_and_update_add(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        print_in_widget("Add 3d label.")
+        # print_in_widget("Add 3d label.")
         # global label_history
         # label_history.save_state()
 
@@ -229,7 +229,7 @@ def save_and_update_add_2d(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        print_in_widget("Add 2d label.")
+        # print_in_widget("Add 2d label.")
         # global label_history
         # label_history.save_state()
         
@@ -244,7 +244,7 @@ def save_and_update_add_6pts(viewer, root_dir, new_json_file_path):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(viewer, root_dir, LABEL_LAYER_IDX)
         update_json_file(viewer, point, new_json_file_path, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        print_in_widget("Add 6pts label.")
+        # print_in_widget("Add 6pts label.")
         # global label_history
         # label_history.save_state()
 

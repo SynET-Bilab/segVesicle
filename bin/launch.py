@@ -11,6 +11,7 @@ import pstats
 from skimage import exposure
 
 from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import QTimer, Qt
 from scipy.spatial import KDTree
 from skimage.morphology import closing, cube
 from napari import Viewer
@@ -27,7 +28,6 @@ from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
 from global_vars import TOMO_SEGMENTATION_PROGRESS, TomoPath, global_viewer
 import center_cross
-
 
 def add_folder_list_widget(viewer, path, dock_widget):
     folder_list_widget = FolderListWidget(path, dock_widget)
