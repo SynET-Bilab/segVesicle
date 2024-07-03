@@ -101,8 +101,9 @@ class UtilWidge(QWidget):
         
     def update_progress_stage(self):
         # 将全局变量的内容显示在 QTextEdit 中
-        from launch import TOMO_SEGMENTATION_PROGRESS
-        self.ui.progressStage.setText(str(TOMO_SEGMENTATION_PROGRESS))
+        # from launch import TOMO_SEGMENTATION_PROGRESS
+        # self.ui.progressStage.setText(str(TOMO_SEGMENTATION_PROGRESS))
+        pass
         
     @QtCore.Slot(str)  # 标记这个方法是一个槽
     def print_in_widget(self, text):

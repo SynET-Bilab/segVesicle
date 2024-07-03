@@ -20,7 +20,6 @@ from napari.qt.threading import thread_worker
 from global_vars import TomoPath, global_viewer
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
-from global_vars import TomoPath, global_viewer
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 
 LABEL_START = 10000  # large enough to avoid overlap with original labe
@@ -321,7 +320,7 @@ def add_button_and_register_add_and_delete(viewer: Viewer, root_dir, new_json_fi
     register_save_shortcut_delete(viewer, root_dir, new_json_file_path)
 
 class FolderListWidget(QWidget):
-    def __init__(self, path, dock_widget):
+    def __init__(self, path, dock_widget: MultipleViewerWidget):
         super().__init__()
         self.path = path  # 保存路径为实例变量
         self.layout = QVBoxLayout()
