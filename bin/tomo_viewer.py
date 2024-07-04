@@ -1,18 +1,242 @@
-from napari import Viewer
+import numpy as np
+import mrcfile
+import napari
+
+from qtpy import QtCore, QtWidgets
+from qtpy.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QGridLayout, QDoubleSpinBox, QProgressDialog
+from qtpy.QtCore import Qt
+from napari.utils.notifications import show_info
+
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
-from qtpy import QtCore, QtWidgets
+
+from util.deconvolution import deconv_tomo
+from util.add_layer_with_right_contrast import add_layer_with_right_contrast
+
+
+class DeconvWindow(QMainWindow):
+    def __init__(self, viewer: napari.Viewer):
+        
+        super().__init__()
+        self.setWindowTitle('Deconv Preview')
+        # self.setStyleSheet("background-color: gray;")
+        # self.showMaximized()
+        
+        self.viewer = viewer
+        self.viewer_left = napari.Viewer(show=False)
+        self.viewer_right = napari.Viewer(show=False)
+    
+        self.points = viewer.layers['edit vesicles'].data
+        self.data = viewer.layers['ori_tomo'].data
+        
+        self.crop_data = self.get_cropped_data()
+        add_layer_with_right_contrast(self.crop_data, 'Ori', self.viewer_left)
+        # self.viewer_left.add_image(self.crop_data, name='Ori')
+        
+        # Default values
+        self.default_values = {
+            'voltage': 300.0,
+            'cs': 2.7,
+            'defocus': 0.0,
+            'pixel_size': 17.14,
+            'snrfalloff': 1.0,
+            'deconvstrength': 1.0,
+            'highpassnyquist': 0.02
+        }
+
+        # Deconv parameter inputs
+        self.voltage_input = QDoubleSpinBox(self)
+        self.voltage_input.setRange(100.0, 1000.0)
+        self.voltage_input.setValue(self.default_values['voltage'])
+
+        self.cs_input = QDoubleSpinBox(self)
+        self.cs_input.setRange(0.0, 5.0)
+        self.cs_input.setValue(self.default_values['cs'])
+
+        self.defocus_input = QDoubleSpinBox(self)
+        self.defocus_input.setRange(0.0, 5.0)
+        self.defocus_input.setValue(self.default_values['defocus'])
+
+        self.pixel_size_input = QDoubleSpinBox(self)
+        self.pixel_size_input.setRange(0.1, 100.0)
+        self.pixel_size_input.setValue(self.default_values['pixel_size'])
+
+        self.snrfalloff_input = QDoubleSpinBox(self)
+        self.snrfalloff_input.setRange(0.0, 10.0)
+        self.snrfalloff_input.setValue(self.default_values['snrfalloff'])
+
+        self.deconvstrength_input = QDoubleSpinBox(self)
+        self.deconvstrength_input.setRange(0.0, 10.0)
+        self.deconvstrength_input.setValue(self.default_values['deconvstrength'])
+
+        self.highpassnyquist_input = QDoubleSpinBox(self)
+        self.highpassnyquist_input.setRange(0.0, 1.0)
+        self.highpassnyquist_input.setValue(self.default_values['highpassnyquist'])
+
+        self.apply_button = QPushButton('Apply Deconv', self)
+        self.apply_button.clicked.connect(self.apply_deconv)
+        
+        self.preview_button = QPushButton('Preview Deconv', self)
+        self.preview_button.clicked.connect(self.preview_deconv)
+
+        layout = QGridLayout()
+        layout.addWidget(self.viewer_left.window.qt_viewer, 0, 0, 1, 1)
+        
+        mid_layout = QVBoxLayout()
+
+        self.add_parameter(mid_layout, 'Voltage (kV):', self.voltage_input)
+        self.add_parameter(mid_layout, 'Cs (mm):', self.cs_input)
+        self.add_parameter(mid_layout, 'Defocus (um):', self.defocus_input)
+        self.add_parameter(mid_layout, 'Pixel Size (A):', self.pixel_size_input)
+        self.add_parameter(mid_layout, 'SNR Falloff:', self.snrfalloff_input)
+        self.add_parameter(mid_layout, 'Deconv Strength:', self.deconvstrength_input)
+        self.add_parameter(mid_layout, 'Highpass Nyquist:', self.highpassnyquist_input)
+        
+        # button_layout = QHBoxLayout()
+        mid_layout.addWidget(self.preview_button)
+        mid_layout.addWidget(self.apply_button)
+        layout.addLayout(mid_layout, 0, 1)
+
+        layout.addWidget(self.viewer_right.window.qt_viewer, 0, 2, 1, 1)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+    
+    def add_parameter(self, layout, label_text, widget):
+        h_layout = QHBoxLayout()
+        h_layout.addWidget(QLabel(label_text))
+        h_layout.addWidget(widget)
+        layout.addLayout(h_layout)
+    
+    def get_cropped_data(self):
+        # 计算剪裁区域
+        p1 = self.points[0]  # 点的格式是 (z, y, x)
+        p2 = self.points[1]
+        z_val = int(round(p1[0]))  # 两个点的 Z 值相同
+        min_y, min_x = np.min([p1[1:], p2[1:]], axis=0)
+        max_y, max_x = np.max([p1[1:], p2[1:]], axis=0)
+        # 确保坐标是整数
+        min_y, min_x = int(min_y), int(min_x)
+        max_y, max_x = int(max_y), int(max_x)
+        # 确定 Z 轴上的剪裁范围
+        min_z = max(0, z_val - 50)
+        max_z = min(self.data.shape[0], z_val + 50)
+        z_size = self.data.shape[0]
+        # 确定 Z 轴上的剪裁范围
+        min_z = max(0, z_val - 25)
+        max_z = min(z_size, z_val + 25 + 1)  # 加1以确保包含第z_val + 50切片
+        # 剪裁图像
+        cropped_image = self.data[min_z:max_z, min_y:max_y + 1, min_x:max_x + 1]
+        return cropped_image
+    
+    def preview_deconv(self):
+        # Read input parameters
+        voltage = self.voltage_input.value()
+        cs = self.cs_input.value()
+        defocus = self.defocus_input.value()
+        pixel_size = self.pixel_size_input.value()
+        snrfalloff = self.snrfalloff_input.value()
+        deconvstrength = self.deconvstrength_input.value()
+        highpassnyquist = self.highpassnyquist_input.value()
+
+        # Call the deconvolution function with the given parameters
+        deconv_result = deconv_tomo(self.crop_data, None, angpix=pixel_size, voltage=voltage, cs=cs, defocus=defocus, 
+                                        snrfalloff=snrfalloff, deconvstrength=deconvstrength, 
+                                        highpassnyquist=highpassnyquist, phaseflipped=False, phaseshift=0, ncpu=4)
+        # Clear all layers in the right viewer
+        self.viewer_right.layers.clear()
+        
+        # Display the result in the right viewer
+        add_layer_with_right_contrast(deconv_result, 'Deconv', self.viewer_right)
+        
+    def apply_deconv(self):
+        self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)
+        self.progress_dialog.setWindowTitle('Applying')
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setValue(0)
+        self.progress_dialog.show()
+        # Read input parameters
+        voltage = self.voltage_input.value()
+        cs = self.cs_input.value()
+        defocus = self.defocus_input.value()
+        pixel_size = self.pixel_size_input.value()
+        snrfalloff = self.snrfalloff_input.value()
+        deconvstrength = self.deconvstrength_input.value()
+        highpassnyquist = self.highpassnyquist_input.value()
+        self.progress_dialog.setValue(50)
+        # Call the deconvolution function with the given parameters
+        deconv_result = deconv_tomo(self.data, None, angpix=pixel_size, voltage=voltage, cs=cs, defocus=defocus, 
+                                        snrfalloff=snrfalloff, deconvstrength=deconvstrength, 
+                                        highpassnyquist=highpassnyquist, phaseflipped=False, phaseshift=0, ncpu=4)
+        # Clear all layers in the right viewer
+        self.viewer_right.layers.clear()
+        
+        # Display the result in the right viewer
+        add_layer_with_right_contrast(deconv_result, 'deconv_tomo', self.viewer)
+        deconv_tomo_layer = self.viewer.layers['deconv_tomo']
+        self.viewer.layers.move(self.viewer.layers.index(deconv_tomo_layer), 0)
+        self.viewer.layers['ori_tomo'].visible = False
+        self.progress_dialog.setValue(100)
+        self.close()
 
 class TomoViewer:
-    def __init__(self, viewer: Viewer, current_path: str, pid: int):
+    def __init__(self, viewer: napari.Viewer, current_path: str, pid: int):
         QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
-        self.viewer: Viewer = viewer
+        self.viewer: napari.Viewer = viewer
+        self.main_viewer = self.viewer.window.qt_viewer.parentWidget()
         self.multiple_viewer_widget: MultipleViewerWidget = MultipleViewerWidget(self.viewer)
         self.tomo_path_and_stage: TomoPathAndStage = TomoPathAndStage(current_path, pid)
         self.cross_widget: CrossWidget = CrossWidget(self.viewer)
-        self.main_viewer = self.viewer.window.qt_viewer.parentWidget()
         self.main_viewer.layout().addWidget(self.multiple_viewer_widget)
         self.viewer.window.add_dock_widget(self.cross_widget, name="Cross", area="left")
         
     def set_tomo_name(self, tomo_name: str):
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
+        
+    def print(self, message):
+        self.multiple_viewer_widget.print_in_widget(message)
+        
+    def register_open_ori_tomo(self):
+        def get_tomo(path):
+            with mrcfile.open(path) as mrc:
+                data = mrc.data
+            data = np.flip(data, axis=1)
+            return data
+        def button_clicked():
+            path = self.tomo_path_and_stage.ori_tomo_path
+            data = get_tomo(path)
+            min_val = np.percentile(data, 0.1)  # 计算第2百分位数
+            max_val = np.percentile(data, 99) # 计算第98百分位数
+            
+            self.viewer.add_image(data, name='ori_tomo')
+            self.viewer.layers['ori_tomo'].contrast_limits = [min_val, max_val]
+            self.viewer.layers['ori_tomo'].opacity = 0.8
+            self.viewer.layers['ori_tomo'].gamma = 0.7
+            
+            self.viewer.layers['corrected_tomo'].visible = False
+            
+            ori_tomo_layer = self.viewer.layers['ori_tomo']
+            self.viewer.layers.move(self.viewer.layers.index(ori_tomo_layer), 0)
+            
+            self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+        try:
+            self.multiple_viewer_widget.utils_widget.ui.open_bin4wbp.clicked.disconnect()
+        except TypeError:
+            pass
+
+        self.multiple_viewer_widget.utils_widget.ui.open_bin4wbp.clicked.connect(button_clicked)
+        
+    def register_deconv_tomo(self):
+        def open_deconv_window():
+            if 'ori_tomo' in self.viewer.layers:
+                if len(self.viewer.layers['edit vesicles'].data) == 2:
+                    self.rotate_window = DeconvWindow(self.viewer)
+                    self.rotate_window.show()
+                else:
+                    self.print('Please add two points to define deconvolution area.')
+                    show_info('Please add two points to define deconvolution area.')
+            else:
+                self.print('Please open original tomo.')
+                show_info('Please open original tomo.')
+        self.multiple_viewer_widget.utils_widget.ui.deconvolution.clicked.connect(open_deconv_window)

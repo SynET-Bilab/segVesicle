@@ -27,7 +27,7 @@ from napari.utils.notifications import show_info
 from napari.utils.events.event import WarningEmitter
 from napari.utils.action_manager import action_manager
 from resource.Ui_utils_widge import Ui_Form
-from global_vars import global_viewer
+from global_vars import TOMO_NAME
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
@@ -342,22 +342,13 @@ class MultipleViewerWidget(QWidget):
         grid_layout.setColumnStretch(0, 3)
         grid_layout.setColumnStretch(1, 1)
         self.setLayout(grid_layout)
+        
         self.viewer.layers.events.inserted.connect(self._layer_added)
         self.viewer.layers.events.removed.connect(self._layer_removed)
         self.viewer.layers.events.moved.connect(self._layer_moved)
         self.viewer.layers.selection.events.active.connect(self._layer_selection_changed)
         
-        # self.viewer.dims.events.current_step.connect(self._point_update)
-        # self.viewer_model1.dims.events.current_step.connect(self._point_update)
-        # self.viewer_model2.dims.events.current_step.connect(self._point_update)
-        # self.viewer_model3.dims.events.current_step.connect(self._point_update)
-        # self.viewer.dims.events.current_step.connect(self._schedule_update)
-        # self.viewer_model1.dims.events.current_step.connect(self._schedule_update)
-        # self.viewer_model2.dims.events.current_step.connect(self._schedule_update)
-        # self.viewer_model3.dims.events.current_step.connect(self._schedule_update)
         self.viewer.dims.events.current_step.connect(self._run_point_update)
-        # self.viewer_model1.dims.events.current_step.connect(self._run_point_update)
-        # self.viewer_model2.dims.events.current_step.connect(self._run_point_update)
         self.viewer_model3.dims.events.current_step.connect(self._run_point_update)
         
         self.viewer.dims.events.order.connect(self._order_update)
@@ -365,14 +356,6 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model1.events.status.connect(self._status_update)
         self.viewer_model2.events.status.connect(self._status_update)
         self.viewer_model3.events.status.connect(self._status_update)
-        
-        # self._block = False
-        # self._last_update_time = 0
-        # self.update_timer = QTimer()
-        # # self.update_timer.setInterval(50)  # 100毫秒更新一次
-        # self.update_timer.timeout.connect(self._process_pending_updates)
-        # self.pending_update = False
-        # self.pending_event = None
         
         # 连接信号到槽
         self.message_signal.connect(self.utils_widget.print_in_widget)
