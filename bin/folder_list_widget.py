@@ -439,8 +439,8 @@ class FolderListWidget(QWidget):
         self.tomo_viewer.viewer.layers['label'].opacity = 0.5
         self.tomo_viewer.viewer.layers['edit vesicles'].mode = 'ADD'
         
-        self.dock_widget.viewer_model1.camera.zoom = 0.9
-        self.dock_widget.viewer_model2.camera.zoom = 0.9
+        # self.dock_widget.viewer_model1.camera.zoom = 0.9
+        # self.dock_widget.viewer_model2.camera.zoom = 0.9
         self.dock_widget.viewer_model3.camera.zoom = 1.3
         
         add_button_and_register_add_and_delete(self.tomo_viewer)
