@@ -24,7 +24,9 @@ class TomoPathAndStage:
 
         # 初始化路径
         self.ori_tomo_path = os.path.abspath(os.path.join(tomo_name, tomo_name + '-bin4-wbp.rec'))
+        self.tomograms_star_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomograms.star'))
         self.deconv_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomoset', tomo_name + '_dec.mrc'))
+        self.correction_output_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg'))
         self.isonet_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_wbp_corrected.mrc'))
         self.segment_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_segment.mrc'))
         self.label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_label_vesicle.mrc'))

@@ -444,8 +444,7 @@ class FolderListWidget(QWidget):
         self.dock_widget.viewer_model3.camera.zoom = 1.3
         
         add_button_and_register_add_and_delete(self.tomo_viewer)
-        self.tomo_viewer.register_open_ori_tomo()
-        self.tomo_viewer.register_deconv_tomo()
+        self.tomo_viewer.register_isonet()
         
         self.progress_dialog.setValue(100)
         self.progress_dialog.close()
