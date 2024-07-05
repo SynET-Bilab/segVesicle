@@ -22,20 +22,36 @@ class TomoPathAndStage:
         self.tomo_name = tomo_name
         self.root_dir = os.path.abspath(os.path.join(self.tomo_name, 'ves_seg', 'temp'))
 
+        # # 初始化路径
+        # self.ori_tomo_path = os.path.abspath(os.path.join(tomo_name, tomo_name + '-bin4-wbp.rec'))
+        # self.tomograms_star_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomograms.star'))
+        # self.deconv_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomoset', tomo_name + '_dec.mrc'))
+        # self.correction_output_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg'))
+        # self.isonet_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_wbp_corrected.mrc'))
+        # self.segment_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_segment.mrc'))
+        # self.label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_label_vesicle.mrc'))
+        # self.json_file_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_vesicle.json'))
+        # self.new_json_file_path = os.path.join(self.root_dir, 'vesicle_new_{}.json'.format(self.pid))
+        # self.new_label_file_path = os.path.join(self.root_dir, 'label_{}.mrc'.format(self.pid))
+        # self.ori_json_file_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_vesicle_ori.json'))
+        # self.ori_label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_label_vesicle_ori.mrc'))
+
+        # 检查是否包含 `*-1`，并获取基本路径
+        base_tomo_name = tomo_name.split('-1')[0] if '-1' in tomo_name else tomo_name
+
         # 初始化路径
-        self.ori_tomo_path = os.path.abspath(os.path.join(tomo_name, tomo_name + '-bin4-wbp.rec'))
+        self.ori_tomo_path = os.path.abspath(os.path.join(tomo_name, base_tomo_name + '-bin4-wbp.rec'))
         self.tomograms_star_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomograms.star'))
-        self.deconv_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomoset', tomo_name + '_dec.mrc'))
+        self.deconv_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomoset', base_tomo_name + '_dec.mrc'))
         self.correction_output_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg'))
-        self.isonet_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_wbp_corrected.mrc'))
-        self.segment_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_segment.mrc'))
-        self.label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_label_vesicle.mrc'))
-        self.json_file_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_vesicle.json'))
+        self.isonet_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_wbp_corrected.mrc'))
+        self.segment_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_segment.mrc'))
+        self.label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_label_vesicle.mrc'))
+        self.json_file_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_vesicle.json'))
         self.new_json_file_path = os.path.join(self.root_dir, 'vesicle_new_{}.json'.format(self.pid))
         self.new_label_file_path = os.path.join(self.root_dir, 'label_{}.mrc'.format(self.pid))
-        self.ori_json_file_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_vesicle_ori.json'))
-        self.ori_label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', tomo_name + '_label_vesicle_ori.mrc'))
-
+        self.ori_json_file_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_vesicle_ori.json'))
+        self.ori_label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_label_vesicle_ori.mrc'))
         # 初始化进度
         self.progress_stage = self.determine_progress()
     

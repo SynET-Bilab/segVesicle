@@ -365,7 +365,7 @@ class FolderListWidget(QWidget):
             lines = file.readlines()
         
         folders = sorted(
-            {os.path.dirname(line.strip()) for line in lines},
+            {line.strip().split('/')[0] for line in lines},
             key=sort_key
         )
         
