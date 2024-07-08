@@ -16,6 +16,7 @@ from napari.resources import ICONS
 from napari.utils.notifications import show_info
 from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 from napari.qt.threading import thread_worker
+from key_bindings.add_del_label import add_button_and_register_add_and_delete as add_button_and_register_add_and_delete_2
 
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
@@ -32,9 +33,6 @@ global added_vesicle_num
 added_vesicle_num = 0
 label_history = None
 tomo_path = None
-
-def print_in_widget(dock_widget, message):
-    dock_widget.message_signal.emit(message)
 
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
@@ -400,6 +398,8 @@ class FolderListWidget(QWidget):
             os.system('mv {} {}'.format(self.tomo_path.new_json_file_path, self.tomo_path.json_file_path))
             os.system('mv {} {}'.format(self.tomo_path.new_label_file_path, self.tomo_path.label_path))
             os.system('rm -r {}'.format(self.tomo_path.root_dir))
+            message = f"Saved tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
+            self.tomo_viewer.print(message)
         
         # # 清除之前的层
         def remove_all_layers(viewer):
@@ -443,8 +443,11 @@ class FolderListWidget(QWidget):
         self.dock_widget.viewer_model2.camera.zoom = 0.9
         # self.dock_widget.viewer_model3.camera.zoom = 2
         
-        add_button_and_register_add_and_delete(self.tomo_viewer)
+        add_button_and_register_add_and_delete_2(self.tomo_viewer)
         self.tomo_viewer.register_isonet()
+        
+        message = f"Successfully opened tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
+        self.tomo_viewer.print(message)
         
         self.progress_dialog.setValue(100)
         self.progress_dialog.close()

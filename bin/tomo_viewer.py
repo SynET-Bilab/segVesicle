@@ -46,14 +46,24 @@ class TomoViewer:
             data = np.flip(data, axis=1)
             return data
         def button_clicked():
+            from qtpy.QtWidgets import QProgressDialog
+            from qtpy.QtCore import Qt
+            progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
+            progress_dialog.setWindowTitle('Opening')
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setValue(0)
+            progress_dialog.show()
             path = self.tomo_path_and_stage.ori_tomo_path
             data = get_tomo(path)
-            
+            progress_dialog.setValue(50)
             add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
             
             self.viewer.layers['corrected_tomo'].visible = False
             self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
             self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+            progress_dialog.setValue(100)
+            message = f"Successfully opened the original image {self.tomo_path_and_stage.ori_tomo_path}."
+            self.print(message)
         try:
             self.multiple_viewer_widget.utils_widget.ui.open_bin4wbp.clicked.disconnect()
         except TypeError:

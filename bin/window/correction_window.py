@@ -12,9 +12,9 @@ from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 
 class CorrectionWindow(QMainWindow):
     def __init__(self, tomo_viewer):        
-        super().__init__()
+        super().__init__(tomo_viewer.viewer.window.qt_viewer)
         self.setWindowTitle('Correction')
-        self.setGeometry(100, 100, 400, 200)
+        self.setGeometry(100, 100, 800, 400)
 
         # Main layout
         layout = QVBoxLayout()
@@ -35,6 +35,7 @@ class CorrectionWindow(QMainWindow):
         tomograms_star_path = tomo_viewer.tomo_path_and_stage.tomograms_star_path
         output_path = tomo_viewer.tomo_path_and_stage.correction_output_path
         self.model_path = '/share/data/CryoET_Data/lvzy/script/segvesicle/segvesv0.1/vesicle_corrected_model.h5'
+        
         # self.model_path = '/home/liushuo/Documents/data/model/vesicle_corrected_model.h5'
         # 生成line内容
         line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} {self.model_path} --gpuID 0'
