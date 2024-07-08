@@ -27,6 +27,8 @@ class TomoViewer:
         self.cross_widget: CrossWidget = CrossWidget(self.viewer)
         self.main_viewer.layout().addWidget(self.multiple_viewer_widget)
         self.viewer.window.add_dock_widget(self.cross_widget, name="Cross", area="left")
+        self.multiple_viewer_widget.utils_widget.ui.finish_isonet.clicked.connect(self.on_finish_isonet_clicked)
+        self.multiple_viewer_widget.utils_widget.ui.predict.clicked.connect(self.predict_clicked)
         
     def set_tomo_name(self, tomo_name: str):
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
@@ -48,20 +50,20 @@ class TomoViewer:
         def button_clicked():
             from qtpy.QtWidgets import QProgressDialog
             from qtpy.QtCore import Qt
-            progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
-            progress_dialog.setWindowTitle('Opening')
-            progress_dialog.setWindowModality(Qt.WindowModal)
-            progress_dialog.setValue(0)
-            progress_dialog.show()
+            self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
+            self.progress_dialog.setWindowTitle('Opening')
+            self.progress_dialog.setWindowModality(Qt.WindowModal)
+            self.progress_dialog.setValue(0)
+            self.progress_dialog.show()
             path = self.tomo_path_and_stage.ori_tomo_path
             data = get_tomo(path)
-            progress_dialog.setValue(50)
+            self.progress_dialog.setValue(50)
             add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
             
             self.viewer.layers['corrected_tomo'].visible = False
             self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
             self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
-            progress_dialog.setValue(100)
+            self.progress_dialog.setValue(100)
             message = f"Successfully opened the original image {self.tomo_path_and_stage.ori_tomo_path}."
             self.print(message)
         try:
@@ -94,3 +96,16 @@ class TomoViewer:
                 self.print('Please perform deconvolution.')
                 show_info('Please perform deconvolution.')
         self.multiple_viewer_widget.utils_widget.ui.correction.clicked.connect(open_correction_window)
+        
+    def on_finish_isonet_clicked(self):
+        self.multiple_viewer_widget.utils_widget.ui.tabWidget.setCurrentIndex(2)
+        
+    def predict_clicked(self):
+        self.data = self.viewer.layers['corrected_tomo'].data
+        self.label = self.predict_label(self.data)
+        
+        
+        
+    def predict_label(self, data):
+        # return label
+        pass

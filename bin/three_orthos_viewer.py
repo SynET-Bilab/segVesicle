@@ -105,15 +105,11 @@ class UtilWidge(QWidget):
         # self.ui.progressStage.setText(str(TOMO_SEGMENTATION_PROGRESS))
         pass
         
-    # @QtCore.Slot(str)  # 标记这个方法是一个槽
     def print_in_widget(self, text):
         from qtpy.QtCore import QMetaObject, Q_ARG
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         formatted_text = f"[{current_time}] {text}"
         QMetaObject.invokeMethod(self.ui.terminal, "append", Qt.QueuedConnection, Q_ARG(str, formatted_text))
-        # self.ui.terminal.append(text)
-        # current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # self.ui.terminal.append(f"[{current_time}] {text}")
         
     def show_help(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
