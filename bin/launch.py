@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import os
+
+
+# os.environ['QT_API'] = 'pyqt5'
 import json
 import fire
 import napari
@@ -17,7 +20,7 @@ from skimage.morphology import closing, cube
 from napari.settings import get_settings
 from napari.resources import ICONS
 from napari.utils.notifications import show_info
-from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
+# from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
 from IsoNet.util.deconvolution import deconv_one
 from folder_list_widget import FolderListWidget

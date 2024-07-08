@@ -30,6 +30,7 @@ class TomoPathAndStage:
         self.tomograms_star_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomograms.star'))
         self.deconv_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomoset', base_tomo_name + '_dec.mrc'))
         self.correction_output_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg'))
+        self.area_path = os.path.abspath(os.path.join(tomo_name, 'area.mod'))
         self.isonet_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_wbp_corrected.mrc'))
         self.segment_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_segment.mrc'))
         self.label_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', base_tomo_name + '_label_vesicle.mrc'))

@@ -10,7 +10,7 @@ from skimage.morphology import closing, cube
 from scipy.spatial import KDTree
 from napari.utils.notifications import show_info
 from napari.resources import ICONS
-from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
+# from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
@@ -157,6 +157,7 @@ def save_and_update_delete(tomo_viewer):
         tomo_viewer.print('Successfully deleted Vesicle')
 
 def create_delete_button(tomo_viewer):
+    from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
     viewer = tomo_viewer.viewer
     del_button = QtViewerPushButton('delete label')
     del_icon_path = ICONS.get('delete')
@@ -243,6 +244,7 @@ def register_save_shortcut_add_6pts(tomo_viewer):
     add_6pts_button.clicked.connect(lambda: threading.Thread(target=save_and_update_add_6pts, args=(tomo_viewer,)).start())
 
 def create_button(viewer, label, icon_key, icon_color, position):
+    from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
     button = QtViewerPushButton(label)
     icon_path = ICONS.get(icon_key)
     icon = change_icon_color(icon_path, icon_color)
