@@ -17,7 +17,6 @@ from qtpy.QtWidgets import (
 )
 from qtpy.QtCore import QTimer, QProcess, QByteArray, Qt, QEvent, Signal, QObject, QThread
 from qtpy import uic, QtGui, QtCore
-from superqt.utils import qthrottled
 import napari
 from napari.components.layerlist import Extent
 from napari.components.viewer_model import ViewerModel
@@ -105,11 +104,11 @@ class UtilWidge(QWidget):
         # self.ui.progressStage.setText(str(TOMO_SEGMENTATION_PROGRESS))
         pass
         
-    @QtCore.Slot(str)  # 标记这个方法是一个槽
     def print_in_widget(self, text):
-        # self.ui.terminal.append(text)
+        from qtpy.QtCore import QMetaObject, Q_ARG
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.ui.terminal.append(f"[{current_time}] {text}")
+        formatted_text = f"[{current_time}] {text}"
+        QMetaObject.invokeMethod(self.ui.terminal, "append", Qt.QueuedConnection, Q_ARG(str, formatted_text))
         
     def show_help(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -328,9 +327,7 @@ class MultipleViewerWidget(QWidget):
         self.qt_viewer2 = QtViewerWrap(viewer, self.viewer_model2)
         self.qt_viewer3 = viewer.window.qt_viewer
         
-        # self.utils_widget = QWidget()
         self.utils_widget = UtilWidge(self.viewer)
-        # uic.loadUi('resource/utils_widge.ui', self.utils_widget)
         
         grid_layout = QGridLayout()
         grid_layout.addWidget(self.utils_widget, 0, 1)
@@ -367,37 +364,6 @@ class MultipleViewerWidget(QWidget):
         self.utils_widget.print_in_widget(text)
         
 
-    def show_deconvolution_widget(self):
-        # # 创建空的 QWidget
-        # self.deconvolution_widget = QWidget()
-        
-        # # 加载 UI 文件
-        # uic.loadUi('/Users/shor/Documents/napari_demo/resourse/deconvolution.ui', self.deconvolution_widget)
-
-        # # 创建一个新的窗口来显示 deconvolution_widget
-        # self.deconvolution_window = QMainWindow()
-        # self.deconvolution_window.setCentralWidget(self.deconvolution_widget)
-        # self.deconvolution_window.setWindowTitle("Deconvolution Widget")
-        
-        # # 显示窗口
-        # self.deconvolution_window.show()
-        
-        # 创建一个新的 QMainWindow
-        self.deconvolution_window = QMainWindow(self.viewer.window.qt_viewer)
-        
-        # 创建一个空的 QWidget
-        self.deconvolution_widget = QWidget(self.deconvolution_window)
-        
-        # 加载 UI 文件
-        uic.loadUi('/Users/shor/Documents/napari_demo/resourse/deconvolution.ui', self.deconvolution_widget)
-        
-        # 设置 deconvolution_widget 为中央部件
-        self.deconvolution_window.setCentralWidget(self.deconvolution_widget)
-        self.deconvolution_window.setWindowTitle("Deconvolution Widget")
-        
-        # 显示窗口
-        self.deconvolution_window.show()
-
     def _status_update(self, event):
         """
         更新状态: 将事件的状态值赋给主 viewer 的状态。
@@ -427,28 +393,6 @@ class MultipleViewerWidget(QWidget):
         self.viewer_model2.layers.selection.active = self.viewer_model2.layers[event.value.name]
         self.viewer_model3.layers.selection.active = self.viewer_model3.layers[event.value.name]
 
-    # def _schedule_update(self, event):
-    #     self.pending_update = True
-    #     self.pending_event = event
-    #     if not self.update_timer.isActive():
-    #         self.update_timer.start()
-
-    # def _process_pending_updates(self):
-    #     if self.pending_update and self.pending_event is not None:
-    #         self.pending_update = False
-    #         self._run_point_update(self.pending_event)
-    #         self.pending_event = None
-
-    # def _schedule_update(self, event):
-    #     if not self.pending_update:
-    #         self.pending_update = True
-    #         self.pending_event = event
-    #         self._run_point_update(event)
-    #         self.update_timer.start(100)  # 设置阻塞时间（例如1000毫秒）
-
-    # def _process_pending_updates(self):
-    #     self.pending_update = False
-    #     self.update_timer.stop()
 
     def _run_point_update(self, event):
         worker = Worker(self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3)
@@ -458,36 +402,6 @@ class MultipleViewerWidget(QWidget):
     def _on_point_update_finished(self):
         pass
 
-    # def _schedule_update(self, event):
-    #     self.pending_update = True
-    #     self.pending_event = event
-    #     if not self.update_timer.isActive():
-    #         self.update_timer.start()
-
-    # def _process_pending_updates(self):
-    #     if self.pending_update and self.pending_event is not None:
-    #         self.pending_update = False
-    #         self._point_update(self.pending_event)
-    #         self.pending_event = None
-    
-    # def _point_update(self, event):
-    #     if self._block:
-    #         return
-    #     self._block = True
-    #     try:
-    #         current_steps = [self.viewer.dims.current_step,
-    #                          self.viewer_model1.dims.current_step,
-    #                          self.viewer_model2.dims.current_step,
-    #                          self.viewer_model3.dims.current_step]
-            
-    #         if all(step == self.viewer.dims.current_step for step in current_steps):
-    #             return
-
-    #         for model in [self.viewer_model1, self.viewer_model2, self.viewer_model3]:
-    #             if model.dims is not event.source and len(self.viewer.layers) == len(model.layers):
-    #                 model.dims.current_step = self.viewer.dims.current_step
-    #     finally:
-    #         self._block = False
 
     def _order_update(self):
         '''
