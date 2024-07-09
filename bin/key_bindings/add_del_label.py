@@ -30,7 +30,7 @@ tomo_path = None
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
-    data = np.flip(data, axis=1)
+    # data = np.flip(data, axis=1)
     return data
 
 def vesicle_rendering(vesicle_info, tomo_dims, idx):
@@ -87,12 +87,12 @@ def save_point_layer(tomo_viewer, layer_idx, mode):
 
 def save_label_layer(tomo_viewer, layer_idx):
     viewer = tomo_viewer.viewer
-    root_dir = tomo_viewer.tomo_path_and_stage.root_dir
-    save_path = root_dir + 'label_{}.mrc'.format(os.getpid())
+    # root_dir = tomo_viewer.tomo_path_and_stage.root_dir
+    save_path = tomo_viewer.tomo_path_and_stage.new_label_file_path
     if len(viewer.layers) > 0:
         image_layer = viewer.layers[layer_idx]
         data = np.asarray(image_layer.data).astype(np.float32)
-        data = np.flip(data, axis=1)
+        # data = np.flip(data, axis=1)
         with mrcfile.new(save_path, overwrite=True) as mrc:
             mrc.set_data(data)
     show_info('Saved at {}'.format(os.path.abspath(save_path)))

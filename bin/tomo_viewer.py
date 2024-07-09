@@ -51,7 +51,7 @@ class TomoViewer:
         def get_tomo(path):
             with mrcfile.open(path) as mrc:
                 data = mrc.data
-            data = np.flip(data, axis=1)
+            # data = np.flip(data, axis=1)
             return data
         def button_clicked():
             from qtpy.QtWidgets import QProgressDialog
@@ -107,18 +107,19 @@ class TomoViewer:
         self.multiple_viewer_widget.utils_widget.ui.tabWidget.setCurrentIndex(2)
         
     def predict_clicked(self):
-        self.data = self.viewer.layers['corrected_tomo'].data
-        self.label = self.predict_label(self.data)
+        self.deconv_data = self.viewer.layers['deconv_tomo'].data
+        self.corrected_data = self.viewer.layers['corrected_tomo'].data
+        self.label = self.predict_label(self.deconv_data, self.corrected_data)
         self.area_path = self.tomo_path_and_stage.area_path
         self.processed_vesicles, self.shape = self.morph_process(self.label, self.area_path)
         self.viewer.add_labels(self.processed_vesicles, name='new_label')
         
-    def predict_label(self, data):
+    def predict_label(self, deconv_data, corrected_data):
         path_weights1 = '/home/liushuo/Documents/code/vesiclePipeline/segVesicle/pretrained/vesicle_seg_model_1.h5'
         path_weights2 = '/home/liushuo/Documents/code/vesiclePipeline/segVesicle/pretrained/vesicle_seg_model_2.h5'
 
-        seg1 = self.segment(path_weights1, data)
-        seg2 = self.segment(path_weights2, data)
+        seg1 = self.segment(path_weights1, corrected_data)
+        seg2 = self.segment(path_weights2, deconv_data)
         labelmap = np.sign(seg1 + seg2).astype(np.int8)
         
         return labelmap

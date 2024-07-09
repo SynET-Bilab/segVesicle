@@ -7,24 +7,11 @@ import os
 import json
 import fire
 import napari
-import mrcfile
-import threading
-import numpy as np
-import pstats
-from skimage import exposure
 
-from qtpy import QtCore, QtWidgets
+
 from qtpy.QtCore import QTimer, Qt
-from scipy.spatial import KDTree
-from skimage.morphology import closing, cube
-from napari.settings import get_settings
-from napari.resources import ICONS
-from napari.utils.notifications import show_info
-# from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
-from IsoNet.util.deconvolution import deconv_one
 from folder_list_widget import FolderListWidget
-from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
 from key_bindings.increment_dims_keys import KeyBinder
 from tomo_viewer import TomoViewer
@@ -58,6 +45,11 @@ def main():
     
     if tomo_viewer.tomo_path_and_stage.tomo_name != None:
         os.system('mv {} {}'.format(tomo_viewer.tomo_path_and_stage.new_json_file_path, tomo_viewer.tomo_path_and_stage.json_file_path))
+        with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'r') as file:
+            data = json.load(file)
+        # 将JSON数据格式化为多行结构并保存
+        with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'w') as file:
+            json.dump(data, file, indent=4)
         os.system('mv {} {}'.format(tomo_viewer.tomo_path_and_stage.new_label_file_path, tomo_viewer.tomo_path_and_stage.label_path))
         os.system('rm -r {}'.format(tomo_viewer.tomo_path_and_stage.root_dir))
 
