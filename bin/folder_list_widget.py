@@ -109,6 +109,11 @@ class FolderListWidget(QWidget):
         # 清除上一个文件夹的缓存
         if self.tomo_path != None:
             os.system('mv {} {}'.format(self.tomo_path.new_json_file_path, self.tomo_path.json_file_path))
+            with open(self.tomo_path.json_file_path, 'r') as file:
+                data = json.load(file)
+            # 将JSON数据格式化为多行结构并保存
+            with open(self.tomo_path.json_file_path, 'w') as file:
+                json.dump(data, file, indent=4)
             os.system('mv {} {}'.format(self.tomo_path.new_label_file_path, self.tomo_path.label_path))
             os.system('rm -r {}'.format(self.tomo_path.root_dir))
             message = f"Saved tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
