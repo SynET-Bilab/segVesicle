@@ -27,7 +27,7 @@ tomo_path = None
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
-    data = np.flip(data, axis=1)
+    # data = np.flip(data, axis=1)
     return data
 
 
@@ -149,9 +149,9 @@ class FolderListWidget(QWidget):
         add_layer_with_right_contrast(tomo, 'corrected_tomo', self.tomo_viewer.viewer)
         
         self.progress_dialog.setValue(60)
-        self.tomo_viewer.viewer.add_labels(get_tomo(self.tomo_path.label_path).astype(np.int16), name='label')  # add label layer
+        self.tomo_viewer.viewer.add_labels(get_tomo(self.tomo_path.label_path).astype(np.int16), name='label', scale=[1,-1,1])  # add label layer
         self.progress_dialog.setValue(80)
-        self.tomo_viewer.viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
+        self.tomo_viewer.viewer.add_points(name='edit vesicles', ndim=3, size=4, scale=[1,-1,1])  # add an empty Points layer
         self.progress_dialog.setValue(90)
     
         self.tomo_viewer.viewer.layers['label'].opacity = 0.5
