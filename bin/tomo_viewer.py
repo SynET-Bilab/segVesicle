@@ -112,7 +112,7 @@ class TomoViewer:
         self.label = self.predict_label(self.deconv_data, self.corrected_data)
         self.area_path = self.tomo_path_and_stage.area_path
         self.processed_vesicles, self.shape = self.morph_process(self.label, self.area_path)
-        self.viewer.add_labels(self.processed_vesicles, name='new_label',scale=[1,-1,1])
+        self.viewer.add_labels(self.processed_vesicles, name='new_label')
         
     def predict_label(self, deconv_data, corrected_data):
         path_weights1 = '/home/liushuo/Documents/code/vesiclePipeline/segVesicle/pretrained/vesicle_seg_model_1.h5'

@@ -16,7 +16,7 @@ def add_layer_with_right_contrast(data: np, name: str, viewer: napari.Viewer):
     max_val = np.percentile(data, 99)   # 计算第99百分位数
     
     # 添加图像到viewer并设置属性
-    viewer.add_image(data, name=name, scale = [1, -1, 1])
+    viewer.add_image(data, name=name)
     viewer.layers[name].contrast_limits = [min_val, max_val]
     viewer.layers[name].opacity = 0.8
     viewer.layers[name].gamma = 0.7
