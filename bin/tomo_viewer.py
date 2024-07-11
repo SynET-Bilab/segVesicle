@@ -1,6 +1,8 @@
 import numpy as np
 import mrcfile
 import napari
+import os
+import subprocess
 
 from qtpy import QtCore, QtWidgets
 from napari.utils.notifications import show_info
@@ -39,6 +41,7 @@ class TomoViewer:
         self.register_open_ori_tomo()
         self.multiple_viewer_widget.utils_widget.ui.finish_isonet.clicked.connect(self.on_finish_isonet_clicked)
         self.multiple_viewer_widget.utils_widget.ui.predict.clicked.connect(self.predict_clicked)
+        self.register_draw_area_mod()
         
     def register_open_ori_tomo(self):
         def get_tomo(path):
@@ -122,3 +125,45 @@ class TomoViewer:
         self.viewer.add_labels(self.ves_tomo, name='new_label')
         self.progress_dialog.setValue(100)
         
+    def register_draw_area_mod(self):
+        def create_area_mod():
+            points = self.viewer.layers['edit vesicles'].data  # (z, y, x) 格式
+            # 转换成 (x, y, z) 形式
+            points_transformed = np.array([[x, y, z] for z, y, x in points])
+            # 检查点的形式
+            if validate_points(points_transformed):
+                # 保存路径
+                point_file_path = os.path.join(self.tomo_path_and_stage.root_dir, 'points.point')
+                output_mod_file = os.path.join(self.tomo_path_and_stage.root_dir, 'area.mod')
+
+                # 保存到 .point 文件，以更可读的形式
+                with open(point_file_path, 'w') as file:
+                    for point in points_transformed:
+                        file.write(f"{point[0]:.6f} {point[1]:.6f} {point[2]:.6f}\n")
+
+                # 通过命令行执行 model2point 命令并保存 area.mod 文件
+                subprocess.run(['point2model', point_file_path, output_mod_file, '-planar'])
+                self.print("Points validated and saved successfully.")
+            else:
+                self.print("Points do not meet the required conditions.")
+        self.multiple_viewer_widget.utils_widget.ui.draw_tomo_area.clicked.connect(create_area_mod)
+      
+    
+        
+def validate_points(points):
+    # 获取所有z值
+    z_values = points[:, 2]
+    unique_z_values, counts = np.unique(z_values, return_counts=True)
+
+    # 检查z值的条件
+    if len(unique_z_values) != 3:
+        return False
+
+    # 查找中间z值
+    middle_z = unique_z_values[1]
+
+    # 检查z值是否满足条件
+    if counts[0] != 1 or counts[2] != 1:
+        return False
+
+    return True

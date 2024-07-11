@@ -188,4 +188,5 @@ class DeconvWindow(QMainWindow):
         self.viewer.layers.move(self.viewer.layers.index(deconv_tomo_layer), 0)
         self.viewer.layers['ori_tomo'].visible = False
         self.progress_dialog.setValue(100)
+        self.viewer.layers['edit vesicles'].data = None
         self.close()
