@@ -290,7 +290,7 @@ class CrossWidget(QCheckBox):
         """
         if state:
             self.viewer.layers.append(self.layer)
-            self.viewer.layers.move(self.viewer.layers.index(self.layer), 0)
+            self.viewer.layers.move(self.viewer.layers.index(self.layer), -1)
         else:
             self.viewer.layers.remove(self.layer)
         self.update_cross()

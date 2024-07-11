@@ -39,9 +39,15 @@ class TomoViewer:
         self.register_correction_tomo()
         self.register_deconv_tomo()
         self.register_open_ori_tomo()
-        self.multiple_viewer_widget.utils_widget.ui.finish_isonet.clicked.disconnect()
+        try:
+            self.multiple_viewer_widget.utils_widget.ui.finish_isonet.clicked.disconnect()
+        except TypeError:
+            pass
         self.multiple_viewer_widget.utils_widget.ui.finish_isonet.clicked.connect(self.on_finish_isonet_clicked)
-        self.multiple_viewer_widget.utils_widget.ui.predict.clicked.disconnect()
+        try:
+            self.multiple_viewer_widget.utils_widget.ui.predict.clicked.disconnect()
+        except TypeError:
+            pass
         self.multiple_viewer_widget.utils_widget.ui.predict.clicked.connect(self.predict_clicked)
         self.register_draw_area_mod()
         
@@ -88,7 +94,10 @@ class TomoViewer:
             else:
                 self.print('Please open original tomo.')
                 show_info('Please open original tomo.')
-        self.multiple_viewer_widget.utils_widget.ui.deconvolution.clicked.disconnect()
+        try:
+            self.multiple_viewer_widget.utils_widget.ui.deconvolution.clicked.disconnect()
+        except TypeError:
+            pass
         self.multiple_viewer_widget.utils_widget.ui.deconvolution.clicked.connect(open_deconv_window)
         
     def register_correction_tomo(self):
@@ -99,7 +108,11 @@ class TomoViewer:
             else:
                 self.print('Please perform deconvolution.')
                 show_info('Please perform deconvolution.')
-        self.multiple_viewer_widget.utils_widget.ui.correction.clicked.disconnect()
+        try:
+            self.multiple_viewer_widget.utils_widget.ui.correction.clicked.disconnect()
+        except TypeError:
+            pass
+        
         self.multiple_viewer_widget.utils_widget.ui.correction.clicked.connect(open_correction_window)
         
     def on_finish_isonet_clicked(self):
@@ -151,7 +164,11 @@ class TomoViewer:
                 self.print("Points validated and saved successfully.")
             else:
                 self.print("Points do not meet the required conditions.")
-        self.multiple_viewer_widget.utils_widget.ui.draw_tomo_area.clicked.disconnect()
+        try:
+            self.multiple_viewer_widget.utils_widget.ui.draw_tomo_area.clicked.disconnect()
+        except TypeError:
+            pass
+        
         self.multiple_viewer_widget.utils_widget.ui.draw_tomo_area.clicked.connect(create_area_mod)
       
     
