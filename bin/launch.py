@@ -11,6 +11,7 @@ import napari
 
 from qtpy.QtCore import QTimer, Qt
 
+
 from folder_list_widget import FolderListWidget
 from morph import density_fit, density_fit_2d, fit_6pts, dis
 from key_bindings.increment_dims_keys import KeyBinder

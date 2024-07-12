@@ -14,7 +14,7 @@ from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
-
+from widget.function_widget import ToolbarWidget
 
 
 
@@ -22,12 +22,14 @@ class TomoViewer:
     def __init__(self, viewer: napari.Viewer, current_path: str, pid: int):
         QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
         self.viewer: napari.Viewer = viewer
+        self.toolbar_widget = ToolbarWidget()
         self.main_viewer = self.viewer.window.qt_viewer.parentWidget()
         self.multiple_viewer_widget: MultipleViewerWidget = MultipleViewerWidget(self.viewer)
         self.tomo_path_and_stage: TomoPathAndStage = TomoPathAndStage(current_path, pid)
         self.cross_widget: CrossWidget = CrossWidget(self.viewer)
         self.main_viewer.layout().addWidget(self.multiple_viewer_widget)
         self.viewer.window.add_dock_widget(self.cross_widget, name="Cross", area="left")
+        self.viewer.window.add_dock_widget(self.toolbar_widget, area='left', name='Tools')
         
     def set_tomo_name(self, tomo_name: str):
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
@@ -35,21 +37,21 @@ class TomoViewer:
     def print(self, message):
         self.multiple_viewer_widget.print_in_widget(message)
         
-    def register_isonet(self):
+    def register(self):
         self.register_correction_tomo()
         self.register_deconv_tomo()
         self.register_open_ori_tomo()
-        try:
-            self.multiple_viewer_widget.utils_widget.ui.finish_isonet.clicked.disconnect()
-        except TypeError:
-            pass
-        self.multiple_viewer_widget.utils_widget.ui.finish_isonet.clicked.connect(self.on_finish_isonet_clicked)
-        try:
-            self.multiple_viewer_widget.utils_widget.ui.predict.clicked.disconnect()
-        except TypeError:
-            pass
-        self.multiple_viewer_widget.utils_widget.ui.predict.clicked.connect(self.predict_clicked)
         self.register_draw_area_mod()
+        try:
+            self.toolbar_widget.finish_isonet_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.finish_isonet_button.clicked.connect(self.on_finish_isonet_clicked)
+        try:
+            self.toolbar_widget.predict_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.predict_button.clicked.connect(self.predict_clicked)
         
     def register_open_ori_tomo(self):
         def get_tomo(path):
@@ -76,17 +78,17 @@ class TomoViewer:
             message = f"Successfully opened the original image {self.tomo_path_and_stage.ori_tomo_path}."
             self.print(message)
         try:
-            self.multiple_viewer_widget.utils_widget.ui.open_bin4wbp.clicked.disconnect()
+            self.toolbar_widget.open_ori_image_button.clicked.disconnect()
         except TypeError:
             pass
 
-        self.multiple_viewer_widget.utils_widget.ui.open_bin4wbp.clicked.connect(button_clicked)
+        self.toolbar_widget.open_ori_image_button.clicked.connect(button_clicked)
         
     def register_deconv_tomo(self):
         def open_deconv_window():
             if 'ori_tomo' in self.viewer.layers:
                 if len(self.viewer.layers['edit vesicles'].data) == 2:
-                    self.deconv_window = DeconvWindow(self.viewer)
+                    self.deconv_window = DeconvWindow(self)
                     self.deconv_window.show()
                 else:
                     self.print('Please add two points to define deconvolution area.')
@@ -95,10 +97,10 @@ class TomoViewer:
                 self.print('Please open original tomo.')
                 show_info('Please open original tomo.')
         try:
-            self.multiple_viewer_widget.utils_widget.ui.deconvolution.clicked.disconnect()
+            self.toolbar_widget.deconvolution_button.clicked.disconnect()
         except TypeError:
             pass
-        self.multiple_viewer_widget.utils_widget.ui.deconvolution.clicked.connect(open_deconv_window)
+        self.toolbar_widget.deconvolution_button.clicked.connect(open_deconv_window)
         
     def register_correction_tomo(self):
         def open_correction_window():
@@ -109,14 +111,14 @@ class TomoViewer:
                 self.print('Please perform deconvolution.')
                 show_info('Please perform deconvolution.')
         try:
-            self.multiple_viewer_widget.utils_widget.ui.correction.clicked.disconnect()
+            self.toolbar_widget.correction_button.clicked.disconnect()
         except TypeError:
             pass
         
-        self.multiple_viewer_widget.utils_widget.ui.correction.clicked.connect(open_correction_window)
+        self.toolbar_widget.correction_button.clicked.connect(open_correction_window)
         
     def on_finish_isonet_clicked(self):
-        self.multiple_viewer_widget.utils_widget.ui.tabWidget.setCurrentIndex(2)
+        self.toolbar_widget.tabs.setCurrentIndex(1)
         
     def predict_clicked(self):
         from qtpy.QtWidgets import QProgressDialog
@@ -143,6 +145,25 @@ class TomoViewer:
         self.progress_dialog.setValue(100)
         
     def register_draw_area_mod(self):
+        
+        def validate_points(points):
+            # 获取所有z值
+            z_values = points[:, 2]
+            unique_z_values, counts = np.unique(z_values, return_counts=True)
+
+            # 检查z值的条件
+            if len(unique_z_values) != 3:
+                return False
+
+            # 查找中间z值
+            middle_z = unique_z_values[1]
+
+            # 检查z值是否满足条件
+            if counts[0] != 1 or counts[2] != 1:
+                return False
+
+            return True
+        
         def create_area_mod():
             points = self.viewer.layers['edit vesicles'].data  # (z, y, x) 格式
             # 转换成 (x, y, z) 形式
@@ -164,29 +185,9 @@ class TomoViewer:
                 self.print("Points validated and saved successfully.")
             else:
                 self.print("Points do not meet the required conditions.")
+        
         try:
-            self.multiple_viewer_widget.utils_widget.ui.draw_tomo_area.clicked.disconnect()
+            self.toolbar_widget.draw_tomo_area_button.clicked.disconnect()
         except TypeError:
             pass
-        
-        self.multiple_viewer_widget.utils_widget.ui.draw_tomo_area.clicked.connect(create_area_mod)
-      
-    
-        
-def validate_points(points):
-    # 获取所有z值
-    z_values = points[:, 2]
-    unique_z_values, counts = np.unique(z_values, return_counts=True)
-
-    # 检查z值的条件
-    if len(unique_z_values) != 3:
-        return False
-
-    # 查找中间z值
-    middle_z = unique_z_values[1]
-
-    # 检查z值是否满足条件
-    if counts[0] != 1 or counts[2] != 1:
-        return False
-
-    return True
+        self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)

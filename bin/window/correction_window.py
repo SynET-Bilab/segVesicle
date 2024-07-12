@@ -34,9 +34,9 @@ class CorrectionWindow(QMainWindow):
         self.tomo_viewer = tomo_viewer
         tomograms_star_path = tomo_viewer.tomo_path_and_stage.tomograms_star_path
         output_path = tomo_viewer.tomo_path_and_stage.correction_output_path
-        self.model_path = '/share/data/CryoET_Data/lvzy/script/segvesicle/segvesv0.1/vesicle_corrected_model.h5'
+        # self.model_path = '/share/data/CryoET_Data/lvzy/script/segvesicle/segvesv0.1/vesicle_corrected_model.h5'
         
-        # self.model_path = '/home/liushuo/Documents/data/model/vesicle_corrected_model.h5'
+        self.model_path = '/home/liushuo/Documents/data/model/vesicle_corrected_model.h5'
         # 生成line内容
         line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} {self.model_path} --gpuID 0'
         
@@ -77,6 +77,7 @@ class CorrectionWindow(QMainWindow):
         correction_data = self.predict_one(data)
         add_layer_with_right_contrast(correction_data, 'corrected_tomo_new', self.tomo_viewer.viewer)
         self.tomo_viewer.viewer.layers.move(self.tomo_viewer.viewer.layers.index(self.tomo_viewer.viewer.layers['corrected_tomo_new']), 0)
+        self.tomo_viewer.print("Finish Correction.")
         self.progress_dialog.setValue(100)
         self.close()
 

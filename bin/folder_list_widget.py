@@ -4,7 +4,7 @@ import re
 import numpy as np
 import mrcfile
 
-from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox
+from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QPushButton, QFileDialog
 from qtpy.QtCore import Qt
 
 from napari.utils.notifications import show_info
@@ -30,7 +30,7 @@ def get_tomo(path):
     # data = np.flip(data, axis=1)
     return data
 
-
+        
 class FolderListWidget(QWidget):
     def __init__(self, tomo_viewer: TomoViewer):
         super().__init__()
@@ -39,6 +39,12 @@ class FolderListWidget(QWidget):
         self.tomo_path = None
         # 保存路径为实例变量
         self.layout = QVBoxLayout()
+        
+        # 添加打开文件夹按钮
+        self.open_folder_button = QPushButton("Open Folder")
+        self.open_folder_button.clicked.connect(self.open_folder_dialog)
+        self.layout.addWidget(self.open_folder_button)
+        
         self.list_widget = QListWidget()
         self.layout.addWidget(self.list_widget)
         self.setLayout(self.layout)
@@ -51,6 +57,30 @@ class FolderListWidget(QWidget):
         self.dock_widget = self.tomo_viewer.multiple_viewer_widget
         self.tomo_viewer.print("Welcome to the Vesicle Segmentation Software, version 0.1.")
         self.tomo_viewer.print("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+
+    def open_folder_dialog(self):
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", os.getcwd())
+        # 清除上一个文件夹的缓存
+        if self.tomo_path != None:
+            os.system('mv {} {}'.format(self.tomo_path.new_json_file_path, self.tomo_path.json_file_path))
+            with open(self.tomo_path.json_file_path, 'r') as file:
+                data = json.load(file)
+            # 将JSON数据格式化为多行结构并保存
+            with open(self.tomo_path.json_file_path, 'w') as file:
+                json.dump(data, file, indent=4)
+            os.system('mv {} {}'.format(self.tomo_path.new_label_file_path, self.tomo_path.label_path))
+            os.system('rm -r {}'.format(self.tomo_path.root_dir))
+            message = f"Saved tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
+            self.tomo_viewer.print(message)
+        if folder_path:
+            self.path = folder_path
+            self.tomo_viewer.tomo_path_and_stage.current_path = folder_path
+            self.state_file = os.path.join(self.path, 'segVesicle_QCheckBox_state.json')
+            self.checkbox_states = self.load_checkbox_states()
+            self.list_widget.clear()
+            self.populate_list(folder_path)
+            message = f"Current path changed to: {self.path}"
+            self.tomo_viewer.print(message)
 
     def load_checkbox_states(self):
         if os.path.exists(self.state_file):
@@ -92,6 +122,12 @@ class FolderListWidget(QWidget):
             # 当状态改变时更新状态字典并保存到文件
             checkbox.stateChanged.connect(lambda state, item=item: self.update_checkbox_state(state, item))
             self.list_widget.setItemWidget(list_item, checkbox)
+
+        # 先断开之前的绑定
+        try:
+            self.list_widget.itemDoubleClicked.disconnect()
+        except TypeError:
+            pass
 
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
 
@@ -162,7 +198,7 @@ class FolderListWidget(QWidget):
         # self.dock_widget.viewer_model3.camera.zoom = 2
         
         add_button_and_register_add_and_delete(self.tomo_viewer)
-        self.tomo_viewer.register_isonet()
+        self.tomo_viewer.register()
         
         message = f"Successfully opened tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
         self.tomo_viewer.print(message)
