@@ -6,9 +6,12 @@ import subprocess
 
 from qtpy import QtCore, QtWidgets
 from napari.utils.notifications import show_info
+import SimpleITK as sitk
 
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
+from qtpy.QtWidgets import QFileDialog, QInputDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout
+
 
 from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
@@ -60,29 +63,100 @@ class TomoViewer:
         self.toolbar_widget.predict_button.clicked.connect(self.predict_clicked)
         
     def register_open_ori_tomo(self):
-        def get_tomo(path):
-            with mrcfile.open(path) as mrc:
-                data = mrc.data
-            return data
         def button_clicked():
-            from qtpy.QtWidgets import QProgressDialog
-            from qtpy.QtCore import Qt
-            self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
-            self.progress_dialog.setWindowTitle('Opening')
-            self.progress_dialog.setWindowModality(Qt.WindowModal)
-            self.progress_dialog.setValue(0)
-            self.progress_dialog.show()
-            path = self.tomo_path_and_stage.ori_tomo_path
-            data = get_tomo(path)
-            self.progress_dialog.setValue(50)
-            add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
+        # Create the dialog
+            dialog = QDialog(self.main_viewer)
+            dialog.setWindowTitle('Open Original Tomogram')
+
+            layout = QVBoxLayout()
+
+            # File selection button
+            file_select_layout = QHBoxLayout()
+            file_label = QLabel('File:')
+            initial_path = os.path.join(self.tomo_path_and_stage.current_path, self.tomo_path_and_stage.tomo_name)
+            self.file_line_edit = QLineEdit(initial_path)
+            file_select_button = QPushButton('Select File')
+            file_select_layout.addWidget(file_label)
+            file_select_layout.addWidget(self.file_line_edit)
+            file_select_layout.addWidget(file_select_button)
+            layout.addLayout(file_select_layout)
+
+            def select_file():
+                options = QFileDialog.Options()
+                file_path, _ = QFileDialog.getOpenFileName(dialog, "Select File", initial_path, "MRC Files (*.mrc);;REC Files (*.rec);;All Files (*)", options=options)
+                if file_path:
+                    self.file_line_edit.setText(file_path)
+
+            file_select_button.clicked.connect(select_file)
+
+            # Pixel size input
+            pixel_size_layout = QHBoxLayout()
+            pixel_size_label = QLabel('Pixel Size:')
+            self.pixel_size_input = QLineEdit('17.142')
+            pixel_size_layout.addWidget(pixel_size_label)
+            pixel_size_layout.addWidget(self.pixel_size_input)
+            layout.addLayout(pixel_size_layout)
+
+            # Apply button
+            apply_button = QPushButton('Apply')
+            layout.addWidget(apply_button)
+
+            def apply_resample_image():
+                file_path = self.file_line_edit.text()
+                try:
+                    pixel_size = float(self.pixel_size_input.text())
+                except ValueError:
+                    self.print("Invalid pixel size.")
+                    return
+
+                # Show progress dialog
+                from qtpy.QtWidgets import QProgressDialog
+                from qtpy.QtCore import Qt
+                self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
+                self.progress_dialog.setWindowTitle('Opening')
+                self.progress_dialog.setWindowModality(Qt.WindowModal)
+                self.progress_dialog.setValue(0)
+                self.progress_dialog.show()
+
+                # Processing
+                self.progress_dialog.setValue(50)
+                data = resample_image(file_path, pixel_size)
+                data = sitk.GetArrayFromImage(data)
+                add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
+
+                self.viewer.layers['corrected_tomo'].visible = False
+                self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
+                self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+                self.progress_dialog.setValue(100)
+                message = f"Successfully opened the original image {file_path}."
+                self.print(message)
+                dialog.accept()
+
+            apply_button.clicked.connect(apply_resample_image)
+
+            dialog.setLayout(layout)
+            dialog.exec_()
+        # def button_clicked():
+        #     from qtpy.QtWidgets import QProgressDialog
+        #     from qtpy.QtCore import Qt
+        #     self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
+        #     self.progress_dialog.setWindowTitle('Opening')
+        #     self.progress_dialog.setWindowModality(Qt.WindowModal)
+        #     self.progress_dialog.setValue(0)
+        #     self.progress_dialog.show()
+        #     path = self.tomo_path_and_stage.ori_tomo_path
+        #     # data = get_tomo(path)
+        #     self.progress_dialog.setValue(50)
+        #     data = resample_image(path, pixel_size)
+        #     data = sitk.GetArrayFromImage(data)
+        #     add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
             
-            self.viewer.layers['corrected_tomo'].visible = False
-            self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
-            self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
-            self.progress_dialog.setValue(100)
-            message = f"Successfully opened the original image {self.tomo_path_and_stage.ori_tomo_path}."
-            self.print(message)
+        #     self.viewer.layers['corrected_tomo'].visible = False
+        #     self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
+        #     self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+        #     self.progress_dialog.setValue(100)
+        #     message = f"Successfully opened the original image {self.tomo_path_and_stage.ori_tomo_path}."
+        #     self.print(message)
         try:
             self.toolbar_widget.open_ori_image_button.clicked.disconnect()
         except TypeError:
@@ -197,3 +271,35 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
+        
+def resample_image(tomo, pixel_size=17.142, out_name=None, outspacing=17.142):
+    tomo_sitk = sitk.ReadImage(tomo)
+    # tomo_sitk = tomo_data
+    #out_spacing = prepare_resample(tomo, pixel_size, outspacing)
+    out_spacing = [outspacing, outspacing, outspacing]
+    # original_spacing = tomo_sitk.GetSpacing()
+    original_spacing = [pixel_size, pixel_size, pixel_size]
+    original_size = tomo_sitk.GetSize()
+    # if original_spacing[0] != 1:
+    #     out_spacing = out_spacing
+    # else:
+    #     out_spacing = [0.942, 0.942, 0.942]
+    out_spacing = [outspacing, outspacing, outspacing]
+    out_size = [
+        int(np.round(original_size[0] * original_spacing[0] / out_spacing[0])),
+        int(np.round(original_size[1] * original_spacing[1] / out_spacing[1])),
+        int(np.round(original_size[2] * original_spacing[2] / out_spacing[2]))
+    ]
+    resample = sitk.ResampleImageFilter()
+    resample.SetOutputSpacing(out_spacing)
+    resample.SetSize(out_size)
+    resample.SetOutputDirection(tomo_sitk.GetDirection())
+    resample.SetOutputOrigin(tomo_sitk.GetOrigin())
+    resample.SetTransform(sitk.Transform())
+    resample.SetDefaultPixelValue(tomo_sitk.GetPixelIDValue())
+    # resample.SetInterpolator(sitk.sitkBSpline)
+    resample.SetInterpolator(sitk.sitkLinear)
+
+    resample_tomo = resample.Execute(tomo_sitk)
+
+    return resample_tomo
