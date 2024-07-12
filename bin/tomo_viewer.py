@@ -30,10 +30,16 @@ class TomoViewer:
         self.main_viewer.layout().addWidget(self.multiple_viewer_widget)
         self.viewer.window.add_dock_widget(self.cross_widget, name="Cross", area="left")
         self.viewer.window.add_dock_widget(self.toolbar_widget, area='left', name='Tools')
+        self.show_current_state()
         
     def set_tomo_name(self, tomo_name: str):
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
         
+    def show_current_state(self):
+        progress_value = self.tomo_path_and_stage.progress_stage.value
+        # 将进度状态展示在QLineEdit里
+        self.multiple_viewer_widget.utils_widget.ui.progressStage.setText(progress_value)
+    
     def print(self, message):
         self.multiple_viewer_widget.print_in_widget(message)
         

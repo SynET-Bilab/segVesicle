@@ -202,6 +202,7 @@ class FolderListWidget(QWidget):
         
         message = f"Successfully opened tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
         self.tomo_viewer.print(message)
+        self.tomo_viewer.show_current_state()
         
         self.progress_dialog.setValue(100)
         self.progress_dialog.close()

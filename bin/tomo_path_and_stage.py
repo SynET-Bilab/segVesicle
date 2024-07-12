@@ -3,20 +3,20 @@ from enum import Enum
 
 class TomoPathAndStage:
     class ProgressStage(Enum):
-        ISO_NET = "IsoNet"
-        ISO_NET_DECONV = "IsoNet Deconvolution"
-        ISO_NET_CORRECTION = "IsoNet Correction"
-        MANUAL_CORRECTION = "Manual Correction"
-        STATISTICAL_ANALYSIS = "Statistical Analysis"
-        
-        def __str__(self):
-            return self.name.replace("_", " ")
+        SELECT_TOMO = "Please Select Tomo"
+        MAKE_DECONVOLUTION = "Please Make Deconvolution"
+        MAKE_CORRECTION = "Please Make Correction"
+        MAKE_PREDICT = "Please Make Prediction"
+        MANUALLY_CORRECT_LABELS = "Please Manually Correct Labels"
 
     def __init__(self, current_path, pid):
         self.tomo_name = None
         self.current_path = current_path
         self.pid = pid
         self.root_dir = None
+        
+        # 初始化进度
+        self.progress_stage = self.determine_progress()
 
     def set_tomo_name(self, tomo_name):
         self.tomo_name = tomo_name
@@ -43,26 +43,24 @@ class TomoPathAndStage:
         self.progress_stage = self.determine_progress()
     
     def determine_progress(self):
+        if self.tomo_name == None:
+            return self.ProgressStage.SELECT_TOMO
         """确定当前的进度阶段"""
-        if os.path.exists(self.ori_label_path):
-            return self.ProgressStage.STATISTICAL_ANALYSIS
-        elif os.path.exists(self.ori_json_file_path) or os.path.exists(self.new_label_file_path):
-            return self.ProgressStage.MANUAL_CORRECTION
+        if os.path.exists(self.new_label_file_path) or os.path.exists(self.label_path):
+            return self.ProgressStage.MANUALLY_CORRECT_LABELS
         elif os.path.exists(self.isonet_tomo_path):
-            return self.ProgressStage.ISO_NET_CORRECTION
+            return self.ProgressStage.MAKE_PREDICT
         elif os.path.exists(self.deconv_tomo_path):
-            return self.ProgressStage.ISO_NET_DECONV
+            return self.ProgressStage.MAKE_CORRECTION
+        elif os.path.exists(self.ori_tomo_path):
+            return self.ProgressStage.MAKE_DECONVOLUTION
         else:
-            return self.ProgressStage.ISO_NET
-
-    def __str__(self):
-        return f"TomoPath: {self.tomo_name}, Progress Stage: {self.progress_stage}"
+            return self.ProgressStage.SELECT_TOMO
+        
+    def update_progress_stage(self):
+        """更新进度阶段"""
+        self.progress_stage = self.determine_progress()
 
 # # 全局变量
 # TOMO_SEGMENTATION_PROGRESS = ProgressStage.ISO_NET
 # global_viewer = napari.Viewer()
-
-if __name__ == '__main__':
-    # 示例使用
-    tomo_path_instance = TomoPathAndStage(tomo_name="example_tomo", root_dir="/path/to/root", pid=1234)
-    print(tomo_path_instance)
