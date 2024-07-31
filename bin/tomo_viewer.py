@@ -3,6 +3,7 @@ import mrcfile
 import napari
 import os
 import subprocess
+import json
 
 from qtpy import QtCore, QtWidgets
 from napari.utils.notifications import show_info
@@ -17,6 +18,7 @@ from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
+from util.resample import resample_image
 from widget.function_widget import ToolbarWidget
 
 
@@ -51,6 +53,7 @@ class TomoViewer:
         self.register_deconv_tomo()
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
+        self.register_manualy_correction()
         try:
             self.toolbar_widget.finish_isonet_button.clicked.disconnect()
         except TypeError:
@@ -83,7 +86,13 @@ class TomoViewer:
 
             def select_file():
                 options = QFileDialog.Options()
-                file_path, _ = QFileDialog.getOpenFileName(dialog, "Select File", initial_path, "MRC Files (*.mrc);;REC Files (*.rec);;All Files (*)", options=options)
+                file_path, _ = QFileDialog.getOpenFileName(
+                    dialog,
+                    "Select File",
+                    initial_path,
+                    "MRC or REC Files (*.mrc *.rec);;All Files (*)",
+                    options=options
+                )
                 if file_path:
                     self.file_line_edit.setText(file_path)
 
@@ -124,9 +133,15 @@ class TomoViewer:
                 data = sitk.GetArrayFromImage(data)
                 add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
 
-                self.viewer.layers['corrected_tomo'].visible = False
+                if 'corrected_tomo' in self.viewer.layers:
+                    self.viewer.layers['corrected_tomo'].visible = False
+                if 'edit vesicles' in self.viewer.layers:
+                    self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+                
                 self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
-                self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+                self.viewer.add_points(name='edit vesicles', ndim=3, size=4)
+                self.viewer.layers['edit vesicles'].mode = 'ADD'
+                
                 self.progress_dialog.setValue(100)
                 message = f"Successfully opened the original image {file_path}."
                 self.print(message)
@@ -136,27 +151,7 @@ class TomoViewer:
 
             dialog.setLayout(layout)
             dialog.exec_()
-        # def button_clicked():
-        #     from qtpy.QtWidgets import QProgressDialog
-        #     from qtpy.QtCore import Qt
-        #     self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
-        #     self.progress_dialog.setWindowTitle('Opening')
-        #     self.progress_dialog.setWindowModality(Qt.WindowModal)
-        #     self.progress_dialog.setValue(0)
-        #     self.progress_dialog.show()
-        #     path = self.tomo_path_and_stage.ori_tomo_path
-        #     # data = get_tomo(path)
-        #     self.progress_dialog.setValue(50)
-        #     data = resample_image(path, pixel_size)
-        #     data = sitk.GetArrayFromImage(data)
-        #     add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
-            
-        #     self.viewer.layers['corrected_tomo'].visible = False
-        #     self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
-        #     self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
-        #     self.progress_dialog.setValue(100)
-        #     message = f"Successfully opened the original image {self.tomo_path_and_stage.ori_tomo_path}."
-        #     self.print(message)
+
         try:
             self.toolbar_widget.open_ori_image_button.clicked.disconnect()
         except TypeError:
@@ -171,6 +166,7 @@ class TomoViewer:
                     self.deconv_window = DeconvWindow(self)
                     self.deconv_window.show()
                 else:
+                    self.viewer.layers['edit vesicles'].data = None
                     self.print('Please add two points to define deconvolution area.')
                     show_info('Please add two points to define deconvolution area.')
             else:
@@ -219,9 +215,13 @@ class TomoViewer:
         self.progress_dialog.setValue(60)
 
         self.vesicle_info = vesicle_measure(self.corrected_data, self.processed_vesicles, self.shape, min_radius=8)
+        with open(self.tomo_path_and_stage.new_json_file_path,"w") as out:
+            json.dump(self.vesicle_info,out)
         self.ves_tomo = vesicle_rendering(self.vesicle_info, self.shape)
-        
-        self.viewer.add_labels(self.ves_tomo, name='new_label')
+        with mrcfile.new(self.tomo_path_and_stage.new_label_file_path, overwrite=True) as mrc:
+            mrc.set_data(self.ves_tomo)
+        self.viewer.add_labels(self.ves_tomo, name='label')
+        self.viewer.layers['label'].opacity = 0.5 
         self.progress_dialog.setValue(100)
         
     def register_draw_area_mod(self):
@@ -262,6 +262,11 @@ class TomoViewer:
 
                 # 通过命令行执行 model2point 命令并保存 area.mod 文件
                 subprocess.run(['point2model', point_file_path, output_mod_file, '-planar'])
+                self.viewer.layers['edit vesicles'].data = None
+                
+                if os.path.exists(point_file_path):
+                    os.remove(point_file_path)
+                
                 self.print("Points validated and saved successfully.")
             else:
                 self.print("Points do not meet the required conditions.")
@@ -272,34 +277,28 @@ class TomoViewer:
             pass
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
         
-def resample_image(tomo, pixel_size=17.142, out_name=None, outspacing=17.142):
-    tomo_sitk = sitk.ReadImage(tomo)
-    # tomo_sitk = tomo_data
-    #out_spacing = prepare_resample(tomo, pixel_size, outspacing)
-    out_spacing = [outspacing, outspacing, outspacing]
-    # original_spacing = tomo_sitk.GetSpacing()
-    original_spacing = [pixel_size, pixel_size, pixel_size]
-    original_size = tomo_sitk.GetSize()
-    # if original_spacing[0] != 1:
-    #     out_spacing = out_spacing
-    # else:
-    #     out_spacing = [0.942, 0.942, 0.942]
-    out_spacing = [outspacing, outspacing, outspacing]
-    out_size = [
-        int(np.round(original_size[0] * original_spacing[0] / out_spacing[0])),
-        int(np.round(original_size[1] * original_spacing[1] / out_spacing[1])),
-        int(np.round(original_size[2] * original_spacing[2] / out_spacing[2]))
-    ]
-    resample = sitk.ResampleImageFilter()
-    resample.SetOutputSpacing(out_spacing)
-    resample.SetSize(out_size)
-    resample.SetOutputDirection(tomo_sitk.GetDirection())
-    resample.SetOutputOrigin(tomo_sitk.GetOrigin())
-    resample.SetTransform(sitk.Transform())
-    resample.SetDefaultPixelValue(tomo_sitk.GetPixelIDValue())
-    # resample.SetInterpolator(sitk.sitkBSpline)
-    resample.SetInterpolator(sitk.sitkLinear)
-
-    resample_tomo = resample.Execute(tomo_sitk)
-
-    return resample_tomo
+    def register_manualy_correction(self):
+        
+        def init_lable_file():
+            if self.viewer.layers:
+                label_shape = self.viewer.layers[0].data.shape
+                zero_label = np.zeros(label_shape, dtype=np.int16)
+                with mrcfile.new(self.tomo_path_and_stage.new_label_file_path, overwrite=True) as mrc:
+                    mrc.set_data(zero_label.astype(np.float32))
+                
+                self.viewer.add_labels(zero_label, name='label')  # add label layer
+                self.viewer.layers['label'].opacity = 0.5
+                self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+                # 将初始数据写入文件
+                initial_data = {
+                    "vesicles": []
+                }
+                with open(self.tomo_path_and_stage.new_json_file_path, 'w') as json_file:
+                    json.dump(initial_data, json_file, indent=4)
+        
+        try:
+            self.toolbar_widget.manual_annotation_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.manual_annotation_button.clicked.connect(init_lable_file)
+    

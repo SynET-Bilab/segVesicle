@@ -104,7 +104,13 @@ def get_info_from_json(json_file):
     for vesicle in vesicles:
         centers.append(vesicle['center'])
     centers = np.asarray(centers)
-    tree = KDTree(centers, leafsize=2)
+    
+    # 如果 centers 为空，则初始化为一个形状为 (0, 3) 的二维数组
+    if centers.size == 0:
+        centers = np.empty((0, 3))
+        tree = KDTree(np.empty((0, 3)))  # 创建一个空的 KDTree
+    else:
+        tree = KDTree(centers, leafsize=2)
     return vesicles, tree
 
 def update_json_file(tomo_viewer, point, mode, vesicle_to_add):
@@ -121,7 +127,7 @@ def update_json_file(tomo_viewer, point, mode, vesicle_to_add):
 
 def add_vesicle_show(tomo_viewer, point, add_mode):
     viewer = tomo_viewer.viewer
-    ori_tomo = viewer.layers['corrected_tomo'].data
+    ori_tomo = viewer.layers[0].data
     label_idx = LABEL_START + added_vesicle_num
     data_to_add, new_added_vesicle = add_vesicle(ori_tomo, point, label_idx, add_mode)
     return data_to_add.astype(np.int16), new_added_vesicle
@@ -138,23 +144,29 @@ def delete_picked_vesicle(tomo_viewer, deleted_point):
 def add_picked_vesicle(tomo_viewer, data_to_add):
     viewer = tomo_viewer.viewer
     if np.sum(np.sign(viewer.layers[LABEL_LAYER_IDX].data) * np.sign(data_to_add)) > 0:
+        tomo_viewer.print('Please reselect two points')
         show_info('Please reselect two points')
     else:
         viewer.layers[LABEL_LAYER_IDX].data = viewer.layers[LABEL_LAYER_IDX].data + data_to_add  # update label layer
         viewer.layers[LABEL_LAYER_IDX].refresh()
+        tomo_viewer.print('Successfully added 3d Vesicle')
 
 def save_and_update_delete(tomo_viewer):
     viewer = tomo_viewer.viewer
-    if len(viewer.layers[POINT_LAYER_IDX].data) < 1:
-        show_info('Please pick a point to delete')
-        tomo_viewer.print('Please pick a point to delete')
+    if LABEL_LAYER_IDX in viewer.layers:
+        if len(viewer.layers[POINT_LAYER_IDX].data) < 1:
+            show_info('Please pick a point to delete')
+            tomo_viewer.print('Please pick a point to delete')
+        else:
+            point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Deleted')
+            delete_picked_vesicle(tomo_viewer, point)
+            viewer.layers[POINT_LAYER_IDX].data = None
+            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+            update_json_file(tomo_viewer, point, mode='Deleted', vesicle_to_add=None)
+            tomo_viewer.print('Successfully deleted Vesicle')
     else:
-        point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Deleted')
-        delete_picked_vesicle(tomo_viewer, point)
         viewer.layers[POINT_LAYER_IDX].data = None
-        save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-        update_json_file(tomo_viewer, point, mode='Deleted', vesicle_to_add=None)
-        tomo_viewer.print('Successfully deleted Vesicle')
+        tomo_viewer.print('Please Make Predict or Start Manual Correction')
 
 def create_delete_button(tomo_viewer):
     from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
@@ -189,7 +201,7 @@ def save_and_update_add(tomo_viewer):
         viewer.layers[POINT_LAYER_IDX].data = None
         save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
         update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        tomo_viewer.print('Successfully added 3d Vesicle')
+        
 
 def save_and_update_add_2d(tomo_viewer):
     viewer = tomo_viewer.viewer

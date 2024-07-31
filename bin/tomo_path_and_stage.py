@@ -4,6 +4,7 @@ from enum import Enum
 class TomoPathAndStage:
     class ProgressStage(Enum):
         SELECT_TOMO = "Please Select Tomo"
+        OPEN_TOMO = "Please Open Original Tomo"
         MAKE_DECONVOLUTION = "Please Make Deconvolution"
         MAKE_CORRECTION = "Please Make Correction"
         MAKE_PREDICT = "Please Make Prediction"
@@ -55,7 +56,7 @@ class TomoPathAndStage:
         elif os.path.exists(self.ori_tomo_path):
             return self.ProgressStage.MAKE_DECONVOLUTION
         else:
-            return self.ProgressStage.SELECT_TOMO
+            return self.ProgressStage.OPEN_TOMO
         
     def update_progress_stage(self):
         """更新进度阶段"""
