@@ -59,6 +59,10 @@ def add_vesicle(data_iso, points, label_idx, add_mode = '3d'):
         [center, evecs, radii, ccf] = density_fit_2d(data_iso, center_manual, radius)
     elif add_mode == '6pts':
         [center, evecs, radii, ccf] = fit_6pts(data_iso, points)
+
+    if ccf < 0.2:
+        return [0], None
+    
     info = {'name':'vesicle_'+str(label_idx), 'center':center.tolist(), 'radii':radii.tolist(), 'evecs':evecs.tolist(), 'CCF':str(ccf)}
     
     result_to_show = [info]
@@ -185,11 +189,14 @@ def save_and_update_add(tomo_viewer):
     else:
         point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
         data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='3d')
-        add_picked_vesicle(tomo_viewer, data_to_add)
-        viewer.layers[POINT_LAYER_IDX].data = None
-        save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-        update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        tomo_viewer.print('Successfully added 3d Vesicle')
+        if new_added_vesicle is None:
+            tomo_viewer.print('Not a good 3d Vesicle, please reselect')
+        else:
+            add_picked_vesicle(tomo_viewer, data_to_add)
+            viewer.layers[POINT_LAYER_IDX].data = None
+            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+            update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+            tomo_viewer.print('Successfully added 3d Vesicle')
 
 def save_and_update_add_2d(tomo_viewer):
     viewer = tomo_viewer.viewer
@@ -199,11 +206,14 @@ def save_and_update_add_2d(tomo_viewer):
     else:
         point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
         data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='2d')
-        add_picked_vesicle(tomo_viewer, data_to_add)
-        viewer.layers[POINT_LAYER_IDX].data = None
-        save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-        update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        tomo_viewer.print('Successfully added 2d Vesicle')
+        if new_added_vesicle is None:
+            tomo_viewer.print('Not a good 2d Vesicle, please reselect')
+        else:
+            add_picked_vesicle(tomo_viewer, data_to_add)
+            viewer.layers[POINT_LAYER_IDX].data = None
+            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+            update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+            tomo_viewer.print('Successfully added 2d Vesicle')
 
 def save_and_update_add_6pts(tomo_viewer):
     viewer = tomo_viewer.viewer
@@ -213,11 +223,14 @@ def save_and_update_add_6pts(tomo_viewer):
     else:
         point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added_6pts')
         data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='6pts')
-        add_picked_vesicle(tomo_viewer, data_to_add)
-        viewer.layers[POINT_LAYER_IDX].data = None
-        save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-        update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
-        tomo_viewer.print('Successfully added 2d Vesicle')
+        if new_added_vesicle is None:
+            tomo_viewer.print('Not a good 2d Vesicle, please reselect')
+        else:
+            add_picked_vesicle(tomo_viewer, data_to_add)
+            viewer.layers[POINT_LAYER_IDX].data = None
+            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+            update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+            tomo_viewer.print('Successfully added 2d Vesicle')
 
 def register_save_shortcut_add(tomo_viewer):
     viewer = tomo_viewer.viewer
