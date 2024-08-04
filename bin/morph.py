@@ -142,7 +142,8 @@ def density_fit(data_iso,center,radius):
     '''input center(z,y,x), output center(z,y.x), both in array
     '''
     shape = data_iso.shape
-    padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
+    # padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
+    padwidth = 20
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
@@ -154,15 +155,21 @@ def density_fit(data_iso,center,radius):
     cube_normalize = (cube_reverse - np.min(cube_reverse))/(np.max(cube_reverse)-np.min(cube_reverse))
 
     mask=ball(cube_.shape[0]//2)
-    mask_circle=cube_.copy()
-    p=np.percentile(cube_, 50)
-    mask_circle[cube_<p]=1
-    mask_circle[cube_>=p]=0
-    mean_circle=np.sum(mask_circle*cube_)/np.sum(mask_circle)
+    # mask_circle=cube_.copy()
+    # p=np.percentile(cube_, 50)
+    # mask_circle[cube_<p]=1
+    # mask_circle[cube_>=p]=0
+    # mean_circle=np.sum(mask_circle*cube_)/np.sum(mask_circle)
 
+    # cube_m=cube_.copy()
+    # cube_m[cube_<mean_circle]=1
+    # cube_m[cube_>=mean_circle]=0
     cube_m=cube_.copy()
-    cube_m[cube_<mean_circle]=1
-    cube_m[cube_>=mean_circle]=0
+    avg = 0.5 * (np.min(cube_)+np.max(cube_))
+    cube_m[cube_<avg]=1
+    cube_m[cube_>=avg]=0    
+
+
     cube_m_mask=mask*cube_m
     databool=cube_m_mask >0
     cube_m_mask=remove_small_objects(databool, min_size=50).astype(np.int8)
@@ -170,10 +177,26 @@ def density_fit(data_iso,center,radius):
     open=opening(cube_m_mask)
     databool=open >0
     opened=remove_small_objects(databool, min_size=50).astype(np.int16)
+    l = label(opened, connectivity=1)
     if np.sum(opened) < 1000:
         return [None, None, None, 0]
-    #erded=erosion(opened,cube(2))
-    idx=get_indices_sparse(opened)
+    d_min = 100
+    label_vaule = 0
+    for i in range(np.max(l)):
+        points_i = np.where(l==(i+1))
+        points_z = points_i[0]
+        points_y = points_i[1]
+        points_x = points_i[2]
+        center_i=np.array([np.mean(points_z),np.mean(points_y),np.mean(points_x)])
+        center_label = np.array([1,1,1])*l.shape[0]//2
+        d = dis(center_i,center_label)
+        if d < d_min:
+            d_min = d
+            label_vaule = i+1
+    labeled = np.zeros_like(l)
+    labeled[l==label_vaule] = 1
+
+    idx=get_indices_sparse(labeled)
     
     vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
     [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
@@ -243,7 +266,8 @@ def density_fit_2d(data_iso,center,radius):
     '''
 
     shape = data_iso.shape
-    padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
+    # padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
+    padwidth = 20
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
@@ -256,18 +280,39 @@ def density_fit_2d(data_iso,center,radius):
     img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
 
     mask = disk(cube_.shape[1]//2)
-    mask_circle=img.copy()
-    p=np.percentile(img, 50)
-    mask_circle[img<p]=1
-    mask_circle[img>=p]=0
-    mean_circle=np.sum(mask_circle * img)/np.sum(mask_circle)
+    # mask_circle=img.copy()
+    # p=np.percentile(img, 50)
+    # mask_circle[img<p]=1
+    # mask_circle[img>=p]=0
+    # mean_circle=np.sum(mask_circle * img)/np.sum(mask_circle)
 
+    # img_m=img.copy()
+    # img_m[img<mean_circle]=1
+    # img_m[img>=mean_circle]=0
     img_m=img.copy()
-    img_m[img<mean_circle]=1
-    img_m[img>=mean_circle]=0
+    avg = 0.5 * (np.min(img)+np.max(img))
+    img_m[img<avg]=1
+    img_m[img>=avg]=0
+
     img_m_mask=mask*img_m
+    open=opening(cube_m_mask)
+    l = label(open, connectivity=1)
+    d_min = 100
+    label_vaule = 0
+    for i in range(np.max(l)):
+        points_i = np.where(l==(i+1))
+        points_y = points_i[0]
+        points_x = points_i[1]
+        center_i=np.array([np.mean(points_y),np.mean(points_x)])
+        center_label = np.array([1,1])*l.shape[0]//2
+        d = dis(center_i,center_label)
+        if d < d_min:
+            d_min = d
+            label_vaule = i+1
+    labeled = np.zeros_like(l)
+    labeled[l==label_vaule] = 1
     cube_m_mask=np.zeros_like(cube_)
-    cube_m_mask[cube_.shape[0]//2]=img_m_mask
+    cube_m_mask[cube_.shape[0]//2]=labeled
 
     cloud=np.where(cube_m_mask>0)
     x = np.asarray(cloud[2])
@@ -294,7 +339,8 @@ def fit_6pts(data_iso, points):
     tm = template_2d(radii, center_cube, evecs, cube_shape)
 
     shape = data_iso.shape
-    padwidth = int(max(-min(center_cube-radius), -min(np.array(shape)-1-center_cube-radius),0))+5
+    #padwidth = int(max(-min(center_cube-radius), -min(np.array(shape)-1-center_cube-radius),0))+5
+    padwidth = 20
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
     center = np.round(center_cube+padwidth).astype(np.int16)
