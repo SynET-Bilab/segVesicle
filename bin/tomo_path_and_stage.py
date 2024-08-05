@@ -27,7 +27,8 @@ class TomoPathAndStage:
         base_tomo_name = tomo_name.split('-1')[0] if '-1' in tomo_name else tomo_name
 
         # 初始化路径
-        self.ori_tomo_path = os.path.abspath(os.path.join(tomo_name, base_tomo_name + '-bin4-wbp.rec'))
+        # self.ori_tomo_path = os.path.abspath(os.path.join(tomo_name, base_tomo_name + '-bin4-wbp.rec'))
+        self.ori_tomo_path = os.path.abspath(os.path.join(tomo_name, base_tomo_name + '-bin4-15i.rec'))
         self.tomograms_star_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomograms.star'))
         self.deconv_tomo_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg', 'tomoset', base_tomo_name + '_dec.mrc'))
         self.correction_output_path = os.path.abspath(os.path.join(tomo_name, 'ves_seg'))
