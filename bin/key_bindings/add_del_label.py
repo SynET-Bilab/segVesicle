@@ -61,7 +61,7 @@ def add_vesicle(data_iso, points, label_idx, add_mode = '3d'):
         [center, evecs, radii, ccf] = fit_6pts(data_iso, points)
 
     if ccf < 0.2:
-        return [0], None
+        return np.array([0]), None
     
     info = {'name':'vesicle_'+str(label_idx), 'center':center.tolist(), 'radii':radii.tolist(), 'evecs':evecs.tolist(), 'CCF':str(ccf)}
     
@@ -190,6 +190,7 @@ def save_and_update_add(tomo_viewer):
         point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
         data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='3d')
         if new_added_vesicle is None:
+            viewer.layers[POINT_LAYER_IDX].data = None
             tomo_viewer.print('Not a good 3d Vesicle, please reselect')
         else:
             add_picked_vesicle(tomo_viewer, data_to_add)
