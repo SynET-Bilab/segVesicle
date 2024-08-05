@@ -47,6 +47,11 @@ class FolderListWidget(QWidget):
         self.open_folder_button.clicked.connect(self.open_folder_dialog)
         self.layout.addWidget(self.open_folder_button)
         
+        # 添加创建segVesicle.batch按钮
+        self.create_segvesicle_batch_button = QPushButton("Create segVesicle.batch")
+        self.create_segvesicle_batch_button.clicked.connect(self.create_segvesicle_batch)
+        self.layout.addWidget(self.create_segvesicle_batch_button)
+        
         self.list_widget = QListWidget()
         self.layout.addWidget(self.list_widget)
         self.setLayout(self.layout)
@@ -59,6 +64,7 @@ class FolderListWidget(QWidget):
         self.dock_widget = self.tomo_viewer.multiple_viewer_widget
         self.tomo_viewer.print("Welcome to the Vesicle Segmentation Software, version 0.1.")
         self.tomo_viewer.print("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+ 
 
     def open_folder_dialog(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", os.getcwd())
@@ -83,6 +89,27 @@ class FolderListWidget(QWidget):
             self.populate_list(folder_path)
             message = f"Current path changed to: {self.path}"
             self.tomo_viewer.print(message)
+
+    def create_segvesicle_batch(self):
+        current_path = self.tomo_viewer.tomo_path_and_stage.current_path
+        import subprocess
+        if current_path:
+            files = []
+            for root, dirs, filenames in os.walk(current_path):
+                for filename in filenames:
+                    if filename.endswith('.rec') or filename.endswith('.mrc'):
+                        dir_path = os.path.relpath(root, current_path)
+                        if dir_path not in [os.path.dirname(f) for f in files]:
+                            files.append(os.path.join(dir_path, filename))
+            
+            with open(os.path.join(current_path, 'segVesicle.batch'), 'w') as f:
+                for file in files:
+                    f.write(file + '\n')
+            self.state_file = os.path.join(self.path, 'segVesicle_QCheckBox_state.json')
+            self.checkbox_states = self.load_checkbox_states()
+            self.list_widget.clear()
+            self.populate_list(self.tomo_viewer.tomo_path_and_stage.current_path)
+            
 
     def load_checkbox_states(self):
         if os.path.exists(self.state_file):
