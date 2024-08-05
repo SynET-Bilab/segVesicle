@@ -26,7 +26,34 @@ The workflow of `SegVesicle` can be divided into the following steps:
 
 ### Data Preprocessing
 Data preprocessing is the first step in the workflow and includes the following parts:
-- **File Organization**: Place all files to be processed in a single folder.
+- **File Organization**: Place all files to be processed in their respective subfolders within a main folder. Each subfolder (e.g., `p545`, `p565`, `pp1134`) should contain the corresponding `.mrc` or `.rec` files. The main folder should also contain a `segVesicle.batch` file that stores information about the images to be segmented.
+    If the `segVesicle.batch` file does not exist, you can create it using the command line:
+
+    `bash
+    ls */*-bin4-wbp.rec > segVesicle.batch
+    `
+    
+    Alternatively, you can create it using the "Create segVesicle.batch" button in the top right corner of the SegVesicle software.
+
+    The file organization should be as follows:
+    ```
+    any_folder/
+    ├── p545/
+    │   ├── p545*.mrc
+    │   ├── p545*.rec
+    │   └── ...
+    ├── p565/
+    │   ├── p565*.mrc
+    │   ├── p565*.rec
+    │   └── ...
+    ├── pp1134/
+    │   ├── p565*.mrc
+    │   ├── p565*.rec
+    │   └── ...
+    ├── ...
+    └── segVesicle.batch
+    ```
+
 - **Batch File Creation**: Use the command `ls */*-bin4-wbp.rec > segVesicle.batch` to create a file that stores information about the images to be segmented.
 - **Image Correction**: Apply IsoNet's deconvolution and correction for image correction.
 
