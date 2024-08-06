@@ -1,6 +1,7 @@
 import time
 import logging
 import sys
+import os
 import numpy as np
 from tqdm import tqdm
 from scipy import ndimage
@@ -15,10 +16,15 @@ from segVesicle.models import resunet3D as models
 from segVesicle.bin.ellipsoid import ellipsoid_fit as ef
 from segVesicle.utils import make_ellipsoid as mk
 
+from util.model_exists import ensure_model_exists
+
 
 def predict_label(deconv_data, corrected_data):
-    path_weights1 = '/home/liushuo/Documents/code/vesiclePipeline/segVesicle/pretrained/vesicle_seg_model_1.h5'
-    path_weights2 = '/home/liushuo/Documents/code/vesiclePipeline/segVesicle/pretrained/vesicle_seg_model_2.h5'
+    model_1 = 'vesicle_seg_model_1.h5'
+    model_2 = 'vesicle_seg_model_2.h5'
+    
+    path_weights1 = ensure_model_exists(model_1)
+    path_weights2 = ensure_model_exists(model_2)
 
     seg1 = segment(path_weights1, corrected_data)
     seg2 = segment(path_weights2, deconv_data)

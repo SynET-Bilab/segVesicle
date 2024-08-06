@@ -11,6 +11,7 @@ from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon
 
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
+from util.model_exists import ensure_model_exists
 
 class CorrectionWindow(QMainWindow):
     def __init__(self, tomo_viewer):        
@@ -37,8 +38,8 @@ class CorrectionWindow(QMainWindow):
         tomograms_star_path = tomo_viewer.tomo_path_and_stage.tomograms_star_path
         output_path = tomo_viewer.tomo_path_and_stage.correction_output_path
         # self.model_path = '/share/data/CryoET_Data/lvzy/script/segvesicle/segvesv0.1/vesicle_corrected_model.h5'
-        
-        self.model_path = '/home/liushuo/Documents/data/model/vesicle_corrected_model.h5'
+        model_name = 'vesicle_corrected_model.h5'
+        self.model_path = ensure_model_exists(model_name)
         # 生成line内容
         line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} {self.model_path} --gpuID 0'
         
