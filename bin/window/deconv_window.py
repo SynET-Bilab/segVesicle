@@ -1,5 +1,7 @@
 import napari
 import numpy as np
+import mrcfile
+import os
 from qtpy.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QGridLayout, QDoubleSpinBox, QProgressDialog, QApplication
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QScreen
@@ -184,6 +186,13 @@ class DeconvWindow(QMainWindow):
                                     snrfalloff=snrfalloff, deconvstrength=deconvstrength, 
                                     highpassnyquist=highpassnyquist, phaseflipped=False, phaseshift=0, ncpu=4)
         # self.viewer.layers.clear()
+        directory = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Created directory: {directory}")
+        with mrcfile.new(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path, overwrite=True) as output_mrc:
+            output_mrc.set_data(deconv_result)
+            output_mrc.voxel_size = 17.14
         add_layer_with_right_contrast(deconv_result, 'deconv_tomo', self.viewer)
         deconv_tomo_layer = self.viewer.layers['deconv_tomo']
         self.viewer.layers.move(self.viewer.layers.index(deconv_tomo_layer), 0)

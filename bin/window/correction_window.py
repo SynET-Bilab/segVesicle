@@ -1,6 +1,8 @@
 import napari
 import sys
 import logging
+import mrcfile
+import os
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
@@ -75,9 +77,17 @@ class CorrectionWindow(QMainWindow):
         data = self.tomo_viewer.viewer.layers['deconv_tomo'].data
         self.progress_dialog.setValue(50)
         correction_data = self.predict_one(data)
+        directory = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Created directory: {directory}")
+        with mrcfile.new(self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path, overwrite=True) as output_mrc:
+            output_mrc.set_data(correction_data)
+            output_mrc.voxel_size = 17.14
         add_layer_with_right_contrast(correction_data, 'corrected_tomo', self.tomo_viewer.viewer)
         self.tomo_viewer.viewer.layers.move(self.tomo_viewer.viewer.layers.index(self.tomo_viewer.viewer.layers['corrected_tomo']), 0)
         self.tomo_viewer.viewer.layers['deconv_tomo'].visible = False
+        self.tomo_viewer.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
         self.tomo_viewer.print("Finish Correction.")
         self.progress_dialog.setValue(100)
         self.close()

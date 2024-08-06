@@ -291,8 +291,10 @@ class CrossWidget(QCheckBox):
         if state:
             self.viewer.layers.append(self.layer)
             self.viewer.layers.move(self.viewer.layers.index(self.layer), -1)
+            self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
         else:
             self.viewer.layers.remove(self.layer)
+            self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
         self.update_cross()
 
     def update_cross(self):

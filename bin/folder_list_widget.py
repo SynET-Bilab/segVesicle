@@ -368,3 +368,37 @@ class FolderListWidget(QWidget):
             self.dock_widget.viewer_model1.camera.zoom = 0.9
             self.dock_widget.viewer_model2.camera.zoom = 0.9
             self.progress_dialog.close()
+            
+        elif self.tomo_path.progress_stage.name == 'MAKE_CORRECTION':
+            tomo = get_tomo(self.tomo_path.deconv_tomo_path)
+            
+            add_layer_with_right_contrast(tomo, 'deconv_tomo', self.tomo_viewer.viewer)
+            
+            
+            self.tomo_viewer.viewer.add_points(name='edit vesicles', ndim=3, size=4)
+            self.tomo_viewer.viewer.layers['edit vesicles'].mode = 'ADD'
+
+            add_button_and_register_add_and_delete(self.tomo_viewer)
+            self.tomo_viewer.register()
+            self.tomo_viewer.show_current_state()
+            
+            self.dock_widget.viewer_model1.camera.zoom = 0.9
+            self.dock_widget.viewer_model2.camera.zoom = 0.9
+            self.progress_dialog.close()
+            
+        elif self.tomo_path.progress_stage.name == 'MAKE_PREDICT':
+            tomo = get_tomo(self.tomo_path.isonet_tomo_path)
+            
+            add_layer_with_right_contrast(tomo, 'corrected_tomo', self.tomo_viewer.viewer)
+            
+            
+            self.tomo_viewer.viewer.add_points(name='edit vesicles', ndim=3, size=4)
+            self.tomo_viewer.viewer.layers['edit vesicles'].mode = 'ADD'
+
+            add_button_and_register_add_and_delete(self.tomo_viewer)
+            self.tomo_viewer.register()
+            self.tomo_viewer.show_current_state()
+            
+            self.dock_widget.viewer_model1.camera.zoom = 0.9
+            self.dock_widget.viewer_model2.camera.zoom = 0.9
+            self.progress_dialog.close()

@@ -32,7 +32,7 @@ Data preprocessing is the first step in the workflow and includes the following 
     `bash
     ls */*-bin4-wbp.rec > segVesicle.batch
     `
-    
+
     Alternatively, you can create it using the "Create segVesicle.batch" button in the top right corner of the SegVesicle software.
 
     The file organization should be as follows:
@@ -54,8 +54,8 @@ Data preprocessing is the first step in the workflow and includes the following 
     └── segVesicle.batch
     ```
 
-- **Batch File Creation**: Use the command `ls */*-bin4-wbp.rec > segVesicle.batch` to create a file that stores information about the images to be segmented.
-- **Image Correction**: Apply IsoNet's deconvolution and correction for image correction.
+- **Image Correction**: Apply IsoNet's CTF deconvolve and correction.
+    - CTF deconvolve
 
 ### Inference and Manual Annotation
 Inference and manual annotation include:
