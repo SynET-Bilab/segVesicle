@@ -17,7 +17,7 @@
 ## 2. Overall Workflow
 The workflow of `SegVesicle` can be divided into the following steps:
 
-1. **Data Preprocessing**: Place all files to be processed in a single folder. Apply deconvolution and correction using IsoNet for image correction.
+1. **Data Preprocessing**: Place all files to be processed in a single folder. Apply deconvolution and correction using IsoNet[1] for image correction.
 2. **Inference and Manual Annotation**: Use the trained model to predict on new images and manually correct annotations as needed.
 3. **Retrain Model**: Based on the manual corrections, retrain the model to improve its accuracy.
 4. **Results Analysis**: Analyze the results of the segmentation.
@@ -25,17 +25,22 @@ The workflow of `SegVesicle` can be divided into the following steps:
 ## 3. Component Overview
 
 ### 3.1 Data Preprocessing
+
 Data preprocessing is the first step in the workflow and includes the following parts:
+
 - **File Organization**: Place all files to be processed in their respective subfolders within a main folder. Each subfolder (e.g., `p545`, `p565`, `pp1134`) should contain the corresponding `.mrc` or `.rec` files. The main folder should also contain a `segVesicle.batch` file that stores information about the images to be segmented.
-    If the `segVesicle.batch` file does not exist, you can create it using the command line:
+    
+If the `segVesicle.batch` file does not exist, you can create it using the command line:
 
-    `bash
+
     ls */*-bin4-wbp.rec > segVesicle.batch
-    `
 
-    Alternatively, you can create it using the "Create segVesicle.batch" button in the top right corner of the SegVesicle software.
 
-    The file organization should be as follows:
+Alternatively, you can create it using the "Create segVesicle.batch" button in the top right corner of the SegVesicle software.
+
+The file organization should be as follows:
+
+
     ```
     any_folder/
     ├── p545/
@@ -79,7 +84,7 @@ Results analysis includes:
 
 
 ## 5. References
-- [1] Reference A
+- [1] [Isotropic Reconstruction For Electron Tomography](https://isonetcryoet.com/)
 - [2] Reference B
 
 ---

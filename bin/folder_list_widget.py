@@ -131,34 +131,37 @@ class FolderListWidget(QWidget):
             return (item, 0)
         
         batch_file_path = os.path.join(path, 'segVesicle.batch')
-        with open(batch_file_path, 'r') as file:
-            lines = file.readlines()
-        
-        folders = sorted(
-            {line.strip().split('/')[0] for line in lines},
-            key=sort_key
-        )
-        
-        for item in folders:
-            list_item = QListWidgetItem("        " + item)
-            self.list_widget.addItem(list_item)
-            checkbox = QCheckBox()
+        if os.path.exists(batch_file_path):
+            with open(batch_file_path, 'r') as file:
+                lines = file.readlines()
             
-            # 设置 QCheckBox 的状态
-            if item in self.checkbox_states:
-                checkbox.setChecked(self.checkbox_states[item])
+            folders = sorted(
+                {line.strip().split('/')[0] for line in lines},
+                key=sort_key
+            )
             
-            # 当状态改变时更新状态字典并保存到文件
-            checkbox.stateChanged.connect(lambda state, item=item: self.update_checkbox_state(state, item))
-            self.list_widget.setItemWidget(list_item, checkbox)
+            for item in folders:
+                list_item = QListWidgetItem("        " + item)
+                self.list_widget.addItem(list_item)
+                checkbox = QCheckBox()
+                
+                # 设置 QCheckBox 的状态
+                if item in self.checkbox_states:
+                    checkbox.setChecked(self.checkbox_states[item])
+                
+                # 当状态改变时更新状态字典并保存到文件
+                checkbox.stateChanged.connect(lambda state, item=item: self.update_checkbox_state(state, item))
+                self.list_widget.setItemWidget(list_item, checkbox)
 
-        # 先断开之前的绑定
-        try:
-            self.list_widget.itemDoubleClicked.disconnect()
-        except TypeError:
+            # 先断开之前的绑定
+            try:
+                self.list_widget.itemDoubleClicked.disconnect()
+            except TypeError:
+                pass
+
+            self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
+        else:
             pass
-
-        self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
 
     def update_checkbox_state(self, state, item):
         self.checkbox_states[item] = (state == 2)

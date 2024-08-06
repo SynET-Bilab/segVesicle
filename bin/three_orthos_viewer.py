@@ -27,6 +27,7 @@ from napari.utils.events.event import WarningEmitter
 from napari.utils.action_manager import action_manager
 from resource.Ui_utils_widge import Ui_Form
 from global_vars import TOMO_NAME
+from help_viewer import HelpViewer
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
@@ -111,37 +112,42 @@ class UtilWidge(QWidget):
         QMetaObject.invokeMethod(self.ui.terminal, "append", Qt.QueuedConnection, Q_ARG(str, formatted_text))
         
     def show_help(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        markdown_file = os.path.join(script_dir, 'resource', 'help.md')
-
-        # 创建一个新的 QMainWindow
-        self.help_window = QMainWindow(self.viewer.window.qt_viewer)
-        self.help_window.setWindowTitle("Help Documentation")
-        self.help_window.setGeometry(100, 100, 600, 400)
-
-        # 创建一个空的 QWidget
-        central_widget = QWidget(self.help_window)
-        self.help_window.setCentralWidget(central_widget)
-
-        # 创建布局
-        layout = QVBoxLayout(central_widget)
-
-        # 创建 QTextBrowser 显示 .md 文件内容
-        text_browser = QTextBrowser(self.help_window)
-        
-        # 读取 .md 文件内容
-        with open(markdown_file, 'r') as file:
-            markdown_content = file.read()
-        
-        # 设置 .md 文件内容到 QTextBrowser
-        text_browser.setMarkdown(markdown_content)
-
-        # 添加 QTextBrowser 到布局
-        layout.addWidget(text_browser)
-
+        self.help_window = HelpViewer(self.viewer.window.qt_viewer)
         # 显示窗口
         self.help_window.show()
         self.help_window.raise_()  # 确保窗口出现在最前面
+        
+        # script_dir = os.path.dirname(os.path.abspath(__file__))
+        # markdown_file = os.path.join(script_dir, 'help_files', 'help.md')
+
+        # # 创建一个新的 QMainWindow
+        # self.help_window = QMainWindow(self.viewer.window.qt_viewer)
+        # self.help_window.setWindowTitle("Help Documentation")
+        # self.help_window.setGeometry(100, 100, 600, 400)
+
+        # # 创建一个空的 QWidget
+        # central_widget = QWidget(self.help_window)
+        # self.help_window.setCentralWidget(central_widget)
+
+        # # 创建布局
+        # layout = QVBoxLayout(central_widget)
+
+        # # 创建 QTextBrowser 显示 .md 文件内容
+        # text_browser = QTextBrowser(self.help_window)
+        
+        # # 读取 .md 文件内容
+        # with open(markdown_file, 'r') as file:
+        #     markdown_content = file.read()
+        
+        # # 设置 .md 文件内容到 QTextBrowser
+        # text_browser.setMarkdown(markdown_content)
+
+        # # 添加 QTextBrowser 到布局
+        # layout.addWidget(text_browser)
+
+        # # 显示窗口
+        # self.help_window.show()
+        # self.help_window.raise_()  # 确保窗口出现在最前面
 
 
 def copy_layer_le_4_16(layer: Layer, name: str = ""):
