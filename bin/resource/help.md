@@ -11,10 +11,10 @@
 4. [Frequently Asked Questions](#frequently-asked-questions)
 5. [References](#references)
 
-## Introduction
+## 1. Introduction
 `SegVesicle` is a tool designed for the neuroscience field, specifically for identifying and segmenting vesicles in microscopy images. This tool combines advanced image processing techniques with deep learning algorithms to provide an efficient and accurate automated solution.
 
-## Overall Workflow
+## 2. Overall Workflow
 The workflow of `SegVesicle` can be divided into the following steps:
 
 1. **Data Preprocessing**: Place all files to be processed in a single folder. Apply deconvolution and correction using IsoNet for image correction.
@@ -22,9 +22,9 @@ The workflow of `SegVesicle` can be divided into the following steps:
 3. **Retrain Model**: Based on the manual corrections, retrain the model to improve its accuracy.
 4. **Results Analysis**: Analyze the results of the segmentation.
 
-## Component Overview
+## 3. Component Overview
 
-### Data Preprocessing
+### 3.1 Data Preprocessing
 Data preprocessing is the first step in the workflow and includes the following parts:
 - **File Organization**: Place all files to be processed in their respective subfolders within a main folder. Each subfolder (e.g., `p545`, `p565`, `pp1134`) should contain the corresponding `.mrc` or `.rec` files. The main folder should also contain a `segVesicle.batch` file that stores information about the images to be segmented.
     If the `segVesicle.batch` file does not exist, you can create it using the command line:
@@ -55,7 +55,8 @@ Data preprocessing is the first step in the workflow and includes the following 
     ```
 
 - **Image Correction**: Apply IsoNet's CTF deconvolve and correction.
-    - CTF deconvolve
+    - CTF deconvolve: 
+    - Correction: 
 
 ### Inference and Manual Annotation
 Inference and manual annotation include:
@@ -72,12 +73,12 @@ Results analysis includes:
 - **Result Visualization**: Visualize the segmentation results for expert analysis and evaluation.
 - **Performance Evaluation**: Evaluate the model performance using metrics such as accuracy, recall, F1 score, etc.
 
-## Frequently Asked Questions
+## 4. Frequently Asked Questions
 1. **Sometimes shortcut keys fail to register. How to resolve this?**
    - Select a few blank spots and rapidly click the small trash icon multiple times. This usually helps in successfully registering the shortcut keys, although the exact reason is unknown.
 
 
-## References
+## 5. References
 - [1] Reference A
 - [2] Reference B
 
