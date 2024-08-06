@@ -28,12 +28,13 @@ The workflow of `SegVesicle` can be divided into the following steps:
 
 Data preprocessing is the first step in the workflow and includes the following parts:
 
-- **File Organization**: Place all files to be processed in their respective subfolders within a main folder. Each subfolder (e.g., `p545`, `p565`, `pp1134`) should contain the corresponding `.mrc` or `.rec` files. The main folder should also contain a `segVesicle.batch` file that stores information about the images to be segmented.
+#### File Organization
+Place all files to be processed in their respective subfolders within a main folder. Each subfolder (e.g., `p545`, `p565`, `pp1134`) should contain the corresponding `.mrc` or `.rec` files. The main folder should also contain a `segVesicle.batch` file that stores information about the images to be segmented.
     
 If the `segVesicle.batch` file does not exist, you can create it using the command line:
 
 
-    ls */*-bin4-wbp.rec > segVesicle.batch
+`ls */*-bin4-wbp.rec > segVesicle.batch`
 
 
 Alternatively, you can create it using the "Create segVesicle.batch" button in the top right corner of the SegVesicle software.
@@ -41,39 +42,40 @@ Alternatively, you can create it using the "Create segVesicle.batch" button in t
 The file organization should be as follows:
 
 
-    ```
-    any_folder/
-    ├── p545/
-    │   ├── p545*.mrc
-    │   ├── p545*.rec
-    │   └── ...
-    ├── p565/
-    │   ├── p565*.mrc
-    │   ├── p565*.rec
-    │   └── ...
-    ├── pp1134/
-    │   ├── p565*.mrc
-    │   ├── p565*.rec
-    │   └── ...
-    ├── ...
-    └── segVesicle.batch
-    ```
+```
+any_folder/
+├── p545/
+│   ├── p545*.mrc
+│   ├── p545*.rec
+│   └── ...
+├── p565/
+│   ├── p565*.mrc
+│   ├── p565*.rec
+│   └── ...
+├── pp1134/
+│   ├── p565*.mrc
+│   ├── p565*.rec
+│   └── ...
+├── ...
+└── segVesicle.batch
+```
 
-- **Image Correction**: Apply IsoNet's CTF deconvolve and correction.
+#### Image Correction
+Apply IsoNet's CTF deconvolve and correction.
     - CTF deconvolve: 
     - Correction: 
 
-### Inference and Manual Annotation
+### 3.2 Inference and Manual Annotation
 Inference and manual annotation include:
 - **Model Inference**: Use the trained model to predict on new images and generate vesicle segmentation results.
 - **Manual Correction**: Manually correct annotations as needed to ensure accuracy.
 
-### Retrain Model
+### 3.3 Retrain Model
 Retraining the model includes:
 - **Model Update**: Incorporate the manual corrections into the training dataset.
 - **Retraining**: Retrain the model with the updated dataset to improve its accuracy and performance.
 
-### Results Analysis
+### 3.4 Results Analysis
 Results analysis includes:
 - **Result Visualization**: Visualize the segmentation results for expert analysis and evaluation.
 - **Performance Evaluation**: Evaluate the model performance using metrics such as accuracy, recall, F1 score, etc.
