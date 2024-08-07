@@ -198,7 +198,14 @@ class TomoViewer:
         self.toolbar_widget.tabs.setCurrentIndex(1)
         
     def predict_clicked(self):
-        if os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
+        if not os.path.exists(self.tomo_path_and_stage.area_path):
+            self.print("Please draw tomo area first.")
+        elif not os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
+            self.print("Predict need deconv data.")
+        elif not os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
+            self.print("Predict need correction data.")
+        else:
+            
             from qtpy.QtWidgets import QProgressDialog
             from qtpy.QtCore import Qt
             self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
@@ -226,12 +233,12 @@ class TomoViewer:
             self.viewer.layers['label'].opacity = 0.5 
             self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
             self.progress_dialog.setValue(100)
-        else:
-            self.print("Please draw tomo area first.")
         
     def register_draw_area_mod(self):
         
         def validate_points(points):
+            if len(points) == 0 :
+                return False
             # 获取所有z值
             z_values = points[:, 2]
             unique_z_values, counts = np.unique(z_values, return_counts=True)

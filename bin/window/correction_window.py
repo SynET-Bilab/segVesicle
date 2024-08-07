@@ -39,6 +39,7 @@ class CorrectionWindow(QMainWindow):
         output_path = tomo_viewer.tomo_path_and_stage.correction_output_path
         # self.model_path = '/share/data/CryoET_Data/lvzy/script/segvesicle/segvesv0.1/vesicle_corrected_model.h5'
         self.model_name = 'vesicle_corrected_model.h5'
+        self.model_path = ensure_model_exists(self.model_name)
         # 生成line内容
         line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} {self.model_path} --gpuID 0'
         
@@ -87,7 +88,7 @@ class CorrectionWindow(QMainWindow):
         add_layer_with_right_contrast(correction_data, 'corrected_tomo', self.tomo_viewer.viewer)
         self.tomo_viewer.viewer.layers.move(self.tomo_viewer.viewer.layers.index(self.tomo_viewer.viewer.layers['corrected_tomo']), 0)
         self.tomo_viewer.viewer.layers['deconv_tomo'].visible = False
-        self.tomo_viewer.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+        self.tomo_viewer.viewer.layers.selection.active = self.tomo_viewer.viewer.layers['edit vesicles']
         self.tomo_viewer.print("Finish Correction.")
         self.progress_dialog.setValue(100)
         self.close()

@@ -23,7 +23,8 @@ def predict_label(deconv_data, corrected_data):
     model_1 = 'vesicle_seg_model_1.h5'
     model_2 = 'vesicle_seg_model_2.h5'
     
-    path_weights1 = ensure_model_exists(model_1)
+    path_weights1 = '/home/liushuo/Documents/data/model/vesicle_seg_model_1.h5'
+    # path_weights1 = ensure_model_exists(model_1)
     path_weights2 = ensure_model_exists(model_2)
 
     seg1 = segment(path_weights1, corrected_data)

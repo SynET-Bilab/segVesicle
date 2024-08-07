@@ -391,9 +391,11 @@ class FolderListWidget(QWidget):
             
         elif self.tomo_path.progress_stage.name == 'MAKE_PREDICT':
             tomo = get_tomo(self.tomo_path.isonet_tomo_path)
-            
             add_layer_with_right_contrast(tomo, 'corrected_tomo', self.tomo_viewer.viewer)
             
+            tomo = get_tomo(self.tomo_path.deconv_tomo_path)
+            add_layer_with_right_contrast(tomo, 'deconv_tomo', self.tomo_viewer.viewer)
+            self.tomo_viewer.viewer.layers['deconv_tomo'].visible = False
             
             self.tomo_viewer.viewer.add_points(name='edit vesicles', ndim=3, size=4)
             self.tomo_viewer.viewer.layers['edit vesicles'].mode = 'ADD'
