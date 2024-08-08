@@ -72,18 +72,8 @@ class FolderListWidget(QWidget):
 
     def open_folder_dialog(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", os.getcwd())
-        # 清除上一个文件夹的缓存
         if self.tomo_path != None:
-            os.system('mv {} {}'.format(self.tomo_path.new_json_file_path, self.tomo_path.json_file_path))
-            with open(self.tomo_path.json_file_path, 'r') as file:
-                data = json.load(file)
-            # 将JSON数据格式化为多行结构并保存
-            with open(self.tomo_path.json_file_path, 'w') as file:
-                json.dump(data, file, indent=4)
-            os.system('mv {} {}'.format(self.tomo_path.new_label_file_path, self.tomo_path.label_path))
-            os.system('rm -r {}'.format(self.tomo_path.root_dir))
-            message = f"Saved tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
-            self.tomo_viewer.print(message)
+            self.save_tomo_files()
         if folder_path:
             self.path = folder_path
             self.tomo_viewer.tomo_path_and_stage.current_path = folder_path
@@ -122,28 +112,6 @@ class FolderListWidget(QWidget):
             self.checkbox_states = self.load_checkbox_states()
             self.list_widget.clear()
             self.populate_list(self.tomo_viewer.tomo_path_and_stage.current_path)
-
-    # def create_segvesicle_batch(self):
-    #     current_path = self.tomo_viewer.tomo_path_and_stage.current_path
-    #     import subprocess
-    #     if current_path:
-    #         top_level_folders = set()
-    #         for root, dirs, filenames in os.walk(current_path):
-    #             for filename in filenames:
-    #                 if filename.endswith('.rec') or filename.endswith('.mrc'):
-    #                     # 提取相对路径并获取顶级文件夹名
-    #                     relative_path = os.path.relpath(root, current_path)
-    #                     top_level_folder = relative_path.split(os.sep)[0]
-    #                     top_level_folders.add(top_level_folder)
-            
-    #         with open(os.path.join(current_path, 'segVesicle.batch'), 'w') as f:
-    #             for folder in top_level_folders:
-    #                 f.write(folder + '\n')
-            
-    #         self.state_file = os.path.join(self.path, 'segVesicle_QCheckBox_state.json')
-    #         self.checkbox_states = self.load_checkbox_states()
-    #         self.list_widget.clear()
-    #         self.populate_list(self.tomo_viewer.tomo_path_and_stage.current_path)
             
 
     def load_checkbox_states(self):
