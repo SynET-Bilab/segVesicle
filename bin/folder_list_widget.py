@@ -98,17 +98,19 @@ class FolderListWidget(QWidget):
         current_path = self.tomo_viewer.tomo_path_and_stage.current_path
         import subprocess
         if current_path:
-            files = []
+            top_level_folders = set()
             for root, dirs, filenames in os.walk(current_path):
                 for filename in filenames:
                     if filename.endswith('.rec') or filename.endswith('.mrc'):
-                        dir_path = os.path.relpath(root, current_path)
-                        if dir_path not in [os.path.dirname(f) for f in files]:
-                            files.append(os.path.join(dir_path, filename))
+                        # 提取相对路径并获取顶级文件夹名
+                        relative_path = os.path.relpath(root, current_path)
+                        top_level_folder = relative_path.split(os.sep)[0]
+                        top_level_folders.add(top_level_folder)
             
             with open(os.path.join(current_path, 'segVesicle.batch'), 'w') as f:
-                for file in files:
-                    f.write(file + '\n')
+                for folder in top_level_folders:
+                    f.write(folder + '\n')
+            
             self.state_file = os.path.join(self.path, 'segVesicle_QCheckBox_state.json')
             self.checkbox_states = self.load_checkbox_states()
             self.list_widget.clear()
