@@ -1,5 +1,7 @@
 import napari
 import numpy as np
+import mrcfile
+import os
 from qtpy.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QGridLayout, QDoubleSpinBox, QProgressDialog, QApplication
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QScreen
@@ -8,15 +10,16 @@ from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.deconvolution import deconv_tomo
 
 class DeconvWindow(QMainWindow):
-    def __init__(self, viewer: napari.Viewer):
-        super().__init__(viewer.window.qt_viewer)
+    def __init__(self, tomo_viewer):
+        super().__init__(tomo_viewer.viewer.window.qt_viewer)
         self.setWindowTitle('Deconv Preview')
         
-        self.viewer = viewer
+        self.tomo_viewer = tomo_viewer
+        self.viewer = tomo_viewer.viewer
         self.preview_viewers = [napari.Viewer(show=False) for _ in range(11)]
 
-        self.points = viewer.layers['edit vesicles'].data
-        self.data = viewer.layers['ori_tomo'].data
+        self.points = self.viewer.layers['edit vesicles'].data
+        self.data = self.viewer.layers['ori_tomo'].data
         self.crop_data = self.get_cropped_data()
         
         # Default values
@@ -183,9 +186,18 @@ class DeconvWindow(QMainWindow):
                                     snrfalloff=snrfalloff, deconvstrength=deconvstrength, 
                                     highpassnyquist=highpassnyquist, phaseflipped=False, phaseshift=0, ncpu=4)
         # self.viewer.layers.clear()
+        directory = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Created directory: {directory}")
+        with mrcfile.new(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path, overwrite=True) as output_mrc:
+            output_mrc.set_data(deconv_result)
+            output_mrc.voxel_size = 17.14
         add_layer_with_right_contrast(deconv_result, 'deconv_tomo', self.viewer)
         deconv_tomo_layer = self.viewer.layers['deconv_tomo']
         self.viewer.layers.move(self.viewer.layers.index(deconv_tomo_layer), 0)
         self.viewer.layers['ori_tomo'].visible = False
         self.progress_dialog.setValue(100)
+        self.viewer.layers['edit vesicles'].data = None
+        self.tomo_viewer.print("Finish Deconvolution.")
         self.close()
