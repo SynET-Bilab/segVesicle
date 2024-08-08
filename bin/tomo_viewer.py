@@ -7,11 +7,10 @@ import json
 
 from qtpy import QtCore, QtWidgets
 from napari.utils.notifications import show_info
-import SimpleITK as sitk
 
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
-from qtpy.QtWidgets import QFileDialog, QInputDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
+from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
 
 
 from window.deconv_window import DeconvWindow
@@ -130,7 +129,6 @@ class TomoViewer:
                 # Processing
                 self.progress_dialog.setValue(50)
                 data = resample_image(file_path, pixel_size)
-                data = sitk.GetArrayFromImage(data)
                 add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
 
                 if 'corrected_tomo' in self.viewer.layers:
