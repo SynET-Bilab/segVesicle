@@ -11,12 +11,15 @@ from skimage.morphology import cube, ball
 from scipy.sparse import csr_matrix
 from skimage.measure import label
 
-from segVesicle.bin.boundary_mask import boundary_mask
-from segVesicle.models import resunet3D as models
-from segVesicle.bin.ellipsoid import ellipsoid_fit as ef
-from segVesicle.utils import make_ellipsoid as mk
+try:
+    from segVesicle.bin.boundary_mask import boundary_mask
+    from segVesicle.models import resunet3D as models
+    from segVesicle.bin.ellipsoid import ellipsoid_fit as ef
+    from segVesicle.utils import make_ellipsoid as mk
+    from util.model_exists import ensure_model_exists
+except ImportError:
+    pass
 
-from util.model_exists import ensure_model_exists
 
 
 def predict_label(deconv_data, corrected_data):

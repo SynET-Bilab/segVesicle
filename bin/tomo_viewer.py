@@ -11,7 +11,7 @@ import SimpleITK as sitk
 
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
-from qtpy.QtWidgets import QFileDialog, QInputDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout
+from qtpy.QtWidgets import QFileDialog, QInputDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
 
 
 from window.deconv_window import DeconvWindow
@@ -198,6 +198,18 @@ class TomoViewer:
         self.toolbar_widget.tabs.setCurrentIndex(1)
         
     def predict_clicked(self):
+        try :
+            import tensorflow as tf
+        except ImportError:
+            self.print("TensorFlow is not available. Correction cannot be performed.")
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("TensorFlow Not Available")
+            msg_box.setText("TensorFlow is not available. Correction cannot be performed.")
+            msg_box.setStandardButtons(QMessageBox.Ok)
+            msg_box.exec_()
+            return
+            
         if not os.path.exists(self.tomo_path_and_stage.area_path):
             self.print("Please draw tomo area first.")
         elif not os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):

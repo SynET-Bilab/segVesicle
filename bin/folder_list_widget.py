@@ -64,6 +64,10 @@ class FolderListWidget(QWidget):
         self.dock_widget = self.tomo_viewer.multiple_viewer_widget
         self.tomo_viewer.print("Welcome to the Vesicle Segmentation Software, version 0.1.")
         self.tomo_viewer.print("For instructions and keyboard shortcuts, please refer to the help documentation available in the '?' section at the top right corner.")
+        try:
+            import tensorflow as tf
+        except ImportError:
+            self.tomo_viewer.print("TensorFlow with GPU support is not installed. Please download and install it to use the IsoNet correction and vesicle prediction model.")
  
 
     def open_folder_dialog(self):
