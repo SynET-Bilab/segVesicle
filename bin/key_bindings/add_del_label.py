@@ -142,7 +142,8 @@ def update_json_file(tomo_viewer, points, mode, vesicle_to_add):
     if mode == 'Deleted':
         for point in points:
             delete_idx = tree.query(point.reshape(1, -1), k=1)[1][0]
-            vesicles.pop(delete_idx)
+            if delete_idx:
+                vesicles.pop(delete_idx)
         # delete_idx = tree.query(point[0].reshape(1, -1), k=1)[1][0]  # delete mode has only 1 point at idx 0
         # vesicles.pop(delete_idx)
     elif mode == 'Added':
