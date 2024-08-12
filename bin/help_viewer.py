@@ -1,17 +1,12 @@
 import sys
 import os
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QListWidget, QTextBrowser
+from PyQt5.QtCore import QUrl  # 导入 QUrl
 import markdown
-import napari
-from qtpy.QtWidgets import QApplication, QMainWindow, QTextBrowser, QListWidget, QHBoxLayout, QWidget
-from qtpy.QtCore import Qt, QUrl
-from pygments.formatters import HtmlFormatter
-from markdown.extensions.codehilite import CodeHiliteExtension
 
 class HelpViewer(QMainWindow):
-    def __init__(self, qt_viewer):
-        super().__init__(qt_viewer)
-        # self.qt_viewer = qt_viewer
-        
+    def __init__(self):
+        super().__init__()
         self.setWindowTitle("Help Viewer")
         self.setGeometry(100, 100, 800, 600)
 
@@ -34,12 +29,11 @@ class HelpViewer(QMainWindow):
     def load_md_files(self):
         self.md_files = []
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        markdown_file = os.path.join(script_dir, 'help_files')
-        # help_dir = "./help_files"  # 替换为你的帮助文件目录路径
-        if os.path.exists(markdown_file):
-            for file_name in os.listdir(markdown_file):
+        markdown_dir = os.path.join(script_dir, 'help_files')
+        if os.path.exists(markdown_dir):
+            for file_name in os.listdir(markdown_dir):
                 if file_name.endswith('.md'):
-                    self.md_files.append(os.path.join(markdown_file, file_name))
+                    self.md_files.append(os.path.join(markdown_dir, file_name))
                     self.file_list.addItem(file_name)
 
     def display_help_content(self, item):
@@ -48,9 +42,16 @@ class HelpViewer(QMainWindow):
         if file_path in self.md_files:
             with open(file_path, 'r', encoding='utf-8') as file:
                 md_content = file.read()
-                self.help_content.setMarkdown(md_content)
+                html_content = markdown.markdown(md_content)
+                base_url = QUrl.fromLocalFile(os.path.dirname(file_path))
+                base_url_path = base_url.toString()  # 获取 Base URL
+                # 调整路径
+                html_content = html_content.replace('src="img/', f'src="{base_url_path}/img/')
+                # 添加 CSS 样式以确保代码块换行
                 
-                
+                self.help_content.setHtml(html_content)
+                # print(html_content)
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     viewer = HelpViewer()

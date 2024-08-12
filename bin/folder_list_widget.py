@@ -29,7 +29,6 @@ tomo_path = None
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
-    # data = np.flip(data, axis=1)
     return data
 
         

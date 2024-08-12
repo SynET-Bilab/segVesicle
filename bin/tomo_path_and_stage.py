@@ -63,7 +63,3 @@ class TomoPathAndStage:
     def update_progress_stage(self):
         """更新进度阶段"""
         self.progress_stage = self.determine_progress()
-
-# # 全局变量
-# TOMO_SEGMENTATION_PROGRESS = ProgressStage.ISO_NET
-# global_viewer = napari.Viewer()

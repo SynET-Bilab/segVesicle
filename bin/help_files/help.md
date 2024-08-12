@@ -1,74 +1,124 @@
 # SegVesicle User Guide
 
 ## Table of Contents
-1. [Introduction](#introduction)
-2. [Overall Workflow](#overall-workflow)
-3. [Component Overview](#component-overview)
-   - [Data Preprocessing](#data-preprocessing)
-   - [Inference and Manual Annotation](#inference-and-manual-annotation)
-   - [Retrain Model](#retrain-model)
-   - [Results Analysis](#results-analysis)
-4. [Frequently Asked Questions](#frequently-asked-questions)
-5. [References](#references)
+1. [Introduction](#1-introduction)
+2. [Overall Workflow](#2-overall-workflow)
+3. [Component Overview](#3-component-overview)
+   - [Data Preprocessing](#31-data-preprocessing)
+   - [Inference and Post Processing](#32-inference-and-post-processing)
+   - [Manual Annotation](#33-manual-annotation)
+   - [Retrain and Results Analysis](#34-retrain-and-results-analysis)
+4. [Frequently Asked Questions](#4-frequently-asked-questions)
+5. [References](#5-references)
 
 ## 1. Introduction
-`SegVesicle` is a tool designed for the neuroscience field, specifically for identifying and segmenting vesicles in microscopy images. This tool combines advanced image processing techniques with deep learning algorithms to provide an efficient and accurate automated solution.
+`SegVesicle` is a specialized tool designed for the neuroscience field, aimed at identifying and segmenting vesicles in microscopy images. By integrating advanced image processing techniques with deep learning algorithms, `SegVesicle` provides an efficient and accurate automated solution for vesicle segmentation.
 
 ## 2. Overall Workflow
-The workflow of `SegVesicle` can be divided into the following steps:
+The workflow of `SegVesicle` is structured into the following steps:
 
-1. **Data Preprocessing**: Place all files to be processed in a single folder. Apply deconvolution and correction using IsoNet[1] for image correction.
-2. **Inference and Manual Annotation**: Use the trained model to predict on new images and manually correct annotations as needed.
-3. **Retrain Model**: Based on the manual corrections, retrain the model to improve its accuracy.
-4. **Results Analysis**: Analyze the results of the segmentation.
+1. **Data Preprocessing**: Organize all the files to be processed in a single folder. Apply deconvolution and correction using IsoNet[1] for image enhancement.
+2. **Inference and Post Processing**: Utilize the trained model to make predictions on new images.
+3. **Manual Annotation**: Manually correct the model’s predictions as needed.
+4. **Retrain and Results Analysis**: Retrain the model based on manual corrections to enhance its accuracy, followed by an analysis of the segmentation results.
 
 ## 3. Component Overview
 
 ### 3.1 Data Preprocessing
 
-Data preprocessing is the first step in the workflow and includes the following parts:
+Data preprocessing is the initial phase in the workflow and includes the following steps:
 
 #### File Organization
-Place all files to be processed in their respective subfolders within a main folder. Each subfolder (e.g., `p545`, `p565`, `pp1134`) should contain the corresponding `.mrc` or `.rec` files. The main folder should also contain a `segVesicle.batch` file that stores information about the images to be segmented.
-    
-If the `segVesicle.batch` file does not exist, you can create it using the command line:
+All files to be processed should be organized into subfolders within a main folder. Each subfolder (e.g., `p545`, `p565`, `pp1134`) must contain the respective `.mrc` or `.rec` files. Additionally, the main folder should include a `segVesicle.batch` file that contains information about the images to be segmented.
 
+If the `segVesicle.batch` file is not present, you can create it using the command line with the following command:
 
 `ls */*-bin4-wbp.rec > segVesicle.batch`
 
+Alternatively, you can create the file using the "Create segVesicle.batch" button located in the top right corner of the SegVesicle interface.
 
-Alternatively, you can create it using the "Create segVesicle.batch" button in the top right corner of the SegVesicle software.
+![Create segVesicle.batch](img/create_segvesicle.png)
 
-The file organization should be as follows:
+The recommended file organization structure is depicted below:
 
+![Folder img](img/folder.png)
+
+#### Resample
+
+The `resample` function is used to adjust the voxel size of the original tomography image. This step is crucial when working with images of varying resolutions, ensuring that all data is standardized to the desired voxel size for consistent analysis.
+
+**Opening Original Tomography Image:**
+
+You can open the original tomography image by clicking the "Open Original Tomo" button in the interface. After opening the image, you will be prompted to manually enter the original pixel size of the image. Alternatively, you can run the resampling process via the command line as described below.
+
+**Example Command-Line Usage:**
+
+To resample a tomography image with a pixel size of 10.0 and save it as `output_resample.mrc`:
 
 ```
-any_folder/
-├── p545/
-│   ├── p545*.mrc
-│   ├── p545*.rec
-│   └── ...
-├── p565/
-│   ├── p565*.mrc
-│   ├── p565*.rec
-│   └── ...
-├── pp1134/
-│   ├── p565*.mrc
-│   ├── p565*.rec
-│   └── ...
-├── ...
-└── segVesicle.batch
+python resample.py --tomo=input_tomo.mrc --pixel_size=10.0 --outname=output_resample.mrc
 ```
+#### Deconvolution
 
-#### Image Correction
-Apply IsoNet's CTF deconvolve and correction.
-    - CTF deconvolve: 
-    - Correction: 
+The deconvolution process in `SegVesicle` is an essential step to enhance the quality of tomography images by reducing blur and improving the resolution. This step is particularly important for identifying small structures such as vesicles with greater accuracy.
 
-### 3.2 Inference and Manual Annotation
-Inference and manual annotation include:
-- **Model Inference**: Use the trained model to predict on new images and generate vesicle segmentation results.
-- **Manual Correction**: Manually correct annotations as needed to ensure accuracy.
+##### Process Overview
+
+**Selecting the Deconvolution Area:**
+
+- **Defining the Preview Area:**  
+  To start the deconvolution process, you need to select two points on the screen within the tomography image. These two points will form a rectangle that defines the area for deconvolution. This region is crucial as it allows you to preview the effect of different deconvolution settings before applying them to the entire image.
+
+**Role of SNR (Signal-to-Noise Ratio):**
+
+- **Adjusting SNR for Optimal Results:**  
+  The Signal-to-Noise Ratio (SNR) is a key parameter in the deconvolution process. Adjusting the SNR value can significantly affect the clarity and quality of the resulting image. In `SegVesicle`, you can fine-tune the SNR value during the preview phase to achieve the best balance between noise reduction and signal preservation.
+
+  - **Low SNR Values:**  
+    Lower SNR values might result in less noise reduction, leading to a clearer but possibly less sharp image.
+  
+  - **High SNR Values:**  
+    Higher SNR values tend to emphasize signal details but may also amplify noise, making it essential to find the right balance.
+
+**Applying Deconvolution:**
+
+![Deconv Window](img/deconv_window.png)
+- **Preview and Apply:**  
+  Once you have selected the appropriate SNR value by previewing the deconvolution effect within the defined area, you can click the **Apply** button. This will apply the deconvolution to the entire image based on the selected SNR settings.
+
+This approach allows you to visually assess the impact of deconvolution on a specific area before committing to changes across the entire image, ensuring optimal image quality.
+
+#### IsoNet Correction
+
+IsoNet correction is a step in the `SegVesicle` workflow that correcting the missing-wedge effect and improving the overall resolution and interpretability of the 3D tomographic images. This step is typically performed after deconvolution to refine the image further, making it more suitable for detailed analysis and segmentation.
+
+### 3.2 Inference and Post Processing
+### 3.2 Inference and Post Processing
+
+The Inference and Post Processing phase in `SegVesicle` involves using the trained model to predict vesicle locations in the tomography images and subsequently processing these predictions to refine and analyze the results. This step is crucial for automatically identifying vesicles and preparing the data for further analysis.
+
+#### Process Overview
+
+**1. Loading Image Data:**
+
+  The function loads the deconvolved (`deconv_tomo`) and corrected (`corrected_tomo`) tomography data from the viewer's layers. These images serve as the input for the vesicle prediction model.
+
+**2. Predicting Vesicles:**
+
+- **Vesicle Prediction:**
+  The `predict_label` function is used to generate predictions based on the deconvolved and corrected tomography data. This function processes the input data to identify regions that likely contain vesicles, producing a label image where each voxel is assigned a label indicating whether it is part of a vesicle or not.
+
+**3. Post Processing:**
+
+- **Morphological Processing:**
+  The predicted label image is then passed to the `morph_process` function along with the path to the area file (`area_path`). This function performs morphological processing to refine the predicted vesicle shapes and prepare them for measurement and rendering.
+
+- **Vesicle Measurement:**
+  The `vesicle_measure` function analyzes the processed vesicle labels in the context of the corrected tomography data. It measures key attributes of each vesicle, such as size and shape, and stores this information in a structured format. The minimum radius for vesicles is set to `8`.
+
+- **Vesicle Rendering:**
+  The `vesicle_rendering` function generates a visualization of the identified vesicles based on the measured data. This rendered image is saved as a new tomography file, and the corresponding labels are added to the viewer.
+
 
 ### 3.3 Retrain Model
 Retraining the model includes:
