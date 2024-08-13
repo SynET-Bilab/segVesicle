@@ -224,6 +224,7 @@ def template(radii, center, evecs, shape, d=3):
     for i in range(len(ellip)):
         if ellip[i][0]<cube_ellip.shape[0] and ellip[i][1]<cube_ellip.shape[0] and ellip[i][2]<cube_ellip.shape[0]:
             ellip_.append(ellip[i])
+    ellip_ = np.array(ellip_)
     cube_ellip[ellip_[:,0],ellip_[:,1],ellip_[:,2]] = 1
     cube_ellip=closing(cube_ellip,cube(d))
     circle = dilation(cube_ellip,cube(d)) - erosion(cube_ellip,cube(d))
@@ -249,6 +250,7 @@ def template_2d(radii, center, evecs, shape, d=3):
     for i in range(len(ellip)):
         if ellip[i][0]<cube_ellip.shape[0] and ellip[i][1]<cube_ellip.shape[0] and ellip[i][2]<cube_ellip.shape[0]:
             ellip_.append(ellip[i])
+    ellip_ = np.array(ellip_)
     cube_ellip[ellip_[:,0],ellip_[:,1],ellip_[:,2]] = 1
     img = cube_ellip[cube_ellip.shape[0]//2]
     cube_ellip=closing(cube_ellip,cube(d))
