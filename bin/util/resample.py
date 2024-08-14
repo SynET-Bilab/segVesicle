@@ -1,11 +1,5 @@
 import mrcfile
-
 from scipy.ndimage import zoom
-
-def get_tomo(input_data):
-    with mrcfile.open(input_data) as m:
-        data = m.data
-    return data
 
 def get_tomo(input_data):
     with mrcfile.open(input_data) as m:
