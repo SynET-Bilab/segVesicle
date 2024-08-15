@@ -12,6 +12,7 @@ from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
 from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
 
+from collections import deque
 
 from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
@@ -35,6 +36,9 @@ class TomoViewer:
         self.viewer.window.add_dock_widget(self.cross_widget, name="Cross", area="left")
         self.viewer.window.add_dock_widget(self.toolbar_widget, area='left', name='Tools')
         self.show_current_state()
+        # self._reset_history()
+        # self.viewer.bind_key('Ctrl-Z', self.on_undo)
+        # self.viewer.bind_key('Ctrl-Shift-Z', self.on_redo)
         
     def set_tomo_name(self, tomo_name: str):
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
@@ -324,3 +328,43 @@ class TomoViewer:
             pass
         self.toolbar_widget.manual_annotation_button.clicked.connect(init_lable_file)
     
+    # def _reset_history(self, event=None):
+    #     self._undo_history = deque()
+    #     self._redo_history = deque()
+    
+    # def _save_history(self):
+    #     history_item = {
+    #         "edit_vesicles": np.copy(self.viewer.layers['edit vesicles'].data),
+    #         "label": np.copy(self.viewer.layers['label'].data)
+    #     }
+    #     self._redo_history = deque()  # 清空重做历史记录
+    #     self._undo_history.append(history_item)  # 将新记录保存到撤销队列中
+
+    # def undo(self):
+    #     self._load_history(self._undo_history, self._redo_history, undoing=True)
+
+    # def redo(self):
+    #     self._load_history(self._redo_history, self._undo_history, undoing=False)
+
+    # def _load_history(self, before, after, undoing=True):
+    #     if len(before) == 0:
+    #         return
+
+    #     history_item = before.pop()  # 从撤销或重做队列中取出最后一个历史记录
+    #     after.append(history_item)  # 将该记录保存到另一个队列中（撤销保存到重做，重做保存到撤销）
+
+    #     # 恢复之前保存的图层数据
+    #     self.viewer.layers['edit vesicles'].data = history_item["edit_vesicles"]
+    #     self.viewer.layers['label'].data = history_item["label"]
+
+    #     # 如果需要，可以在这里调用更新函数刷新图层显示
+    #     self.viewer.layers['edit vesicles'].refresh()
+    #     self.viewer.layers['label'].refresh()
+        
+    # def on_undo(self, event=None):
+    #     """触发撤销操作"""
+    #     self.undo()
+
+    # def on_redo(self, event=None):
+    #     """触发重做操作"""
+    #     self.redo()

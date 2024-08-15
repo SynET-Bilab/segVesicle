@@ -288,6 +288,7 @@ class FolderListWidget(QWidget):
         self.progress_dialog.setValue(0)
         self.progress_dialog.show()
         
+        # self.tomo_viewer._reset_history()
         # 清除上一个文件夹的缓存
         if self.tomo_path != None:
             self.save_tomo_files()
@@ -426,6 +427,7 @@ class FolderListWidget(QWidget):
             message = f"Successfully opened tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
             self.tomo_viewer.print(message)
             self.tomo_viewer.show_current_state()
+            # self.tomo_viewer._save_history()
             
             self.progress_dialog.setValue(100)
             self.progress_dialog.close()
