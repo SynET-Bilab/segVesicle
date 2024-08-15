@@ -30,7 +30,6 @@ tomo_path = None
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
-    # data = np.flip(data, axis=1)
     return data
 
 def vesicle_rendering(vesicle_info, tomo_dims, idx):
@@ -89,28 +88,8 @@ def save_point_layer(tomo_viewer, layer_idx, mode):
     
     return image_data
 
-# def save_point_layer(tomo_viewer, layer_idx, mode):
-#     global added_vesicle_num
-#     viewer = tomo_viewer.viewer
-    
-#     if len(viewer.layers) > 0:
-#         image_layer = viewer.layers[layer_idx]
-#         if mode == 'Deleted':
-#             image_data = image_layer.data[-1:]
-#         elif mode == 'Added':
-#             image_data = image_layer.data[-2:]
-#             added_vesicle_num += 1  # to label new added vesicles
-#         elif mode == 'Added_6pts':
-#             image_data = image_layer.data[-6:]
-#             added_vesicle_num += 1
-#     else:
-#         show_info('no points added')
-    
-#     return image_data
-
 def save_label_layer(tomo_viewer, layer_idx):
     viewer = tomo_viewer.viewer
-    # root_dir = tomo_viewer.tomo_path_and_stage.root_dir
     save_path = tomo_viewer.tomo_path_and_stage.new_label_file_path
     if len(viewer.layers) > 0:
         image_layer = viewer.layers[layer_idx]
@@ -144,8 +123,6 @@ def update_json_file(tomo_viewer, points, mode, vesicle_to_add):
             delete_idx = tree.query(point.reshape(1, -1), k=1)[1][0]
             if delete_idx:
                 vesicles.pop(delete_idx)
-        # delete_idx = tree.query(point[0].reshape(1, -1), k=1)[1][0]  # delete mode has only 1 point at idx 0
-        # vesicles.pop(delete_idx)
     elif mode == 'Added':
         vesicles.append(vesicle_to_add)
     vesicle_info = {'vesicles': vesicles}
@@ -178,23 +155,6 @@ def add_picked_vesicle(tomo_viewer, data_to_add):
         viewer.layers[LABEL_LAYER_IDX].data = viewer.layers[LABEL_LAYER_IDX].data + data_to_add  # update label layer
         viewer.layers[LABEL_LAYER_IDX].refresh()
         tomo_viewer.print('Successfully added 3d Vesicle')
-
-# def save_and_update_delete(tomo_viewer):
-#     viewer = tomo_viewer.viewer
-#     if LABEL_LAYER_IDX in viewer.layers:
-#         if len(viewer.layers[POINT_LAYER_IDX].data) < 1:
-#             show_info('Please pick a point to delete')
-#             tomo_viewer.print('Please pick a point to delete')
-#         else:
-#             point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Deleted')
-#             delete_picked_vesicle(tomo_viewer, point)
-#             viewer.layers[POINT_LAYER_IDX].data = None
-#             save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-#             update_json_file(tomo_viewer, point, mode='Deleted', vesicle_to_add=None)
-#             tomo_viewer.print('Successfully deleted Vesicle')
-#     else:
-#         viewer.layers[POINT_LAYER_IDX].data = None
-#         tomo_viewer.print('Please Make Predict or Start Manual Correction')
 
 def save_and_update_delete(tomo_viewer):
     viewer = tomo_viewer.viewer
