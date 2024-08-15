@@ -180,7 +180,7 @@ def density_fit(data_iso,center,radius):
     l = label(opened, connectivity=1)
     if np.sum(opened) < 1000:
         return [None, None, None, 0]
-    d_min = 100
+    d_min = 99999
     label_vaule = 0
     for i in range(np.max(l)):
         points_i = np.where(l==(i+1))
@@ -190,16 +190,20 @@ def density_fit(data_iso,center,radius):
         center_i=np.array([np.mean(points_z),np.mean(points_y),np.mean(points_x)])
         center_label = np.array([1,1,1])*l.shape[0]//2
         d = dis(center_i,center_label)
-        if d < d_min:
+        if d < d_min  and len(points_z)>2000:
             d_min = d
             label_vaule = i+1
     labeled = np.zeros_like(l)
     labeled[l==label_vaule] = 1
+    if d_min == 99999: #if the num of points to fit is too small (<2000)
+        return [None, None, None, 0]
 
     idx=get_indices_sparse(labeled)
     
     vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
     [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
+    if np.min(center_cube) < 0: # if the shape of fitted ellipsoid is too strange
+        return [None, None, None, 0]
 
 
     tm = template(radii, center_cube, evecs, cube_.shape)
