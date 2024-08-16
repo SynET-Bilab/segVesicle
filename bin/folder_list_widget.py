@@ -5,7 +5,7 @@ import numpy as np
 import SimpleITK as sitk
 import mrcfile
 
-from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QPushButton, QFileDialog, QHBoxLayout, QLabel
+from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QPushButton, QFileDialog, QHBoxLayout, QLabel, QSizePolicy
 from qtpy.QtGui import QPixmap, QIcon  # 使用 qtpy 进行导入
 from qtpy.QtCore import Qt, QSize
 
@@ -43,8 +43,8 @@ class FolderListWidget(QWidget):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
 
         # 构建图像文件的完整路径
-        self.heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/heart.png')
-        self.broken_heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/broken_heart.png')
+        self.heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/heart.svg')
+        self.broken_heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/broken_heart.svg')
         
         
         self.tomo_path = None
@@ -166,6 +166,8 @@ class FolderListWidget(QWidget):
             
             for item in folders:
                 label = QLabel(item)
+                label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+                label.setMinimumHeight(20)  # 增加标签高度，避免文本被裁剪
                 
                 # list_item = QListWidgetItem("        " + item)
                 # self.list_widget.addItem(list_item)
@@ -195,6 +197,8 @@ class FolderListWidget(QWidget):
                 checkbox.stateChanged.connect(lambda state, item=item: self.update_checkbox_state(state, item))
                 
                 widget_item_layout = QHBoxLayout()  # 使用 QHBoxLayout 以便在同一行内放置多个控件
+                widget_item_layout.setSpacing(2)  # 控制控件之间的间距，设置为较小的值
+                widget_item_layout.setContentsMargins(0, 0, 0, 0)  # 去掉布局的边距
                 widget_item_layout.addWidget(heart_checkbox)  # 添加心形复选框到布局中
                 widget_item_layout.addWidget(checkbox)
                 widget_item_layout.addWidget(label) 
@@ -202,6 +206,16 @@ class FolderListWidget(QWidget):
                 
                 widget_item = QWidget()
                 widget_item.setLayout(widget_item_layout)
+                
+                # 设置选中时的样式表
+                widget_item.setStyleSheet("""
+                    QWidget {
+                        background: transparent;
+                    }
+                    QWidget:item:selected {
+                        background: lightgray;
+                    }
+                """)
                 
                 # 创建 QListWidgetItem 并将其小部件设置为 widget_item
                 list_item = QListWidgetItem()
@@ -211,6 +225,9 @@ class FolderListWidget(QWidget):
                 # 调整 QListWidgetItem 的大小以适应其内容
                 list_item.setSizeHint(widget_item.sizeHint())
                 # self.list_widget.setItemWidget(list_item, checkbox)
+                
+                list_item.setFlags(list_item.flags() | Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+
 
             # 先断开之前的绑定
             try:
