@@ -323,12 +323,6 @@ def density_fit_2d(data_iso,center,radius):
 
     img_m_mask=mask*img_m
     open=opening(img_m_mask)
-    
-    c=np.zeros_like(cube_)
-    c[cube_.shape[0]//2]=open
-    with mrcfile.new('/share/data/CryoET_Data/lvzy/test/open.mrc', overwrite=True) as m:
-        m.set_data(c.astype(np.float32))
-    
 
     l = label(open, connectivity=1)
     d_min = 99999
@@ -347,13 +341,11 @@ def density_fit_2d(data_iso,center,radius):
     labeled[l==label_vaule] = 1
     if d_min == 99999: #if the num of points to fit is too small (<20)
         return [None, None, None, 0]
-    if(np.sum(labeled)/np.sum(open)<0.7):
+    if(np.sum(labeled)/np.sum(open)<0.6):
         labeled = open
     cube_m_mask=np.zeros_like(cube_)
     cube_m_mask[cube_.shape[0]//2]=labeled
     
-    with mrcfile.new('/share/data/CryoET_Data/lvzy/test/cube_m_mask.mrc', overwrite=True) as m:
-        m.set_data(cube_m_mask.astype(np.float32))
     cloud=np.where(cube_m_mask>0)
     x = np.asarray(cloud[2])
     y = np.asarray(cloud[1])
