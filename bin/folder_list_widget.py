@@ -5,8 +5,9 @@ import numpy as np
 import SimpleITK as sitk
 import mrcfile
 
-from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QPushButton, QFileDialog
-from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QPushButton, QFileDialog, QHBoxLayout, QLabel
+from qtpy.QtGui import QPixmap, QIcon  # 使用 qtpy 进行导入
+from qtpy.QtCore import Qt, QSize
 
 from napari.utils.notifications import show_info
 from key_bindings.add_del_label import add_button_and_register_add_and_delete
@@ -37,6 +38,15 @@ class FolderListWidget(QWidget):
         super().__init__()
         self.tomo_viewer = tomo_viewer
         self.path = self.tomo_viewer.tomo_path_and_stage.current_path  # 从tomo_viewer获取路径
+        
+        # 获取当前脚本文件所在的目录
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # 构建图像文件的完整路径
+        self.heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/heart.png')
+        self.broken_heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/broken_heart.png')
+        
+        
         self.tomo_path = None
         # 保存路径为实例变量
         self.layout = QVBoxLayout()
@@ -56,7 +66,9 @@ class FolderListWidget(QWidget):
         self.setLayout(self.layout)
         
         self.state_file = os.path.join(self.path, 'segVesicle_QCheckBox_state.json')
+        self.heart_state_file = os.path.join(self.path, 'segVesicle_heart_broken.json')
         self.checkbox_states = self.load_checkbox_states()
+        self.heart_checkbox_states = self.load_heart_checkbox_states()
         
         self.populate_list(self.path)
         
@@ -119,6 +131,16 @@ class FolderListWidget(QWidget):
                 return json.load(f)
         return {}
 
+    def load_heart_checkbox_states(self):
+        if os.path.exists(self.heart_state_file):
+            with open(self.heart_state_file, 'r') as f:
+                return json.load(f)
+        return {}
+    
+    def save_heart_checkbox_states(self):
+        with open(self.heart_state_file, 'w') as f:
+            json.dump(self.heart_checkbox_states, f)
+
     def save_checkbox_states(self):
         with open(self.state_file, 'w') as f:
             json.dump(self.checkbox_states, f)
@@ -143,8 +165,26 @@ class FolderListWidget(QWidget):
             )
             
             for item in folders:
-                list_item = QListWidgetItem("        " + item)
-                self.list_widget.addItem(list_item)
+                label = QLabel(item)
+                
+                # list_item = QListWidgetItem("        " + item)
+                # self.list_widget.addItem(list_item)
+                # 创建爱心 QCheckBox
+                heart_checkbox = QCheckBox()
+                heart_checkbox.setIcon(QIcon(QPixmap(self.heart_icon_path)))
+                
+                heart_checkbox.setChecked(False)
+                heart_checkbox.setStyleSheet("QCheckBox::indicator { width: 0px; height: 0px; }")  # 隐藏复选标记，只显示图标
+
+                # 使用 item 作为键来存储和加载状态
+                if item in self.heart_checkbox_states:
+                    heart_checkbox.setChecked(self.heart_checkbox_states[item])
+                    if self.heart_checkbox_states[item]:
+                        heart_checkbox.setIcon(QIcon(QPixmap(self.broken_heart_icon_path)))
+
+                 # 仅传递 item 作为键
+                heart_checkbox.stateChanged.connect(lambda state, item=item: self.toggle_heart_icon(state, item))
+
                 checkbox = QCheckBox()
                 
                 # 设置 QCheckBox 的状态
@@ -153,7 +193,24 @@ class FolderListWidget(QWidget):
                 
                 # 当状态改变时更新状态字典并保存到文件
                 checkbox.stateChanged.connect(lambda state, item=item: self.update_checkbox_state(state, item))
-                self.list_widget.setItemWidget(list_item, checkbox)
+                
+                widget_item_layout = QHBoxLayout()  # 使用 QHBoxLayout 以便在同一行内放置多个控件
+                widget_item_layout.addWidget(heart_checkbox)  # 添加心形复选框到布局中
+                widget_item_layout.addWidget(checkbox)
+                widget_item_layout.addWidget(label) 
+                widget_item_layout.addStretch()
+                
+                widget_item = QWidget()
+                widget_item.setLayout(widget_item_layout)
+                
+                # 创建 QListWidgetItem 并将其小部件设置为 widget_item
+                list_item = QListWidgetItem()
+                self.list_widget.addItem(list_item)
+                self.list_widget.setItemWidget(list_item, widget_item)
+                
+                # 调整 QListWidgetItem 的大小以适应其内容
+                list_item.setSizeHint(widget_item.sizeHint())
+                # self.list_widget.setItemWidget(list_item, checkbox)
 
             # 先断开之前的绑定
             try:
@@ -164,6 +221,17 @@ class FolderListWidget(QWidget):
             self.list_widget.itemDoubleClicked.connect(self.on_item_double_click)
         else:
             pass
+
+    def toggle_heart_icon(self, state, item):
+        if state == Qt.Checked:
+            self.heart_checkbox_states[item] = True
+            checkbox = self.sender()
+            checkbox.setIcon(QIcon(QPixmap(self.broken_heart_icon_path)))
+        else:
+            self.heart_checkbox_states[item] = False
+            checkbox = self.sender()
+            checkbox.setIcon(QIcon(QPixmap(self.heart_icon_path)))
+        self.save_heart_checkbox_states()
 
     def update_checkbox_state(self, state, item):
         self.checkbox_states[item] = (state == 2)
@@ -220,6 +288,7 @@ class FolderListWidget(QWidget):
         self.progress_dialog.setValue(0)
         self.progress_dialog.show()
         
+        # self.tomo_viewer._reset_history()
         # 清除上一个文件夹的缓存
         if self.tomo_path != None:
             self.save_tomo_files()
@@ -231,7 +300,19 @@ class FolderListWidget(QWidget):
                 viewer.layers.remove(name)
         remove_all_layers(self.tomo_viewer.viewer)
         
-        item_name = item.text().strip()
+        # 获取与QListWidgetItem关联的QWidget
+        widget_item = self.list_widget.itemWidget(item)
+        if widget_item:
+            # 获取QLabel中的文本（也就是文件夹名称）
+            label = widget_item.findChild(QLabel)
+            if label:
+                item_name = label.text().strip()
+            else:
+                item_name = ''
+        else:
+            item_name = ''
+        
+        # item_name = item.text().strip()
         
         self.progress_dialog.setValue(20)
 
@@ -346,6 +427,7 @@ class FolderListWidget(QWidget):
             message = f"Successfully opened tomo {self.tomo_viewer.tomo_path_and_stage.tomo_name}."
             self.tomo_viewer.print(message)
             self.tomo_viewer.show_current_state()
+            # self.tomo_viewer._save_history()
             
             self.progress_dialog.setValue(100)
             self.progress_dialog.close()
