@@ -255,6 +255,8 @@ def template_2d(radii, center, evecs, shape, d=3):
         if ellip[i][0]<cube_ellip.shape[0] and ellip[i][1]<cube_ellip.shape[0] and ellip[i][2]<cube_ellip.shape[0]:
             ellip_.append(ellip[i])
     ellip_ = np.array(ellip_)
+    if len(ellip_)<5:
+        return cube_ellip[cube_ellip.shape[0]//2]
     cube_ellip[ellip_[:,0],ellip_[:,1],ellip_[:,2]] = 1
     img = cube_ellip[cube_ellip.shape[0]//2]
     cube_ellip=closing(cube_ellip,cube(d))
@@ -321,8 +323,15 @@ def density_fit_2d(data_iso,center,radius):
 
     img_m_mask=mask*img_m
     open=opening(img_m_mask)
+    
+    c=np.zeros_like(cube_)
+    c[cube_.shape[0]//2]=open
+    with mrcfile.new('/share/data/CryoET_Data/lvzy/test/open.mrc', overwrite=True) as m:
+        m.set_data(c.astype(np.float32))
+    
+
     l = label(open, connectivity=1)
-    d_min = 100
+    d_min = 99999
     label_vaule = 0
     for i in range(np.max(l)):
         points_i = np.where(l==(i+1))
@@ -331,19 +340,27 @@ def density_fit_2d(data_iso,center,radius):
         center_i=np.array([np.mean(points_y),np.mean(points_x)])
         center_label = np.array([1,1])*l.shape[0]//2
         d = dis(center_i,center_label)
-        if d < d_min:
+        if d < d_min and len(points_y) > 20:
             d_min = d
             label_vaule = i+1
     labeled = np.zeros_like(l)
     labeled[l==label_vaule] = 1
+    if d_min == 99999: #if the num of points to fit is too small (<20)
+        return [None, None, None, 0]
+    if(np.sum(labeled)/np.sum(open)<0.7):
+        labeled = open
     cube_m_mask=np.zeros_like(cube_)
     cube_m_mask[cube_.shape[0]//2]=labeled
-
+    
+    with mrcfile.new('/share/data/CryoET_Data/lvzy/test/cube_m_mask.mrc', overwrite=True) as m:
+        m.set_data(cube_m_mask.astype(np.float32))
     cloud=np.where(cube_m_mask>0)
     x = np.asarray(cloud[2])
     y = np.asarray(cloud[1])
     z = np.asarray(cloud[0])[0]
     [center_cube, evecs, radii]=ef.ellipse_fit(x,y,z)
+    if np.min(center_cube) < 0: # if the shape of fitted ellipsoid is too strange
+        return [None, None, None, 0]
 
     tm = template_2d(radii, center_cube, evecs, cube_.shape)
     ccf = CCF(img_normalize,tm)
