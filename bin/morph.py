@@ -155,19 +155,19 @@ def density_fit(data_iso,center,radius):
     cube_normalize = (cube_reverse - np.min(cube_reverse))/(np.max(cube_reverse)-np.min(cube_reverse))
 
     mask=ball(cube_.shape[0]//2)
-    # mask_circle=cube_.copy()
-    # p=np.percentile(cube_, 50)
-    # mask_circle[cube_<p]=1
-    # mask_circle[cube_>=p]=0
-    # mean_circle=np.sum(mask_circle*cube_)/np.sum(mask_circle)
+    mask_circle=cube_.copy()
+    p=np.percentile(cube_, 50)
+    mask_circle[cube_<p]=1
+    mask_circle[cube_>=p]=0
+    mean_circle=np.sum(mask_circle*cube_)/np.sum(mask_circle)
 
-    # cube_m=cube_.copy()
-    # cube_m[cube_<mean_circle]=1
-    # cube_m[cube_>=mean_circle]=0
     cube_m=cube_.copy()
-    avg = 0.5 * (np.min(cube_)+np.max(cube_))
-    cube_m[cube_<avg]=1
-    cube_m[cube_>=avg]=0    
+    cube_m[cube_<mean_circle]=1
+    cube_m[cube_>=mean_circle]=0
+    # cube_m=cube_.copy()
+    # avg = 0.5 * (np.min(cube_)+np.max(cube_))
+    # cube_m[cube_<avg]=1
+    # cube_m[cube_>=avg]=0    
 
 
     cube_m_mask=mask*cube_m
@@ -304,19 +304,20 @@ def density_fit_2d(data_iso,center,radius):
     img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
 
     mask = disk(cube_.shape[1]//2)
-    # mask_circle=img.copy()
-    # p=np.percentile(img, 50)
-    # mask_circle[img<p]=1
-    # mask_circle[img>=p]=0
-    # mean_circle=np.sum(mask_circle * img)/np.sum(mask_circle)
+    
+    mask_circle=img.copy()
+    p=np.percentile(img, 50)
+    mask_circle[img<p]=1
+    mask_circle[img>=p]=0
+    mean_circle=np.sum(mask_circle * img)/np.sum(mask_circle)
 
-    # img_m=img.copy()
-    # img_m[img<mean_circle]=1
-    # img_m[img>=mean_circle]=0
     img_m=img.copy()
-    avg = 0.5 * (np.min(img)+np.max(img))
-    img_m[img<avg]=1
-    img_m[img>=avg]=0
+    img_m[img<mean_circle]=1
+    img_m[img>=mean_circle]=0
+    # img_m=img.copy()
+    # avg = 0.5 * (np.min(img)+np.max(img))
+    # img_m[img<avg]=1
+    # img_m[img>=avg]=0
 
     img_m_mask=mask*img_m
     open=opening(img_m_mask)
