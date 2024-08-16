@@ -163,7 +163,6 @@ def add_picked_vesicle(tomo_viewer, data_to_add):
     else:
         viewer.layers[LABEL_LAYER_IDX].data = viewer.layers[LABEL_LAYER_IDX].data + data_to_add  # update label layer
         viewer.layers[LABEL_LAYER_IDX].refresh()
-        tomo_viewer.print('Successfully added 3d Vesicle')
 
 def save_and_update_delete(tomo_viewer):
     viewer = tomo_viewer.viewer
