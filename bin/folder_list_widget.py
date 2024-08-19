@@ -89,7 +89,9 @@ class FolderListWidget(QWidget):
             self.path = folder_path
             self.tomo_viewer.tomo_path_and_stage.current_path = folder_path
             self.state_file = os.path.join(self.path, 'segVesicle_QCheckBox_state.json')
+            self.heart_state_file = os.path.join(self.path, 'segVesicle_heart_broken.json')
             self.checkbox_states = self.load_checkbox_states()
+            self.heart_checkbox_states = self.load_heart_checkbox_states()
             self.list_widget.clear()
             self.populate_list(folder_path)
             message = f"Current path changed to: {self.path}"
@@ -120,7 +122,9 @@ class FolderListWidget(QWidget):
                     f.write(folder + '\n')
             
             self.state_file = os.path.join(self.path, 'segVesicle_QCheckBox_state.json')
+            self.heart_state_file = os.path.join(self.path, 'segVesicle_heart_broken.json')
             self.checkbox_states = self.load_checkbox_states()
+            self.heart_checkbox_states = self.load_heart_checkbox_states()
             self.list_widget.clear()
             self.populate_list(self.tomo_viewer.tomo_path_and_stage.current_path)
             

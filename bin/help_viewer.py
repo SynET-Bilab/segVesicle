@@ -1,8 +1,11 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QListWidget, QTextBrowser
-from PyQt5.QtCore import QUrl  # 导入 QUrl
+import base64
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QListWidget
+from PyQt5.QtCore import QUrl
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 import markdown
+import re
 
 class HelpViewer(QMainWindow):
     def __init__(self):
@@ -18,8 +21,7 @@ class HelpViewer(QMainWindow):
         self.file_list.setMaximumWidth(200)
         self.file_list.itemClicked.connect(self.display_help_content)
         
-        self.help_content = QTextBrowser()
-        self.help_content.setOpenExternalLinks(True)
+        self.help_content = QWebEngineView()  # 使用 QWebEngineView
         
         self.layout.addWidget(self.file_list)
         self.layout.addWidget(self.help_content)
@@ -36,6 +38,11 @@ class HelpViewer(QMainWindow):
                     self.md_files.append(os.path.join(markdown_dir, file_name))
                     self.file_list.addItem(file_name)
 
+    def convert_image_to_base64(self, image_path):
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        return encoded_string
+
     def display_help_content(self, item):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(script_dir, 'help_files', item.text())
@@ -44,13 +51,28 @@ class HelpViewer(QMainWindow):
                 md_content = file.read()
                 html_content = markdown.markdown(md_content)
                 base_url = QUrl.fromLocalFile(os.path.dirname(file_path))
-                base_url_path = base_url.toString()  # 获取 Base URL
-                # 调整路径
-                html_content = html_content.replace('src="img/', f'src="{base_url_path}/img/')
+                base_url_path = base_url.toString()
+
+                # 查找并处理所有图片路径
+                img_pattern = re.compile(r'src="img/([^"]+)"')
+                matches = img_pattern.findall(html_content)
+                for image_relative_path in matches:
+                    image_absolute_path = os.path.join(script_dir, 'help_files', 'img', image_relative_path)
+                    if os.path.exists(image_absolute_path):
+                        base64_image = self.convert_image_to_base64(image_absolute_path)
+                        html_content = html_content.replace(f'src="img/{image_relative_path}"', f'src="data:image/png;base64,{base64_image}"')
+
                 # 添加 CSS 样式以确保代码块换行
-                
+                html_content = """
+                <style>
+                    code, pre {
+                        white-space: pre-wrap;
+                        word-wrap: break-word;
+                    }
+                </style>
+                """ + html_content
+
                 self.help_content.setHtml(html_content)
-                # print(html_content)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
