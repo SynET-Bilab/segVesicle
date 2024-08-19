@@ -33,10 +33,12 @@ class HelpViewer(QMainWindow):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         markdown_dir = os.path.join(script_dir, 'help_files')
         if os.path.exists(markdown_dir):
-            for file_name in os.listdir(markdown_dir):
-                if file_name.endswith('.md'):
-                    self.md_files.append(os.path.join(markdown_dir, file_name))
-                    self.file_list.addItem(file_name)
+            # 获取所有 Markdown 文件并按名称排序
+            md_files = sorted([file_name for file_name in os.listdir(markdown_dir) if file_name.endswith('.md')])
+            for file_name in md_files:
+                file_path = os.path.join(markdown_dir, file_name)
+                self.md_files.append(file_path)
+                self.file_list.addItem(file_name)
 
     def convert_image_to_base64(self, image_path):
         with open(image_path, "rb") as image_file:
