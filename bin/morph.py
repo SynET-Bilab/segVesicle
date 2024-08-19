@@ -326,6 +326,8 @@ def density_fit_2d(data_iso,center,radius):
 
     img_m_mask=mask*img_m
     open=opening(img_m_mask)
+    databool=open >0
+    open=remove_small_objects(databool, min_size=50).astype(np.int16)
 
     l = label(open, connectivity=1)
     d_min = 99999
@@ -348,7 +350,7 @@ def density_fit_2d(data_iso,center,radius):
         labeled = open
     cube_m_mask=np.zeros_like(cube_)
     cube_m_mask[cube_.shape[0]//2]=labeled
-    
+
     cloud=np.where(cube_m_mask>0)
     x = np.asarray(cloud[2])
     y = np.asarray(cloud[1])
