@@ -197,7 +197,8 @@ def density_fit(data_iso,center,radius):
     labeled[l==label_vaule] = 1
     if d_min == 99999: #if the num of points to fit is too small (<2000)
         return [None, None, None, 0]
-
+    if(np.sum(labeled)/np.sum(open)<0.6):
+        labeled = opened
     idx=get_indices_sparse(labeled)
     
     vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
