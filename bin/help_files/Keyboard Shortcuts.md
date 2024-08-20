@@ -15,7 +15,7 @@ This document lists the keyboard shortcuts available for adding and deleting lab
 
 ### Delete Label
 - **Delete Label**: `d`
-  - Use this shortcut to delete a label.
+  - Use this shortcut to delete labels.
 
 ### Center Cross
 - **Center Cross**: `c`
