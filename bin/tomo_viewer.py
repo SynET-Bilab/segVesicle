@@ -141,6 +141,9 @@ class TomoViewer:
                     self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
                 
                 self.viewer.layers.move(self.viewer.layers.index(self.viewer.layers['ori_tomo']), 0)
+                
+                if 'edit vesicles' in self.viewer.layers:
+                    self.viewer.layers.remove('edit vesicles')
                 self.viewer.add_points(name='edit vesicles', ndim=3, size=4)
                 self.viewer.layers['edit vesicles'].mode = 'ADD'
                 self.multiple_viewer_widget.viewer_model1.camera.zoom = 0.9
@@ -314,6 +317,7 @@ class TomoViewer:
                 
                 self.viewer.add_labels(zero_label, name='label')  # add label layer
                 self.viewer.layers['label'].opacity = 0.5
+                
                 self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
                 # 将初始数据写入文件
                 initial_data = {

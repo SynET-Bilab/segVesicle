@@ -27,6 +27,8 @@ class HelpViewer(QMainWindow):
         self.layout.addWidget(self.help_content)
 
         self.load_md_files()
+        # 自动加载并显示 GUI.md
+        self.open_default_file("3. Gui.md")
 
     def load_md_files(self):
         self.md_files = []
@@ -75,6 +77,15 @@ class HelpViewer(QMainWindow):
                 """ + html_content
 
                 self.help_content.setHtml(html_content)
+
+    def open_default_file(self, default_file_name):
+        # 检查 GUI.md 是否在文件列表中
+        items = [self.file_list.item(i) for i in range(self.file_list.count())]
+        for item in items:
+            if item.text() == default_file_name:
+                self.file_list.setCurrentItem(item)
+                self.display_help_content(item)
+                break
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
