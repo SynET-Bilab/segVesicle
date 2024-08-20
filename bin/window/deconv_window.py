@@ -200,4 +200,5 @@ class DeconvWindow(QMainWindow):
         self.progress_dialog.setValue(100)
         self.viewer.layers['edit vesicles'].data = None
         self.tomo_viewer.print("Finish Deconvolution.")
+        self.tomo_viewer.show_current_state()
         self.close()

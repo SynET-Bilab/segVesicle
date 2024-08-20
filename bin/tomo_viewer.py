@@ -44,9 +44,10 @@ class TomoViewer:
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
         
     def show_current_state(self):
-        progress_value = self.tomo_path_and_stage.progress_stage.value
+        progress_value = self.tomo_path_and_stage.determine_progress()
+        # progress_value = self.tomo_path_and_stage.progress_stage.value
         # 将进度状态展示在QLineEdit里
-        self.multiple_viewer_widget.utils_widget.ui.progressStage.setText(progress_value)
+        self.multiple_viewer_widget.utils_widget.ui.progressStage.setText(progress_value.value)
     
     def print(self, message):
         self.multiple_viewer_widget.print_in_widget(message)
@@ -133,8 +134,12 @@ class TomoViewer:
                 # Processing
                 self.progress_dialog.setValue(50)
                 data = resample_image(file_path, pixel_size)
+                if 'ori_tomo' in self.viewer.layers:
+                    self.viewer.layers.remove('ori_tomo')
                 add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
-
+                with mrcfile.new(self.tomo_path_and_stage.ori_tomo_path, overwrite=True) as output_mrc:
+                    output_mrc.set_data(data)
+                    output_mrc.voxel_size = 17.14
                 if 'corrected_tomo' in self.viewer.layers:
                     self.viewer.layers['corrected_tomo'].visible = False
                 if 'edit vesicles' in self.viewer.layers:
@@ -151,10 +156,10 @@ class TomoViewer:
                 self.progress_dialog.setValue(100)
                 message = f"Successfully opened the original image {file_path}."
                 self.print(message)
+                self.show_current_state()
                 dialog.accept()
 
             apply_button.clicked.connect(apply_resample_image)
-
             dialog.setLayout(layout)
             dialog.exec_()
 
@@ -250,6 +255,7 @@ class TomoViewer:
             self.viewer.layers['label'].opacity = 0.5 
             self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
             self.progress_dialog.setValue(100)
+            self.show_current_state()
         
     def register_draw_area_mod(self):
         
@@ -325,6 +331,7 @@ class TomoViewer:
                 }
                 with open(self.tomo_path_and_stage.new_json_file_path, 'w') as json_file:
                     json.dump(initial_data, json_file, indent=4)
+                self.multiple_viewer_widget.utils_widget.ui.progressStage.setText('Please Make Manualy Annotations')
         
         try:
             self.toolbar_widget.manual_annotation_button.clicked.disconnect()

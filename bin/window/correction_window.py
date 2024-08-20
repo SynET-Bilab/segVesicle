@@ -100,8 +100,14 @@ class CorrectionWindow(QMainWindow):
         if not os.path.exists(directory):
             os.makedirs(directory)
             print(f"Created directory: {directory}")
+        
+        # 将数据缩放到 -128 到 127 的范围
+        correction_data_normalized = (correction_data - correction_data.min()) / (correction_data.max() - correction_data.min())
+
+        correction_data_int8 = (correction_data_normalized * 255 - 128).astype(np.int8)
+
         with mrcfile.new(self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path, overwrite=True) as output_mrc:
-            output_mrc.set_data(correction_data)
+            output_mrc.set_data(correction_data_int8)
             output_mrc.voxel_size = 17.14
         
         add_layer_with_right_contrast(correction_data, 'corrected_tomo', self.tomo_viewer.viewer)
@@ -110,6 +116,7 @@ class CorrectionWindow(QMainWindow):
         self.tomo_viewer.viewer.layers.selection.active = self.tomo_viewer.viewer.layers['edit vesicles']
         self.tomo_viewer.print("Finish Correction.")
         self.progress_dialog.setValue(100)
+        self.tomo_viewer.show_current_state()
         self.close()
 
     def predict_one(self, one_tomo):
@@ -132,7 +139,6 @@ class CorrectionWindow(QMainWindow):
         data = np.append(data, data[0:append_number], axis=0)
         num_big_batch = data.shape[0] // N
         outData = np.zeros(data.shape)
-
         logging.info("total batches: {}".format(num_big_batch))
         for i in tqdm(range(num_big_batch), file=sys.stdout):
             in_data = data[i * N:(i + 1) * N]
