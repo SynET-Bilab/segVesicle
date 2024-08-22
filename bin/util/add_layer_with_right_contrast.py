@@ -19,4 +19,4 @@ def add_layer_with_right_contrast(data: np, name: str, viewer: napari.Viewer):
     viewer.add_image(data, name=name)
     viewer.layers[name].contrast_limits = [min_val, max_val]
     viewer.layers[name].opacity = 0.8
-    viewer.layers[name].gamma = 0.7
+    viewer.layers[name].gamma = 0.75
