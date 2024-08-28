@@ -137,9 +137,12 @@ class TomoViewer:
                 if 'ori_tomo' in self.viewer.layers:
                     self.viewer.layers.remove('ori_tomo')
                 add_layer_with_right_contrast(data, 'ori_tomo', self.viewer)
-                # with mrcfile.new(self.tomo_path_and_stage.ori_tomo_path, overwrite=True) as output_mrc:
-                #     output_mrc.set_data(data)
-                #     output_mrc.voxel_size = 17.14
+                rec_folder_path = os.path.dirname(self.tomo_path_and_stage.rec_tomo_path)
+                if not os.path.exists(rec_folder_path):
+                    os.makedirs(rec_folder_path)
+                with mrcfile.new(self.tomo_path_and_stage.rec_tomo_path, overwrite=True) as output_mrc:
+                    output_mrc.set_data(data)
+                    output_mrc.voxel_size = 17.14
                 if 'corrected_tomo' in self.viewer.layers:
                     self.viewer.layers['corrected_tomo'].visible = False
                 if 'edit vesicles' in self.viewer.layers:
