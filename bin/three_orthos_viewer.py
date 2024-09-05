@@ -8,12 +8,6 @@ from qtpy.QtWidgets import (
     QCheckBox,
     QGridLayout,
     QWidget,
-    QPushButton,
-    QApplication, 
-    QVBoxLayout, 
-    QMainWindow,
-    QTextBrowser,
-    QTextEdit
 )
 from qtpy.QtCore import QTimer, QProcess, QByteArray, Qt, QEvent, Signal, QObject, QThread
 from qtpy import uic, QtGui, QtCore
@@ -118,21 +112,13 @@ class UtilWidge(QWidget):
         self.help_window.raise_()  # 确保窗口出现在最前面
 
 
-def copy_layer_le_4_16(layer: Layer, name: str = ""):
-    """
-    复制一个 Layer 对象（适用于 napari 版本 > 0.4.16）。
-    
-    参数:
-    layer (Layer): 要复制的图层
-    name (str): 图层的新名称
-
-    返回:
-    Layer: 复制后的图层
-    """
+def copy_layer_le_4_16(layer: Layer, name: str = ''):
     res_layer = deepcopy(layer)
+    # this deepcopy is not optimal for labels and images layers
     if isinstance(layer, (Image, Labels)):
         res_layer.data = layer.data
-    res_layer.metadata["viewer_name"] = name
+    res_layer.metadata['viewer_name'] = name
+
     res_layer.events.disconnect()
     res_layer.events.source = res_layer
     for emitter in res_layer.events.emitters.values():

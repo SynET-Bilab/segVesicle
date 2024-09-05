@@ -4,9 +4,12 @@ import napari
 import os
 import subprocess
 import json
+import tempfile
 
 from qtpy import QtCore, QtWidgets
 from napari.utils.notifications import show_info
+import pandas as pd
+from pathlib import Path
 
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
@@ -21,8 +24,6 @@ from util.predict_vesicle import predict_label, morph_process, vesicle_measure, 
 from util.resample import resample_image
 from widget.function_widget import ToolbarWidget
 
-
-
 class TomoViewer:
     def __init__(self, viewer: napari.Viewer, current_path: str, pid: int):
         QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
@@ -36,9 +37,6 @@ class TomoViewer:
         self.viewer.window.add_dock_widget(self.cross_widget, name="Cross", area="left")
         self.viewer.window.add_dock_widget(self.toolbar_widget, area='left', name='Tools')
         self.show_current_state()
-        # self._reset_history()
-        # self.viewer.bind_key('Ctrl-Z', self.on_undo)
-        # self.viewer.bind_key('Ctrl-Shift-Z', self.on_redo)
         
     def set_tomo_name(self, tomo_name: str):
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
@@ -63,11 +61,30 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.finish_isonet_button.clicked.connect(self.on_finish_isonet_clicked)
+        
         try:
             self.toolbar_widget.predict_button.clicked.disconnect()
         except TypeError:
             pass
         self.toolbar_widget.predict_button.clicked.connect(self.predict_clicked)
+        
+        try:
+            self.toolbar_widget.draw_memb_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
+        
+        try:
+            self.toolbar_widget.visualize_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
+        
+        try:
+            self.toolbar_widget.stsyseg_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.stsyseg_button.clicked.connect(self.register_seg_memb)
         
     def register_open_ori_tomo(self):
         def button_clicked():
@@ -260,6 +277,136 @@ class TomoViewer:
             self.progress_dialog.setValue(100)
             self.show_current_state()
         
+    def register_draw_memb_mod(self):
+        # 保存为临时点文件并转换为 .mod 文件
+        def write_model(model_file, model_df):
+            """ 将点文件转换为 .mod 文件 """
+            model = np.asarray(model_df)
+            
+            # 提取model_file的文件夹路径
+            model_dir = os.path.dirname(model_file)
+            
+            # 如果文件夹不存在，则创建文件夹
+            if not os.path.exists(model_dir):
+                os.makedirs(model_dir)
+            
+            with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+                # 保存点文件
+                point_file = temp_file.name
+                np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
+                
+                # 使用 point2model 命令将点文件转换为 .mod 文件
+                cmd = f"point2model -op {point_file} {model_file} >/dev/null"
+                subprocess.run(cmd, shell=True, check=True)
+        
+        points = self.viewer.layers['edit vesicles'].data
+        # 按照 z 轴分组
+        z_groups = {}
+        for point in points:
+            z = point[0]
+            if z not in z_groups:
+                z_groups[z] = []
+            z_groups[z].append(point)
+
+        # 准备保存的点数据
+        data = []
+        # 创建 object1 并添加三个 contour
+        object_id = 1
+        contour_count = 0
+        for z, group in z_groups.items():
+            if len(group) > 1 and contour_count < 3:
+                for point in group:
+                    # object_id, contour_id, x, y, z (1-based for object and contour)
+                    data.append([object_id, contour_count + 1, point[2], point[1], point[0]])
+                contour_count += 1
+
+        # 创建 object2 并添加单独的点
+        object_id = 2
+        for z, group in z_groups.items():
+            if len(group) == 1:
+                for point in group:
+                    # object_id, contour_id, x, y, z
+                    data.append([object_id, 1, point[2], point[1], point[0]])
+
+        # 转换为DataFrame
+        df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
+        write_model(self.tomo_path_and_stage.memb_prompt_path, df)
+        self.print("Points validated and saved successfully.")
+    
+    def register_seg_memb(self):
+        # Show progress dialog
+        from qtpy.QtWidgets import QProgressDialog
+        from qtpy.QtCore import Qt
+        self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
+        self.progress_dialog.setWindowTitle('Opening')
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setValue(0)
+        self.progress_dialog.show()
+        
+        output_path = self.tomo_path_and_stage.memb_folder_path + '/' + self.tomo_path_and_stage.base_tomo_name
+        cmd = f'segprepost.py run {self.tomo_path_and_stage.isonet_tomo_path} {self.tomo_path_and_stage.memb_prompt_path} -o {output_path}'
+        
+        subprocess.run(cmd, shell=True, check=True)
+        
+        self.progress_dialog.setValue(100)
+    
+    def register_vis_memb(self):
+        def read_point(point_file, dtype_z=int):
+            """ Read imod point file. """
+            point = np.loadtxt(point_file)
+            if point.shape[1] != 5:
+                raise ValueError("Point file should contain five columns, corresponding to object,contour,x,y,z.")
+            
+            cols = ["object", "contour", "x", "y", "z"]
+            dtypes = [int, int, float, float, dtype_z]
+            data = {
+                cols[i]: pd.Series(point[:, i], dtype=dtypes[i])
+                for i in range(5)
+            }
+            model = pd.DataFrame(data)
+            return model
+
+        def read_model(model_file, dtype_z=int):
+            """ Read imod model file. """
+            with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+                point_file = temp_file.name
+                # cmd = f"model2point -ob {model_file} {point_file}"
+                cmd = f"model2point -ob {model_file} {point_file} >/dev/null"
+                subprocess.run(cmd, shell=True, check=True)
+                
+                bak_file = Path(f"{point_file}~")
+                if bak_file.exists():
+                    bak_file.unlink()
+
+                model = read_point(point_file, dtype_z=dtype_z)
+                return model
+
+        def mod_to_3d_data(model_df, shape):
+            """ Convert model DataFrame to 3D numpy array. """
+            data = np.zeros(shape, dtype=np.int16)
+            
+            # Mapping from object values to desired output values
+            obj_mapping = {1: 0, 2: 2, 3: 0}
+            # obj_mapping = {1: 37, 2: 2, 3: 22}
+            
+            for _, row in model_df.iterrows():
+                obj = int(row['object'])
+                z, y, x = int(row['z']), int(row['y']), int(row['x'])
+                if obj in obj_mapping:
+                    data[z, y, x] = obj_mapping[obj]
+                    
+            return data
+
+        # 读取mod文件
+        model_file = self.tomo_path_and_stage.memb_result_path
+        model_df = read_model(model_file)
+
+        shape = self.viewer.layers[0].data.shape  # 请根据你的实际情况调整
+        data = mod_to_3d_data(model_df, shape)
+        # 使用Napari可视化
+        self.viewer.add_labels(data, name='Membrane' ,opacity=1)
+        # self.viewer.add_labels(data.astype(np.int16), name='Membrane', color={1: 'green', 2: 'cyan', 3: 'magenta'})
+    
     def register_draw_area_mod(self):
         
         def validate_points(points):
@@ -281,6 +428,7 @@ class TomoViewer:
                 return False
 
             return True
+        
         
         def create_area_mod():
             points = self.viewer.layers['edit vesicles'].data  # (z, y, x) 格式
@@ -315,6 +463,8 @@ class TomoViewer:
             pass
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
         
+        
+        
     def register_manualy_correction(self):
         
         def init_lable_file():
@@ -341,44 +491,3 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.manual_annotation_button.clicked.connect(init_lable_file)
-    
-    # def _reset_history(self, event=None):
-    #     self._undo_history = deque()
-    #     self._redo_history = deque()
-    
-    # def _save_history(self):
-    #     history_item = {
-    #         "edit_vesicles": np.copy(self.viewer.layers['edit vesicles'].data),
-    #         "label": np.copy(self.viewer.layers['label'].data)
-    #     }
-    #     self._redo_history = deque()  # 清空重做历史记录
-    #     self._undo_history.append(history_item)  # 将新记录保存到撤销队列中
-
-    # def undo(self):
-    #     self._load_history(self._undo_history, self._redo_history, undoing=True)
-
-    # def redo(self):
-    #     self._load_history(self._redo_history, self._undo_history, undoing=False)
-
-    # def _load_history(self, before, after, undoing=True):
-    #     if len(before) == 0:
-    #         return
-
-    #     history_item = before.pop()  # 从撤销或重做队列中取出最后一个历史记录
-    #     after.append(history_item)  # 将该记录保存到另一个队列中（撤销保存到重做，重做保存到撤销）
-
-    #     # 恢复之前保存的图层数据
-    #     self.viewer.layers['edit vesicles'].data = history_item["edit_vesicles"]
-    #     self.viewer.layers['label'].data = history_item["label"]
-
-    #     # 如果需要，可以在这里调用更新函数刷新图层显示
-    #     self.viewer.layers['edit vesicles'].refresh()
-    #     self.viewer.layers['label'].refresh()
-        
-    # def on_undo(self, event=None):
-    #     """触发撤销操作"""
-    #     self.undo()
-
-    # def on_redo(self, event=None):
-    #     """触发重做操作"""
-    #     self.redo()
