@@ -282,31 +282,63 @@ class TomoViewer:
         def write_model(model_file, model_df):
             """ 将点文件转换为 .mod 文件 """
             model = np.asarray(model_df)
-            
+
             # 提取model_file的文件夹路径
             model_dir = os.path.dirname(model_file)
-            
+
             # 如果文件夹不存在，则创建文件夹
             if not os.path.exists(model_dir):
                 os.makedirs(model_dir)
-            
+
             with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
                 # 保存点文件
                 point_file = temp_file.name
                 np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
-                
+
                 # 使用 point2model 命令将点文件转换为 .mod 文件
                 cmd = f"point2model -op {point_file} {model_file} >/dev/null"
                 subprocess.run(cmd, shell=True, check=True)
-        
+
+        def validate_points(points):
+            """ 验证点是否满足要求 """
+            # 按照 z 轴分组
+            z_groups = {}
+            for point in points:
+                z = point[0]
+                if z not in z_groups:
+                    z_groups[z] = []
+                z_groups[z].append(point)
+
+            # 检查是否有四个不同的 z 轴
+            if len(z_groups) != 4:
+                self.print("Error: Points must be distributed across exactly four distinct Z-axes.")
+                return None
+
+            # 检查其中一个 z 轴上只有一个点，其他三个 z 轴上点的数量大于一个
+            single_point_z_count = 0
+            multi_point_z_count = 0
+            for group in z_groups.values():
+                if len(group) == 1:
+                    single_point_z_count += 1
+                elif len(group) > 1:
+                    multi_point_z_count += 1
+
+            if single_point_z_count != 1 or multi_point_z_count != 3:
+                self.print("Error: There must be exactly one Z-axis with a single point and three Z-axes with more than one point.")
+                return None
+
+            return z_groups
+
+        # 获取点数据
         points = self.viewer.layers['edit vesicles'].data
-        # 按照 z 轴分组
-        z_groups = {}
-        for point in points:
-            z = point[0]
-            if z not in z_groups:
-                z_groups[z] = []
-            z_groups[z].append(point)
+
+        # 验证点数据是否符合要求
+        z_groups = validate_points(points)
+
+        # 如果验证不通过，直接退出并清空点数据
+        if z_groups is None:
+            self.viewer.layers['edit vesicles'].data = None
+            return
 
         # 准备保存的点数据
         data = []
@@ -332,9 +364,12 @@ class TomoViewer:
         df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
         write_model(self.tomo_path_and_stage.memb_prompt_path, df)
         self.print("Points validated and saved successfully.")
+
+        # 最后清空点数据
+        self.viewer.layers['edit vesicles'].data = None
     
     def register_seg_memb(self):
-        # Show progress dialog
+        # 显示进度对话框
         from qtpy.QtWidgets import QProgressDialog
         from qtpy.QtCore import Qt
         self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
@@ -342,12 +377,25 @@ class TomoViewer:
         self.progress_dialog.setWindowModality(Qt.WindowModal)
         self.progress_dialog.setValue(0)
         self.progress_dialog.show()
-        
+
+        # 设置输出路径
         output_path = self.tomo_path_and_stage.memb_folder_path + '/' + self.tomo_path_and_stage.base_tomo_name
         cmd = f'segprepost.py run {self.tomo_path_and_stage.isonet_tomo_path} {self.tomo_path_and_stage.memb_prompt_path} -o {output_path}'
-        
-        subprocess.run(cmd, shell=True, check=True)
-        
+
+        try:
+            # 运行命令并捕获错误
+            subprocess.run(cmd, shell=True, check=True)
+
+            # 成功时的提示信息
+            result = f'Membrane segmentation successful. The result is saved at {self.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
+            self.print(result)
+
+        except subprocess.CalledProcessError as e:
+            # 捕获错误并输出错误信息
+            error_message = f"An error occurred during membrane segmentation: {str(e)}"
+            self.print(error_message)
+
+        # 进度完成
         self.progress_dialog.setValue(100)
     
     def register_vis_memb(self):
@@ -397,15 +445,22 @@ class TomoViewer:
                     
             return data
 
-        # 读取mod文件
         model_file = self.tomo_path_and_stage.memb_result_path
+        if not os.path.exists(model_file):
+            result = f'Error: The file {model_file} does not exist.'
+            self.print(result)
+            return
+        
         model_df = read_model(model_file)
 
         shape = self.viewer.layers[0].data.shape  # 请根据你的实际情况调整
         data = mod_to_3d_data(model_df, shape)
+
         # 使用Napari可视化
-        self.viewer.add_labels(data, name='Membrane' ,opacity=1)
-        # self.viewer.add_labels(data.astype(np.int16), name='Membrane', color={1: 'green', 2: 'cyan', 3: 'magenta'})
+        self.viewer.add_labels(data, name='Membrane', opacity=1)
+
+        # 操作成功后输出提示
+        self.print("Visualize successfully.")
     
     def register_draw_area_mod(self):
         
