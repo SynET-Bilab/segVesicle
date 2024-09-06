@@ -602,4 +602,4 @@ if __name__ == "__main__":
         ves_tomo = vesicle_rendering(args.output_file,shape)
         #labels = label(ves_tomo).astype(np.float32)
         with mrcfile.new(args.label,overwrite=True) as n:
-            n.set_data(ves_tomo.astype(np.float32))
+            n.set_data(ves_tomo.astype(np.int16))
