@@ -15,14 +15,17 @@ from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
 from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
 
+
 from collections import deque
 
 from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
+from window.memb_segmentation_window import MembSegmentationWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample import resample_image
 from widget.function_widget import ToolbarWidget
+
 
 class TomoViewer:
     def __init__(self, viewer: napari.Viewer, current_path: str, pid: int):
@@ -84,7 +87,7 @@ class TomoViewer:
             self.toolbar_widget.stsyseg_button.clicked.disconnect()
         except TypeError:
             pass
-        self.toolbar_widget.stsyseg_button.clicked.connect(self.register_seg_memb)
+        self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
         
     def register_open_ori_tomo(self):
         def button_clicked():
@@ -368,6 +371,11 @@ class TomoViewer:
         # 最后清空点数据
         self.viewer.layers['edit vesicles'].data = None
     
+    def open_segmentation_window(self):
+        # 创建并显示用于输入 pixel_size 和 extend 的新窗口
+        self.segmentation_window = MembSegmentationWindow(self)
+        self.segmentation_window.show()
+    
     def register_seg_memb(self):
         # 显示进度对话框
         from qtpy.QtWidgets import QProgressDialog
@@ -434,7 +442,7 @@ class TomoViewer:
             data = np.zeros(shape, dtype=np.int16)
             
             # Mapping from object values to desired output values
-            obj_mapping = {1: 0, 2: 2, 3: 0}
+            obj_mapping = {1: 0, 2: 2, 3: 22}
             # obj_mapping = {1: 37, 2: 2, 3: 22}
             
             for _, row in model_df.iterrows():

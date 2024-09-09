@@ -2,6 +2,7 @@ import napari
 import numpy as np
 import mrcfile
 import os
+import json
 from qtpy.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QGridLayout, QDoubleSpinBox, QProgressDialog, QApplication
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QScreen
@@ -69,6 +70,9 @@ class DeconvWindow(QMainWindow):
         self.highpassnyquist_input.setValue(self.default_values['highpassnyquist'])
         self.highpassnyquist_input.setSingleStep(0.01)  # 设置步长
 
+        self.save_button = QPushButton('Save Parameters', self)
+        self.save_button.clicked.connect(self.save_parameters)
+
         self.apply_button = QPushButton('Apply Deconv', self)
         self.apply_button.clicked.connect(self.apply_deconv)
         
@@ -105,6 +109,7 @@ class DeconvWindow(QMainWindow):
         self.add_parameter(right_bottom_layout, 'SNR Falloff:', self.snrfalloff_input)
         self.add_parameter(right_bottom_layout, 'Deconv Strength:', self.deconvstrength_input)
         self.add_parameter(right_bottom_layout, 'Highpass Nyquist:', self.highpassnyquist_input)
+        right_bottom_layout.addWidget(self.save_button)
         right_bottom_layout.addWidget(self.preview_button)
         right_bottom_layout.addWidget(self.apply_button)
         
@@ -134,6 +139,30 @@ class DeconvWindow(QMainWindow):
         max_z = min(self.data.shape[0], z_val + 25 + 1)
         cropped_image = self.data[min_z:max_z, min_y:max_y + 1, min_x:max_x + 1]
         return cropped_image
+    
+    def save_parameters(self):
+        # 获取当前参数值
+        parameters = {
+            'voltage': self.voltage_input.value(),
+            'cs': self.cs_input.value(),
+            'defocus': self.defocus_input.value(),
+            'pixel_size': self.pixel_size_input.value(),
+            'snrfalloff': round(self.snrfalloff_input.value(), 2), 
+            'deconvstrength': self.deconvstrength_input.value(),
+            'highpassnyquist': self.highpassnyquist_input.value()
+        }
+
+        # 保存为 JSON 文件
+        save_path = self.tomo_viewer.tomo_path_and_stage.deconv_para  # 目标保存路径
+        if not save_path.endswith('.json'):
+            save_path += '.json'
+
+        with open(save_path, 'w') as json_file:
+            json.dump(parameters, json_file, indent=4)
+        
+        message = f"Parameters saved to {save_path}"
+        print(f"Parameters saved to {save_path}")
+        self.tomo_viewer.print(message)
     
     def preview_deconv(self):
         self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)
