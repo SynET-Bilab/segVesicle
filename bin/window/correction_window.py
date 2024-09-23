@@ -3,6 +3,7 @@ import sys
 import logging
 import mrcfile
 import os
+import subprocess
 import numpy as np
 from tqdm import tqdm
 from qtpy.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QApplication, QTextEdit, QProgressDialog, QMessageBox
@@ -26,6 +27,12 @@ class CorrectionWindow(QMainWindow):
 
         # Main layout
         layout = QVBoxLayout()
+
+        # New button for 'create tomo star'
+        self.create_tomo_star_button = QPushButton('Create tomo star')
+        layout.addWidget(self.create_tomo_star_button)
+        self.create_tomo_star_button.clicked.connect(self.create_tomo_star)
+
 
         # First button
         self.button1 = QPushButton('Correction in Vesicle Segmentation (about 10 minutes)')
@@ -67,6 +74,34 @@ class CorrectionWindow(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
+        
+    def create_tomo_star(self):
+        """
+        Function to execute the 'isonet.py prepare_star' command with updated paths.
+        """
+        try:
+            # 获取 rec_tomo_path 所在的文件夹路径
+            rec_tomo_dir = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.rec_tomo_path)
+            
+            # 获取 tomograms_star_path
+            output_star = self.tomo_viewer.tomo_path_and_stage.tomograms_star_path
+            
+            # 构建命令
+            command = [
+                'isonet.py', 'prepare_star', rec_tomo_dir,
+                '--pixel_size', '17.14',
+                '--output_star', output_star
+            ]
+            
+            # 执行命令
+            subprocess.run(command, check=True)
+            
+            # 成功提示
+            self.tomo_viewer.print('Tomo star created successfully!')
+        
+        except subprocess.CalledProcessError as e:
+            # 错误提示
+            self.tomo_viewer.print('Failed to create tomo star.')
 
     def copy_code_to_clipboard(self):
         clipboard = QApplication.clipboard()
