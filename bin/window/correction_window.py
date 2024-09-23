@@ -45,8 +45,10 @@ class CorrectionWindow(QMainWindow):
         # self.model_path = '/share/data/CryoET_Data/lvzy/script/segvesicle/segvesv0.1/vesicle_corrected_model.h5'
         self.model_name = 'vesicle_corrected_model.h5'
         self.model_path = ensure_model_exists(self.model_name)
-        # 生成line内容
-        line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} {self.model_path} --gpuID 0'
+        if self.model_path is None:
+            line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} model_path --gpuID 0'
+        else:
+            line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} {self.model_path} --gpuID 0'
         
         # 代码显示和复制按钮
         code_layout = QHBoxLayout()
