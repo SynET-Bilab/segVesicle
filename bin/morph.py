@@ -54,7 +54,7 @@ def morph_process(mask, area_file, pixelsize=17.14, elem_len=1, radius=10, save_
 
     kernel_pre = cube(11)
     pre_pro = opening(pre_pro, kernel_pre)
-    pre_pro = erosion(pre_pro, cube(2))
+    pre_pro = erosion(pre_pro, cube(3))
     labeled_pre_pro = label(pre_pro) #process linked vesicles just after prediction, Part 1
 
     logging.info('\nFix the broken vesicles\n')
@@ -143,7 +143,7 @@ def density_fit(data_iso,center,radius):
     '''
     shape = data_iso.shape
     # padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
-    padwidth = 20
+    padwidth = 10
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
@@ -174,12 +174,11 @@ def density_fit(data_iso,center,radius):
     databool=cube_m_mask >0
     cube_m_mask=remove_small_objects(databool, min_size=50).astype(np.int8)
     
-    open=opening(cube_m_mask)
+    open=opening(cube_m_mask,cube(2))
     databool=open >0
     opened=remove_small_objects(databool, min_size=50).astype(np.int16)
     l = label(opened, connectivity=1)
-    if np.sum(opened) < 1000:
-        return [None, None, None, 0]
+    
     d_min = 99999
     label_vaule = 0
     for i in range(np.max(l)):
@@ -190,12 +189,12 @@ def density_fit(data_iso,center,radius):
         center_i=np.array([np.mean(points_z),np.mean(points_y),np.mean(points_x)])
         center_label = np.array([1,1,1])*l.shape[0]//2
         d = dis(center_i,center_label)
-        if d < d_min  and len(points_z)>2000:
+        if d < d_min  and len(points_z)>200:
             d_min = d
             label_vaule = i+1
     labeled = np.zeros_like(l)
     labeled[l==label_vaule] = 1
-    if d_min == 99999: #if the num of points to fit is too small (<2000)
+    if d_min == 99999: #if the num of points to fit is too small (<200)
         return [None, None, None, 0]
     if(np.sum(labeled)/np.sum(open)<0.6):
         labeled = opened
@@ -296,7 +295,7 @@ def density_fit_2d(data_iso,center,radius):
 
     shape = data_iso.shape
     # padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
-    padwidth = 20
+    padwidth = 10
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
@@ -325,9 +324,9 @@ def density_fit_2d(data_iso,center,radius):
     # img_m[img>=avg]=0
 
     img_m_mask=mask*img_m
-    open=opening(img_m_mask)
+    open=opening(img_m_mask,square(2))
     databool=open >0
-    open=remove_small_objects(databool, min_size=50).astype(np.int16)
+    open=remove_small_objects(databool, min_size=10).astype(np.int16)
 
     l = label(open, connectivity=1)
     d_min = 99999
@@ -339,12 +338,12 @@ def density_fit_2d(data_iso,center,radius):
         center_i=np.array([np.mean(points_y),np.mean(points_x)])
         center_label = np.array([1,1])*l.shape[0]//2
         d = dis(center_i,center_label)
-        if d < d_min and len(points_y) > 20:
+        if d < d_min and len(points_y) > 10:
             d_min = d
             label_vaule = i+1
     labeled = np.zeros_like(l)
     labeled[l==label_vaule] = 1
-    if d_min == 99999: #if the num of points to fit is too small (<20)
+    if d_min == 99999: #if the num of points to fit is too small (<10)
         return [None, None, None, 0]
     if(np.sum(labeled)/np.sum(open)<0.6):
         labeled = open
