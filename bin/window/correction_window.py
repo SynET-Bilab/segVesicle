@@ -28,12 +28,6 @@ class CorrectionWindow(QMainWindow):
         # Main layout
         layout = QVBoxLayout()
 
-        # New button for 'create tomo star'
-        self.create_tomo_star_button = QPushButton('Create tomo star')
-        layout.addWidget(self.create_tomo_star_button)
-        self.create_tomo_star_button.clicked.connect(self.create_tomo_star)
-
-
         # First button
         self.button1 = QPushButton('Correction in Vesicle Segmentation (about 10 minutes)')
         layout.addWidget(self.button1)
@@ -43,6 +37,11 @@ class CorrectionWindow(QMainWindow):
         self.button2 = QPushButton('Correction in Terminal (Recommended)')
         layout.addWidget(self.button2)
         self.button2.clicked.connect(self.copy_code_and_close)
+        
+        # New button: Open corrected tomo in Napari
+        self.button3 = QPushButton('Open Corrected Tomo in Napari')
+        layout.addWidget(self.button3)
+        self.button3.clicked.connect(self.open_corrected_tomo)
 
         # Code display and copy button
         code_layout = QHBoxLayout()
@@ -56,6 +55,11 @@ class CorrectionWindow(QMainWindow):
             line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} model_path --gpuID 0'
         else:
             line = f'isonet.py predict {tomograms_star_path} --output_dir {output_path} {self.model_path} --gpuID 0'
+        
+        # Add the mv command
+        isonet_tomo_path = tomo_viewer.tomo_path_and_stage.isonet_tomo_path
+        isonet_old_tomo_path = isonet_tomo_path.replace('_wbp_corrected.mrc', '_wbp_resample_corrected.mrc')
+        line += f'\nmv {isonet_old_tomo_path} {isonet_tomo_path}'
         
         # 代码显示和复制按钮
         code_layout = QHBoxLayout()
@@ -74,34 +78,6 @@ class CorrectionWindow(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-        
-    def create_tomo_star(self):
-        """
-        Function to execute the 'isonet.py prepare_star' command with updated paths.
-        """
-        try:
-            # 获取 rec_tomo_path 所在的文件夹路径
-            rec_tomo_dir = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.rec_tomo_path)
-            
-            # 获取 tomograms_star_path
-            output_star = self.tomo_viewer.tomo_path_and_stage.tomograms_star_path
-            
-            # 构建命令
-            command = [
-                'isonet.py', 'prepare_star', rec_tomo_dir,
-                '--pixel_size', '17.14',
-                '--output_star', output_star
-            ]
-            
-            # 执行命令
-            subprocess.run(command, check=True)
-            
-            # 成功提示
-            self.tomo_viewer.print('Tomo star created successfully!')
-        
-        except subprocess.CalledProcessError as e:
-            # 错误提示
-            self.tomo_viewer.print('Failed to create tomo star.')
 
     def copy_code_to_clipboard(self):
         clipboard = QApplication.clipboard()
@@ -110,6 +86,24 @@ class CorrectionWindow(QMainWindow):
     def copy_code_and_close(self):
         self.copy_code_to_clipboard()
         self.close()
+        
+    def open_corrected_tomo(self):
+        # Path to the corrected tomogram
+        corrected_tomo_path = self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path
+        
+        if os.path.exists(corrected_tomo_path):
+            with mrcfile.open(corrected_tomo_path, permissive=True) as mrc:
+                corrected_data = mrc.data
+            
+            # Add the corrected tomogram to the Napari viewer
+            add_layer_with_right_contrast(corrected_data, 'corrected_tomo', self.tomo_viewer.viewer)
+            self.tomo_viewer.viewer.layers.move(self.tomo_viewer.viewer.layers.index(self.tomo_viewer.viewer.layers['corrected_tomo']), 0)
+            self.tomo_viewer.viewer.layers.selection.active = self.tomo_viewer.viewer.layers['corrected_tomo']
+            self.tomo_viewer.print("Corrected Tomo opened in Napari.")
+            self.tomo_viewer.show_current_state()
+            self.close()
+        else:
+            self.tomo_viewer.print("Corrected Tomogram file not found.")
         
     def correction(self):
         if not TF_AVAILABLE:

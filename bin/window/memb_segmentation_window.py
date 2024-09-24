@@ -59,7 +59,7 @@ class MembSegmentationWindow(QMainWindow):
     def register_seg_memb(self, pixel_size=None, extend=30):
         # 显示进度对话框
         progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)
-        progress_dialog.setWindowTitle('Opening')
+        progress_dialog.setWindowTitle('Segmenting')
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
         progress_dialog.show()
@@ -82,14 +82,21 @@ class MembSegmentationWindow(QMainWindow):
             # 成功时的提示信息
             result = f'Membrane segmentation successful. The result is saved at {self.tomo_viewer.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
             self.tomo_viewer.print(result)
+            
+            # 进度完成
+            progress_dialog.setValue(100)
+            # 关闭窗口
+            self.close()
 
         except subprocess.CalledProcessError as e:
             # 捕获错误并输出错误信息
             error_message = f"An error occurred during membrane segmentation: {str(e)}"
             self.tomo_viewer.print(error_message)
+            
+            # 进度完成
+            progress_dialog.setValue(100)
 
-        # 进度完成
-        progress_dialog.setValue(100)
+        
         
     def center_on_screen(self):
         ''' 使窗口居中显示 '''

@@ -163,6 +163,37 @@ class TomoViewer:
                 with mrcfile.new(self.tomo_path_and_stage.rec_tomo_path, overwrite=True) as output_mrc:
                     output_mrc.set_data(data)
                     output_mrc.voxel_size = 17.14
+                
+                # 打印成功信息并告知路径
+                resampled_image_path = self.tomo_path_and_stage.rec_tomo_path
+                message = f"Resampled image successfully saved at: {resampled_image_path}"
+                self.print(message)
+                
+                # 执行创建 tomograms.star 文件
+                try:
+                    # 获取 rec_tomo_path 所在的文件夹路径
+                    rec_tomo_dir = os.path.dirname(self.tomo_path_and_stage.rec_tomo_path)
+                    
+                    # 获取 tomograms_star_path
+                    output_star = self.tomo_path_and_stage.tomograms_star_path
+                    
+                    # 构建命令
+                    command = [
+                        'isonet.py', 'prepare_star', rec_tomo_dir,
+                        '--pixel_size', '17.14',
+                        '--output_star', output_star
+                    ]
+                    
+                    # 执行命令
+                    subprocess.run(command, check=True)
+                    
+                    # 成功提示
+                    self.print('Tomo star created successfully!')
+                
+                except subprocess.CalledProcessError as e:
+                    # 错误提示
+                    self.print('Failed to create tomo star.')
+                
                 if 'corrected_tomo' in self.viewer.layers:
                     self.viewer.layers['corrected_tomo'].visible = False
                 if 'edit vesicles' in self.viewer.layers:

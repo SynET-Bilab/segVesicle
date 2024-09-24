@@ -3,6 +3,7 @@ import numpy as np
 import mrcfile
 import os
 import json
+import subprocess
 from qtpy.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QGridLayout, QDoubleSpinBox, QProgressDialog, QApplication
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QScreen
@@ -211,23 +212,63 @@ class DeconvWindow(QMainWindow):
 
         self.progress_dialog.setValue(50)
 
-        deconv_result = deconv_tomo(self.data, None, angpix=pixel_size, voltage=voltage, cs=cs, defocus=defocus, 
-                                    snrfalloff=snrfalloff, deconvstrength=deconvstrength, 
-                                    highpassnyquist=highpassnyquist, phaseflipped=False, phaseshift=0, ncpu=4)
-        # self.viewer.layers.clear()
-        directory = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            print(f"Created directory: {directory}")
-        with mrcfile.new(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path, overwrite=True) as output_mrc:
-            output_mrc.set_data(deconv_result)
-            output_mrc.voxel_size = 17.14
-        add_layer_with_right_contrast(deconv_result, 'deconv_tomo', self.viewer)
-        deconv_tomo_layer = self.viewer.layers['deconv_tomo']
-        self.viewer.layers.move(self.viewer.layers.index(deconv_tomo_layer), 0)
-        self.viewer.layers['ori_tomo'].visible = False
-        self.progress_dialog.setValue(100)
-        self.viewer.layers['edit vesicles'].data = None
-        self.tomo_viewer.print("Finish Deconvolution.")
-        self.tomo_viewer.show_current_state()
+        # 构造命令行
+        star_file_path = self.tomo_viewer.tomo_path_and_stage.tomograms_star_path  # 假设 self.data 是 STAR 文件路径
+        deconv_folder = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path)
+
+        command = [
+            "isonet.py", "deconv", star_file_path,
+            "--deconv_folder", deconv_folder,
+            "--voltage", str(voltage),
+            "--cs", str(cs),
+            "--snrfalloff", str(snrfalloff),
+            "--deconvstrength", str(deconvstrength),
+            "--highpassnyquist", str(highpassnyquist),
+            "--ncpu", '4',
+        ]
+
+        # 执行命令行
+        try:
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            print("deconv_tomo output:", result.stdout)
+        except subprocess.CalledProcessError as e:
+            print(f"Error during deconv_tomo execution: {e.stderr}")
+
+        # 读取deconv_tomo的结果
+        deconv_result_path = self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path
+        if os.path.exists(deconv_result_path):
+            with mrcfile.open(deconv_result_path, mode='r') as output_mrc:
+                deconv_result = output_mrc.data
+
+            add_layer_with_right_contrast(deconv_result, 'deconv_tomo', self.viewer)
+            deconv_tomo_layer = self.viewer.layers['deconv_tomo']
+            self.viewer.layers.move(self.viewer.layers.index(deconv_tomo_layer), 0)
+            self.viewer.layers['ori_tomo'].visible = False
+            self.progress_dialog.setValue(100)
+            self.viewer.layers['edit vesicles'].data = None
+            self.tomo_viewer.print("Finish Deconvolution.")
+            self.tomo_viewer.show_current_state()
+        else:
+            print(f"Deconv result not found at: {deconv_result_path}")
+            self.progress_dialog.setValue(100)
+
+        # deconv_result = deconv_tomo(self.data, None, angpix=pixel_size, voltage=voltage, cs=cs, defocus=defocus, 
+        #                             snrfalloff=snrfalloff, deconvstrength=deconvstrength, 
+        #                             highpassnyquist=highpassnyquist, phaseflipped=False, phaseshift=0, ncpu=4)
+        # # self.viewer.layers.clear()
+        # directory = os.path.dirname(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path)
+        # if not os.path.exists(directory):
+        #     os.makedirs(directory)
+        #     print(f"Created directory: {directory}")
+        # with mrcfile.new(self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path, overwrite=True) as output_mrc:
+        #     output_mrc.set_data(deconv_result)
+        #     output_mrc.voxel_size = 17.14
+        # add_layer_with_right_contrast(deconv_result, 'deconv_tomo', self.viewer)
+        # deconv_tomo_layer = self.viewer.layers['deconv_tomo']
+        # self.viewer.layers.move(self.viewer.layers.index(deconv_tomo_layer), 0)
+        # self.viewer.layers['ori_tomo'].visible = False
+        # self.progress_dialog.setValue(100)
+        # self.viewer.layers['edit vesicles'].data = None
+        # self.tomo_viewer.print("Finish Deconvolution.")
+        # self.tomo_viewer.show_current_state()
         self.close()
