@@ -188,7 +188,7 @@ def delete_picked_vesicle(tomo_viewer, deleted_point):
 
 def add_picked_vesicle(tomo_viewer, data_to_add):
     viewer = tomo_viewer.viewer
-    if np.sum(np.sign(viewer.layers[LABEL_LAYER_IDX].data) * np.sign(data_to_add)) > 0:
+    if False: #np.sum(np.sign(viewer.layers[LABEL_LAYER_IDX].data) * np.sign(data_to_add)) > 0:
         tomo_viewer.print('Please reselect two points')
         show_info('Please reselect two points')
     else:

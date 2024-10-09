@@ -98,11 +98,11 @@ segVesicleHome = os.path.split(segVesicleHome)[0]+'/'
 # path_weights1 = segVesicleHome + 'pretrained/vesicle_seg_model_1.h5'
 # path_weights2 = segVesicleHome + 'pretrained/vesicle_seg_model_2.h5'
 path_weights1 = '/share/data/CryoET_Data/lvzy/pretrained/seg_iso.h5'
-path_weights2 = '/share/data/CryoET_Data/lvzy/pretrained/seg_dec.h5'
+#path_weights2 = '/share/data/CryoET_Data/lvzy/pretrained/seg_dec.h5'
 tomopath1=args.tomo_file
-tomopath2=args.tomo_deconv_file
+#tomopath2=args.tomo_deconv_file
 seg1=segment(path_weights1,tomopath1)
-seg2=segment(path_weights2,tomopath2)
+#seg2=segment(path_weights2,tomopath2)
 with mrcfile.new(args.mask_file,overwrite=True) as m:
-    m.set_data(np.sign(seg1+seg2).astype(np.int8))
+    m.set_data(np.sign(seg1).astype(np.int8))
 
