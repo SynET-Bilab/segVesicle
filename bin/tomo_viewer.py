@@ -6,7 +6,14 @@ import subprocess
 import json
 import tempfile
 
+import xml.etree.ElementTree as ET
+
 from qtpy import QtCore, QtWidgets
+from qtpy.QtWidgets import (
+    QMainWindow, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout,
+    QHBoxLayout, QGridLayout, QSpinBox, QMessageBox
+)
+
 from napari.utils.notifications import show_info
 import pandas as pd
 from pathlib import Path
@@ -14,13 +21,17 @@ from pathlib import Path
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
 from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
-
+from sklearn.neighbors import KDTree
 
 from collections import deque
 
+from util.distance_calculator import distance_calc
+from window.vesicle_window import VesicleViewer
 from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
 from window.memb_segmentation_window import MembSegmentationWindow
+from window.distance_filter_window import DistanceFilterWindow
+from window.annotate_vesicle_class import VesicleAnnotationWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample import resample_image
@@ -59,6 +70,12 @@ class TomoViewer:
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
         self.register_manualy_correction()
+        self.register_distance_calc()
+        self.register_filter_vesicle()
+        self.register_annotate_vesicle()
+        self.register_multi_class_visualize()
+        # self.register_analyze_by_volume()
+        # self.register_show_single_vesicle()
         try:
             self.toolbar_widget.finish_isonet_button.clicked.disconnect()
         except TypeError:
@@ -557,8 +574,6 @@ class TomoViewer:
             pass
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
         
-        
-        
     def register_manualy_correction(self):
         
         def init_lable_file():
@@ -585,3 +600,203 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.manual_annotation_button.clicked.connect(init_lable_file)
+        
+    def register_distance_calc(self):
+        
+        def distance_calculation():
+            # Define the file paths
+            json_path = self.tomo_path_and_stage.new_json_file_path
+            mod_path = self.tomo_path_and_stage.memb_result_path
+            xml_output_path = self.tomo_path_and_stage.ori_xml_path
+
+            # Call the distance_calc function, passing the paths and a print function
+            distance_calc(json_path, mod_path, xml_output_path, self.print)
+
+        
+        try:
+            self.toolbar_widget.distance_calc_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.distance_calc_button.clicked.connect(distance_calculation)
+        
+    
+    def register_filter_vesicle(self):
+        
+        def filter_vesicle():
+            dialog = DistanceFilterWindow(self)
+            dialog.exec_()
+
+        
+        try:
+            self.toolbar_widget.filter_by_distance_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.filter_by_distance_button.clicked.connect(filter_vesicle)
+        
+    def register_annotate_vesicle(self):
+        
+        def annotate_vesicle():
+            window = VesicleAnnotationWindow(self)
+            window.show()
+
+        try:
+            self.toolbar_widget.annotate_vesicle_type_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.annotate_vesicle_type_button.clicked.connect(annotate_vesicle)
+        
+    def register_multi_class_visualize(self):
+        
+        def multi_class_visualize():
+            print("Starting multi-class visualization...")
+            try:
+                # Parse the XML file
+                tree = ET.parse(self.tomo_path_and_stage.class_xml_path)
+                root = tree.getroot()
+
+                # Define type mapping
+                type_mapping = {
+                    'false': 0,
+                    'tether': 1,
+                    'contact': 2,
+                    'omega': 3,
+                    'pit': 4,
+                    'CCV': 5,
+                    'endosome': 6,
+                    'DCV': 7,
+                    'others': 8
+                }
+
+                # Define the types to include
+                included_types = ['false', 'tether', 'contact', 'omega', 'pit', 'CCV', 'endosome', 'DCV', 'others']
+
+                # Initialize the new label array
+                new_label = np.zeros_like(self.viewer.layers['label'].data, dtype=np.int32)
+
+                # Iterate over vesicles in the XML
+                for vesicle in root.findall('Vesicle'):
+                    vesicle_id = int(vesicle.get('vesicleId'))
+                    vesicle_type_element = vesicle.find('Type')
+                    if vesicle_type_element is not None:
+                        vesicle_type = vesicle_type_element.get('t')
+                        if vesicle_type in included_types:
+                            mapped_value = type_mapping[vesicle_type]
+                            # Set pixels corresponding to vesicle_id to mapped_value
+                            new_label[self.viewer.layers['label'].data == vesicle_id] = mapped_value
+                            print(f"Vesicle ID {vesicle_id} of type '{vesicle_type}' mapped to {mapped_value}.")
+
+                # Add the new label layer
+                self.viewer.add_labels(new_label, name='multi_class_labels')
+
+                # Hide the original label layer
+                self.viewer.layers['label'].visible = False
+
+                self.print("Multi-class visualization completed successfully.")
+
+            except Exception as e:
+                print(f"An error occurred during multi-class visualization: {e}")
+
+        try:
+            self.toolbar_widget.multi_class_visualize_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.multi_class_visualize_button.clicked.connect(multi_class_visualize)
+
+    # def register_analyze_by_volume(self):
+    #     def get_info_from_json(json_file):
+    #         """
+    #         从 JSON 文件中读取囊泡信息并构建 KDTree。
+
+    #         Parameters:
+    #         - json_file (str): JSON 文件的路径。
+
+    #         Returns:
+    #         - vesicles (list): 囊泡信息的列表。
+    #         - tree (KDTree): 基于囊泡中心坐标构建的 KDTree。
+    #         """
+    #         with open(json_file, "r") as f:
+    #             data = json.load(f)
+    #             vesicles = data.get('vesicles', [])
+            
+    #         centers = [vesicle['center'] for vesicle in vesicles]
+    #         centers = np.asarray(centers)
+            
+    #         if centers.size == 0:
+    #             centers = np.empty((0, 3))
+    #             tree = KDTree(np.empty((0, 3)))
+    #         else:
+    #             tree = KDTree(centers, leaf_size=2)
+            
+    #         return vesicles, tree
+    #     def analyze_by_volume():
+    #         """
+    #         根据 JSON 文件中的囊泡信息更换 MRC 数据中的囊泡颜色（mask 值）。
+
+    #         Parameters:
+    #         - json_file (str): JSON 文件的路径。
+    #         - mrc_data (numpy.ndarray): 读取的 MRC 数据，形状为 (z, y, x)。
+
+    #         Returns:
+    #         - None: 直接修改传入的 mrc_data 数组。
+    #         """
+    #         vesicles, tree = get_info_from_json(self.tomo_path_and_stage.new_json_file_path)
+    #         new_label_data = np.copy(self.viewer.layers['label'].data)
+            
+    #         for vesicle in vesicles:
+    #             # 计算平均半径
+    #             radii = vesicle.get('radii', [])
+    #             if not radii:
+    #                 self.print(f"Vesicle {vesicle.get('name', 'unknown')} has no radius information, skipping.")
+    #                 continue
+    #             avg_radii = np.mean(radii)
+                
+    #             # 确定新的 mask 值
+    #             if avg_radii < 10:
+    #                 new_value = 1
+    #             elif 10 <= avg_radii <= 15:
+    #                 new_value = 2
+    #             else:
+    #                 new_value = 3
+                
+    #             # 获取中心坐标并转换为整数索引
+    #             center = vesicle.get('center', [])
+    #             if len(center) != 3:
+    #                 self.print(f"Vesicle {vesicle.get('name', 'unknown')} has invalid center coordinates, skipping.")
+    #                 continue
+    #             z, y, x = map(int, np.round(center))
+                
+    #             # 检查索引是否在 MRC 数据范围内
+    #             z = np.clip(z, 0, new_label_data.shape[0]-1)
+    #             y = np.clip(y, 0, new_label_data.shape[1]-1)
+    #             x = np.clip(x, 0, new_label_data.shape[2]-1)
+                
+    #             # Get the current mask value
+    #             old_value = new_label_data[z, y, x]
+                
+    #             if old_value == 0:
+    #                 self.print(f"Warning: Vesicle {vesicle.get('name', 'unknown')} has a mask value of 0 at ({z}, {y}, {x}), possibly unmarked.")
+    #                 continue
+        
+    #             # Update all corresponding mask values
+    #             new_label_data[new_label_data == old_value] = new_value
+    #             self.print(f"Vesicle {vesicle.get('name', 'unknown')} mask value updated from {old_value} to {new_value}.")
+    
+    #         self.print("Vesicle color changes complete.")
+    #         self.viewer.add_labels(new_label_data, name="Updated Vesicle Labels")
+        
+    #     try:
+    #         self.toolbar_widget.analyze_volume_button.clicked.disconnect()
+    #     except TypeError:
+    #         pass
+    #     self.toolbar_widget.analyze_volume_button.clicked.connect(analyze_by_volume)
+        
+    # def register_show_single_vesicle(self):
+        # def show_single_vesicle():
+        #     # 初始化 VesicleViewer
+        #     self.vesicle_viewer = VesicleViewer(self.viewer, self.tomo_path_and_stage.new_json_file_path)
+        #     self.vesicle_viewer.show()
+        # try:
+        #     self.toolbar_widget.show_single_vesicle.clicked.disconnect()
+        # except TypeError:
+        #     pass
+        # self.toolbar_widget.show_single_vesicle.clicked.connect(show_single_vesicle)
