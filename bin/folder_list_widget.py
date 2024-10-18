@@ -2,7 +2,7 @@ import os
 import json
 import re
 import numpy as np
-import SimpleITK as sitk
+# import SimpleITK as sitk
 import mrcfile
 
 from qtpy.QtWidgets import QProgressDialog, QWidget, QVBoxLayout, QListWidget, QListWidgetItem, QCheckBox, QPushButton, QFileDialog, QHBoxLayout, QLabel, QSizePolicy
@@ -408,7 +408,7 @@ class FolderListWidget(QWidget):
                             return
 
                         data = resample_image(file_path, pixel_size)
-                        data = sitk.GetArrayFromImage(data)
+                        # data = sitk.GetArrayFromImage(data)
                         add_layer_with_right_contrast(data, 'tomo', self.tomo_viewer.viewer)
                             
                         message = f"Successfully opened tomo {file_path}."
@@ -432,7 +432,8 @@ class FolderListWidget(QWidget):
             self.progress_dialog.setValue(60)
             self.tomo_viewer.viewer.add_labels(get_tomo(self.tomo_path.label_path).astype(np.int16), name='label')  # add label layer
             self.progress_dialog.setValue(80)
-            self.tomo_viewer.viewer.add_points(name='edit vesicles', ndim=3, size=4)  # add an empty Points layer
+            self.tomo_viewer.viewer.add_points(name='edit vesicles', ndim=3, size=4)
+            # self.tomo_viewer.viewer.add_points(name='edit vesicles')  # add an empty Points layer
             self.progress_dialog.setValue(90)
         
             self.tomo_viewer.viewer.layers['label'].opacity = 0.5

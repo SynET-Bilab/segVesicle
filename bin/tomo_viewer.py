@@ -4,23 +4,38 @@ import napari
 import os
 import subprocess
 import json
+import tempfile
+
+import xml.etree.ElementTree as ET
 
 from qtpy import QtCore, QtWidgets
+from qtpy.QtWidgets import (
+    QMainWindow, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout,
+    QHBoxLayout, QGridLayout, QSpinBox, QMessageBox
+)
+
 from napari.utils.notifications import show_info
+import pandas as pd
+from pathlib import Path
 
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
 from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
+from sklearn.neighbors import KDTree
 
 from collections import deque
 
+from util.distance_calculator import distance_calc
+from window.vesicle_window import VesicleViewer
 from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
+from window.memb_segmentation_window import MembSegmentationWindow
+from window.distance_filter_window import DistanceFilterWindow
+from window.annotate_vesicle_class import VesicleAnnotationWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample import resample_image
 from widget.function_widget import ToolbarWidget
-
 
 
 class TomoViewer:
@@ -36,9 +51,6 @@ class TomoViewer:
         self.viewer.window.add_dock_widget(self.cross_widget, name="Cross", area="left")
         self.viewer.window.add_dock_widget(self.toolbar_widget, area='left', name='Tools')
         self.show_current_state()
-        # self._reset_history()
-        # self.viewer.bind_key('Ctrl-Z', self.on_undo)
-        # self.viewer.bind_key('Ctrl-Shift-Z', self.on_redo)
         
     def set_tomo_name(self, tomo_name: str):
         self.tomo_path_and_stage.set_tomo_name(tomo_name)
@@ -58,16 +70,41 @@ class TomoViewer:
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
         self.register_manualy_correction()
+        self.register_distance_calc()
+        self.register_filter_vesicle()
+        self.register_annotate_vesicle()
+        self.register_multi_class_visualize()
+        # self.register_analyze_by_volume()
+        # self.register_show_single_vesicle()
         try:
             self.toolbar_widget.finish_isonet_button.clicked.disconnect()
         except TypeError:
             pass
         self.toolbar_widget.finish_isonet_button.clicked.connect(self.on_finish_isonet_clicked)
+        
         try:
             self.toolbar_widget.predict_button.clicked.disconnect()
         except TypeError:
             pass
         self.toolbar_widget.predict_button.clicked.connect(self.predict_clicked)
+        
+        try:
+            self.toolbar_widget.draw_memb_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
+        
+        try:
+            self.toolbar_widget.visualize_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
+        
+        try:
+            self.toolbar_widget.stsyseg_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
         
     def register_open_ori_tomo(self):
         def button_clicked():
@@ -143,6 +180,37 @@ class TomoViewer:
                 with mrcfile.new(self.tomo_path_and_stage.rec_tomo_path, overwrite=True) as output_mrc:
                     output_mrc.set_data(data)
                     output_mrc.voxel_size = 17.14
+                
+                # 打印成功信息并告知路径
+                resampled_image_path = self.tomo_path_and_stage.rec_tomo_path
+                message = f"Resampled image successfully saved at: {resampled_image_path}"
+                self.print(message)
+                
+                # 执行创建 tomograms.star 文件
+                try:
+                    # 获取 rec_tomo_path 所在的文件夹路径
+                    rec_tomo_dir = os.path.dirname(self.tomo_path_and_stage.rec_tomo_path)
+                    
+                    # 获取 tomograms_star_path
+                    output_star = self.tomo_path_and_stage.tomograms_star_path
+                    
+                    # 构建命令
+                    command = [
+                        'isonet.py', 'prepare_star', rec_tomo_dir,
+                        '--pixel_size', '17.14',
+                        '--output_star', output_star
+                    ]
+                    
+                    # 执行命令
+                    subprocess.run(command, check=True)
+                    
+                    # 成功提示
+                    self.print('Tomo star created successfully!')
+                
+                except subprocess.CalledProcessError as e:
+                    # 错误提示
+                    self.print('Failed to create tomo star.')
+                
                 if 'corrected_tomo' in self.viewer.layers:
                     self.viewer.layers['corrected_tomo'].visible = False
                 if 'edit vesicles' in self.viewer.layers:
@@ -260,6 +328,196 @@ class TomoViewer:
             self.progress_dialog.setValue(100)
             self.show_current_state()
         
+    def register_draw_memb_mod(self):
+        # 保存为临时点文件并转换为 .mod 文件
+        def write_model(model_file, model_df):
+            """ 将点文件转换为 .mod 文件 """
+            model = np.asarray(model_df)
+
+            # 提取model_file的文件夹路径
+            model_dir = os.path.dirname(model_file)
+
+            # 如果文件夹不存在，则创建文件夹
+            if not os.path.exists(model_dir):
+                os.makedirs(model_dir)
+
+            with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+                # 保存点文件
+                point_file = temp_file.name
+                np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
+
+                # 使用 point2model 命令将点文件转换为 .mod 文件
+                cmd = f"point2model -op {point_file} {model_file} >/dev/null"
+                subprocess.run(cmd, shell=True, check=True)
+
+        def validate_points(points):
+            """ 验证点是否满足要求 """
+            # 按照 z 轴分组
+            z_groups = {}
+            for point in points:
+                z = point[0]
+                if z not in z_groups:
+                    z_groups[z] = []
+                z_groups[z].append(point)
+
+            # 检查是否有四个不同的 z 轴
+            if len(z_groups) != 4:
+                self.print("Error: Points must be distributed across exactly four distinct Z-axes.")
+                return None
+
+            # 检查其中一个 z 轴上只有一个点，其他三个 z 轴上点的数量大于一个
+            single_point_z_count = 0
+            multi_point_z_count = 0
+            for group in z_groups.values():
+                if len(group) == 1:
+                    single_point_z_count += 1
+                elif len(group) > 1:
+                    multi_point_z_count += 1
+
+            if single_point_z_count != 1 or multi_point_z_count != 3:
+                self.print("Error: There must be exactly one Z-axis with a single point and three Z-axes with more than one point.")
+                return None
+
+            return z_groups
+
+        # 获取点数据
+        points = self.viewer.layers['edit vesicles'].data
+
+        # 验证点数据是否符合要求
+        z_groups = validate_points(points)
+
+        # 如果验证不通过，直接退出并清空点数据
+        if z_groups is None:
+            self.viewer.layers['edit vesicles'].data = None
+            return
+
+        # 准备保存的点数据
+        data = []
+        # 创建 object1 并添加三个 contour
+        object_id = 1
+        contour_count = 0
+        for z, group in z_groups.items():
+            if len(group) > 1 and contour_count < 3:
+                for point in group:
+                    # object_id, contour_id, x, y, z (1-based for object and contour)
+                    data.append([object_id, contour_count + 1, point[2], point[1], point[0]])
+                contour_count += 1
+
+        # 创建 object2 并添加单独的点
+        object_id = 2
+        for z, group in z_groups.items():
+            if len(group) == 1:
+                for point in group:
+                    # object_id, contour_id, x, y, z
+                    data.append([object_id, 1, point[2], point[1], point[0]])
+
+        # 转换为DataFrame
+        df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
+        write_model(self.tomo_path_and_stage.memb_prompt_path, df)
+        self.print("Points validated and saved successfully.")
+
+        # 最后清空点数据
+        self.viewer.layers['edit vesicles'].data = None
+    
+    def open_segmentation_window(self):
+        # 创建并显示用于输入 pixel_size 和 extend 的新窗口
+        self.segmentation_window = MembSegmentationWindow(self)
+        self.segmentation_window.show()
+    
+    def register_seg_memb(self):
+        # 显示进度对话框
+        from qtpy.QtWidgets import QProgressDialog
+        from qtpy.QtCore import Qt
+        self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
+        self.progress_dialog.setWindowTitle('Opening')
+        self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setValue(0)
+        self.progress_dialog.show()
+
+        # 设置输出路径
+        output_path = self.tomo_path_and_stage.memb_folder_path + '/' + self.tomo_path_and_stage.base_tomo_name
+        cmd = f'segprepost.py run {self.tomo_path_and_stage.isonet_tomo_path} {self.tomo_path_and_stage.memb_prompt_path} -o {output_path}'
+
+        try:
+            # 运行命令并捕获错误
+            subprocess.run(cmd, shell=True, check=True)
+
+            # 成功时的提示信息
+            result = f'Membrane segmentation successful. The result is saved at {self.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
+            self.print(result)
+
+        except subprocess.CalledProcessError as e:
+            # 捕获错误并输出错误信息
+            error_message = f"An error occurred during membrane segmentation: {str(e)}"
+            self.print(error_message)
+
+        # 进度完成
+        self.progress_dialog.setValue(100)
+    
+    def register_vis_memb(self):
+        def read_point(point_file, dtype_z=int):
+            """ Read imod point file. """
+            point = np.loadtxt(point_file)
+            if point.shape[1] != 5:
+                raise ValueError("Point file should contain five columns, corresponding to object,contour,x,y,z.")
+            
+            cols = ["object", "contour", "x", "y", "z"]
+            dtypes = [int, int, float, float, dtype_z]
+            data = {
+                cols[i]: pd.Series(point[:, i], dtype=dtypes[i])
+                for i in range(5)
+            }
+            model = pd.DataFrame(data)
+            return model
+
+        def read_model(model_file, dtype_z=int):
+            """ Read imod model file. """
+            with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+                point_file = temp_file.name
+                # cmd = f"model2point -ob {model_file} {point_file}"
+                cmd = f"model2point -ob {model_file} {point_file} >/dev/null"
+                subprocess.run(cmd, shell=True, check=True)
+                
+                bak_file = Path(f"{point_file}~")
+                if bak_file.exists():
+                    bak_file.unlink()
+
+                model = read_point(point_file, dtype_z=dtype_z)
+                return model
+
+        def mod_to_3d_data(model_df, shape):
+            """ Convert model DataFrame to 3D numpy array. """
+            data = np.zeros(shape, dtype=np.int16)
+            
+            # Mapping from object values to desired output values
+            obj_mapping = {1: 0, 2: 2, 3: 22}
+            # obj_mapping = {1: 37, 2: 2, 3: 22}
+            
+            for _, row in model_df.iterrows():
+                obj = int(row['object'])
+                z, y, x = int(row['z']), int(row['y']), int(row['x'])
+                if obj in obj_mapping:
+                    data[z, y, x] = obj_mapping[obj]
+                    
+            return data
+
+        model_file = self.tomo_path_and_stage.memb_result_path
+        if not os.path.exists(model_file):
+            result = f'Error: The file {model_file} does not exist.'
+            self.print(result)
+            return
+        
+        model_df = read_model(model_file)
+
+        shape = self.viewer.layers[0].data.shape  # 请根据你的实际情况调整
+        data = mod_to_3d_data(model_df, shape)
+
+        # 使用Napari可视化
+        self.viewer.add_labels(data, name='Membrane', opacity=1)
+
+        # 操作成功后输出提示
+        self.print("Visualize successfully.")
+    
     def register_draw_area_mod(self):
         
         def validate_points(points):
@@ -281,6 +539,7 @@ class TomoViewer:
                 return False
 
             return True
+        
         
         def create_area_mod():
             points = self.viewer.layers['edit vesicles'].data  # (z, y, x) 格式
@@ -341,44 +600,203 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.manual_annotation_button.clicked.connect(init_lable_file)
-    
-    # def _reset_history(self, event=None):
-    #     self._undo_history = deque()
-    #     self._redo_history = deque()
-    
-    # def _save_history(self):
-    #     history_item = {
-    #         "edit_vesicles": np.copy(self.viewer.layers['edit vesicles'].data),
-    #         "label": np.copy(self.viewer.layers['label'].data)
-    #     }
-    #     self._redo_history = deque()  # 清空重做历史记录
-    #     self._undo_history.append(history_item)  # 将新记录保存到撤销队列中
-
-    # def undo(self):
-    #     self._load_history(self._undo_history, self._redo_history, undoing=True)
-
-    # def redo(self):
-    #     self._load_history(self._redo_history, self._undo_history, undoing=False)
-
-    # def _load_history(self, before, after, undoing=True):
-    #     if len(before) == 0:
-    #         return
-
-    #     history_item = before.pop()  # 从撤销或重做队列中取出最后一个历史记录
-    #     after.append(history_item)  # 将该记录保存到另一个队列中（撤销保存到重做，重做保存到撤销）
-
-    #     # 恢复之前保存的图层数据
-    #     self.viewer.layers['edit vesicles'].data = history_item["edit_vesicles"]
-    #     self.viewer.layers['label'].data = history_item["label"]
-
-    #     # 如果需要，可以在这里调用更新函数刷新图层显示
-    #     self.viewer.layers['edit vesicles'].refresh()
-    #     self.viewer.layers['label'].refresh()
         
-    # def on_undo(self, event=None):
-    #     """触发撤销操作"""
-    #     self.undo()
+    def register_distance_calc(self):
+        
+        def distance_calculation():
+            # Define the file paths
+            json_path = self.tomo_path_and_stage.new_json_file_path
+            mod_path = self.tomo_path_and_stage.memb_result_path
+            xml_output_path = self.tomo_path_and_stage.ori_xml_path
 
-    # def on_redo(self, event=None):
-    #     """触发重做操作"""
-    #     self.redo()
+            # Call the distance_calc function, passing the paths and a print function
+            distance_calc(json_path, mod_path, xml_output_path, self.print)
+
+        
+        try:
+            self.toolbar_widget.distance_calc_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.distance_calc_button.clicked.connect(distance_calculation)
+        
+    
+    def register_filter_vesicle(self):
+        
+        def filter_vesicle():
+            dialog = DistanceFilterWindow(self)
+            dialog.exec_()
+
+        
+        try:
+            self.toolbar_widget.filter_by_distance_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.filter_by_distance_button.clicked.connect(filter_vesicle)
+        
+    def register_annotate_vesicle(self):
+        
+        def annotate_vesicle():
+            window = VesicleAnnotationWindow(self)
+            window.show()
+
+        try:
+            self.toolbar_widget.annotate_vesicle_type_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.annotate_vesicle_type_button.clicked.connect(annotate_vesicle)
+        
+    def register_multi_class_visualize(self):
+        
+        def multi_class_visualize():
+            print("Starting multi-class visualization...")
+            try:
+                # Parse the XML file
+                tree = ET.parse(self.tomo_path_and_stage.class_xml_path)
+                root = tree.getroot()
+
+                # Define type mapping
+                type_mapping = {
+                    'false': 0,
+                    'tether': 1,
+                    'contact': 2,
+                    'omega': 3,
+                    'pit': 4,
+                    'CCV': 5,
+                    'endosome': 6,
+                    'DCV': 7,
+                    'others': 8
+                }
+
+                # Define the types to include
+                included_types = ['false', 'tether', 'contact', 'omega', 'pit', 'CCV', 'endosome', 'DCV', 'others']
+
+                # Initialize the new label array
+                new_label = np.zeros_like(self.viewer.layers['label'].data, dtype=np.int32)
+
+                # Iterate over vesicles in the XML
+                for vesicle in root.findall('Vesicle'):
+                    vesicle_id = int(vesicle.get('vesicleId'))
+                    vesicle_type_element = vesicle.find('Type')
+                    if vesicle_type_element is not None:
+                        vesicle_type = vesicle_type_element.get('t')
+                        if vesicle_type in included_types:
+                            mapped_value = type_mapping[vesicle_type]
+                            # Set pixels corresponding to vesicle_id to mapped_value
+                            new_label[self.viewer.layers['label'].data == vesicle_id] = mapped_value
+                            print(f"Vesicle ID {vesicle_id} of type '{vesicle_type}' mapped to {mapped_value}.")
+
+                # Add the new label layer
+                self.viewer.add_labels(new_label, name='multi_class_labels')
+
+                # Hide the original label layer
+                self.viewer.layers['label'].visible = False
+
+                self.print("Multi-class visualization completed successfully.")
+
+            except Exception as e:
+                print(f"An error occurred during multi-class visualization: {e}")
+
+        try:
+            self.toolbar_widget.multi_class_visualize_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.multi_class_visualize_button.clicked.connect(multi_class_visualize)
+
+    # def register_analyze_by_volume(self):
+    #     def get_info_from_json(json_file):
+    #         """
+    #         从 JSON 文件中读取囊泡信息并构建 KDTree。
+
+    #         Parameters:
+    #         - json_file (str): JSON 文件的路径。
+
+    #         Returns:
+    #         - vesicles (list): 囊泡信息的列表。
+    #         - tree (KDTree): 基于囊泡中心坐标构建的 KDTree。
+    #         """
+    #         with open(json_file, "r") as f:
+    #             data = json.load(f)
+    #             vesicles = data.get('vesicles', [])
+            
+    #         centers = [vesicle['center'] for vesicle in vesicles]
+    #         centers = np.asarray(centers)
+            
+    #         if centers.size == 0:
+    #             centers = np.empty((0, 3))
+    #             tree = KDTree(np.empty((0, 3)))
+    #         else:
+    #             tree = KDTree(centers, leaf_size=2)
+            
+    #         return vesicles, tree
+    #     def analyze_by_volume():
+    #         """
+    #         根据 JSON 文件中的囊泡信息更换 MRC 数据中的囊泡颜色（mask 值）。
+
+    #         Parameters:
+    #         - json_file (str): JSON 文件的路径。
+    #         - mrc_data (numpy.ndarray): 读取的 MRC 数据，形状为 (z, y, x)。
+
+    #         Returns:
+    #         - None: 直接修改传入的 mrc_data 数组。
+    #         """
+    #         vesicles, tree = get_info_from_json(self.tomo_path_and_stage.new_json_file_path)
+    #         new_label_data = np.copy(self.viewer.layers['label'].data)
+            
+    #         for vesicle in vesicles:
+    #             # 计算平均半径
+    #             radii = vesicle.get('radii', [])
+    #             if not radii:
+    #                 self.print(f"Vesicle {vesicle.get('name', 'unknown')} has no radius information, skipping.")
+    #                 continue
+    #             avg_radii = np.mean(radii)
+                
+    #             # 确定新的 mask 值
+    #             if avg_radii < 10:
+    #                 new_value = 1
+    #             elif 10 <= avg_radii <= 15:
+    #                 new_value = 2
+    #             else:
+    #                 new_value = 3
+                
+    #             # 获取中心坐标并转换为整数索引
+    #             center = vesicle.get('center', [])
+    #             if len(center) != 3:
+    #                 self.print(f"Vesicle {vesicle.get('name', 'unknown')} has invalid center coordinates, skipping.")
+    #                 continue
+    #             z, y, x = map(int, np.round(center))
+                
+    #             # 检查索引是否在 MRC 数据范围内
+    #             z = np.clip(z, 0, new_label_data.shape[0]-1)
+    #             y = np.clip(y, 0, new_label_data.shape[1]-1)
+    #             x = np.clip(x, 0, new_label_data.shape[2]-1)
+                
+    #             # Get the current mask value
+    #             old_value = new_label_data[z, y, x]
+                
+    #             if old_value == 0:
+    #                 self.print(f"Warning: Vesicle {vesicle.get('name', 'unknown')} has a mask value of 0 at ({z}, {y}, {x}), possibly unmarked.")
+    #                 continue
+        
+    #             # Update all corresponding mask values
+    #             new_label_data[new_label_data == old_value] = new_value
+    #             self.print(f"Vesicle {vesicle.get('name', 'unknown')} mask value updated from {old_value} to {new_value}.")
+    
+    #         self.print("Vesicle color changes complete.")
+    #         self.viewer.add_labels(new_label_data, name="Updated Vesicle Labels")
+        
+    #     try:
+    #         self.toolbar_widget.analyze_volume_button.clicked.disconnect()
+    #     except TypeError:
+    #         pass
+    #     self.toolbar_widget.analyze_volume_button.clicked.connect(analyze_by_volume)
+        
+    # def register_show_single_vesicle(self):
+        # def show_single_vesicle():
+        #     # 初始化 VesicleViewer
+        #     self.vesicle_viewer = VesicleViewer(self.viewer, self.tomo_path_and_stage.new_json_file_path)
+        #     self.vesicle_viewer.show()
+        # try:
+        #     self.toolbar_widget.show_single_vesicle.clicked.disconnect()
+        # except TypeError:
+        #     pass
+        # self.toolbar_widget.show_single_vesicle.clicked.connect(show_single_vesicle)

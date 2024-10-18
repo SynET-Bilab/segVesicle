@@ -3,6 +3,7 @@ import json
 import mrcfile
 import threading
 import numpy as np
+import queue
 
 from qtpy.QtCore import QObject
 from qtpy.QtGui import QTextCursor
@@ -26,6 +27,36 @@ global added_vesicle_num
 added_vesicle_num = 0
 label_history = None
 tomo_path = None
+
+# 全局任务队列和锁
+task_queue = queue.Queue()
+lock = threading.Lock()
+
+# 处理队列中的任务
+def process_queue():
+    while True:
+        func, args = task_queue.get()
+        try:
+            func(*args)
+        finally:
+            task_queue.task_done()
+
+# 启动队列处理线程
+queue_thread = threading.Thread(target=process_queue, daemon=True)
+queue_thread.start()
+
+# 以队列方式执行的操作
+def save_and_update_add_with_queue(tomo_viewer):
+    task_queue.put((save_and_update_add, (tomo_viewer,)))
+
+def save_and_update_add_2d_with_queue(tomo_viewer):
+    task_queue.put((save_and_update_add_2d, (tomo_viewer,)))
+
+def save_and_update_add_6pts_with_queue(tomo_viewer):
+    task_queue.put((save_and_update_add_6pts, (tomo_viewer,)))
+
+def save_and_update_delete_with_queue(tomo_viewer):
+    task_queue.put((save_and_update_delete, (tomo_viewer,)))
 
 def get_tomo(path):
     with mrcfile.open(path) as mrc:
@@ -157,7 +188,7 @@ def delete_picked_vesicle(tomo_viewer, deleted_point):
 
 def add_picked_vesicle(tomo_viewer, data_to_add):
     viewer = tomo_viewer.viewer
-    if np.sum(np.sign(viewer.layers[LABEL_LAYER_IDX].data) * np.sign(data_to_add)) > 0:
+    if False: #np.sum(np.sign(viewer.layers[LABEL_LAYER_IDX].data) * np.sign(data_to_add)) > 0:
         tomo_viewer.print('Please reselect two points')
         show_info('Please reselect two points')
     else:
@@ -165,23 +196,24 @@ def add_picked_vesicle(tomo_viewer, data_to_add):
         viewer.layers[LABEL_LAYER_IDX].refresh()
 
 def save_and_update_delete(tomo_viewer):
-    viewer = tomo_viewer.viewer
-    if LABEL_LAYER_IDX in viewer.layers:
-        if len(viewer.layers[POINT_LAYER_IDX].data) < 1:
-            show_info('Please pick a point to delete')
-            tomo_viewer.print('Please pick a point to delete')
+    with lock:
+        viewer = tomo_viewer.viewer
+        if LABEL_LAYER_IDX in viewer.layers:
+            if len(viewer.layers[POINT_LAYER_IDX].data) < 1:
+                show_info('Please pick a point to delete')
+                tomo_viewer.print('Please pick a point to delete')
+            else:
+                points = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Deleted')
+                for point in points:
+                    delete_picked_vesicle(tomo_viewer, point)
+                viewer.layers[POINT_LAYER_IDX].data = None
+                save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+                update_json_file(tomo_viewer, points, mode='Deleted', vesicle_to_add=None)
+                # tomo_viewer._save_history()
+                tomo_viewer.print('Successfully deleted Vesicles')
         else:
-            points = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Deleted')
-            for point in points:
-                delete_picked_vesicle(tomo_viewer, point)
             viewer.layers[POINT_LAYER_IDX].data = None
-            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-            update_json_file(tomo_viewer, points, mode='Deleted', vesicle_to_add=None)
-            # tomo_viewer._save_history()
-            tomo_viewer.print('Successfully deleted Vesicles')
-    else:
-        viewer.layers[POINT_LAYER_IDX].data = None
-        tomo_viewer.print('Please Make Predict or Start Manual Correction')
+            tomo_viewer.print('Please Make Predict or Start Manual Correction')
 
 def create_delete_button(tomo_viewer):
     from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
@@ -200,70 +232,73 @@ def register_save_shortcut_delete(tomo_viewer):
     viewer = tomo_viewer.viewer
     @viewer.bind_key('d', overwrite=True)
     def save_label_image(viewer):
-        threading.Thread(target=save_and_update_delete, args=(tomo_viewer,)).start()
+        save_and_update_delete_with_queue(tomo_viewer)
     del_button = create_button(viewer, 'Delete label (Shortcut: d)', 'delete', 'yellow', 6)
     del_button.clicked.connect(lambda: save_label_image(viewer))
 
 def save_and_update_add(tomo_viewer):
-    viewer = tomo_viewer.viewer
-    if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
-        show_info('Please add two points to define a vesicle')
-        tomo_viewer.print('Please add two points to define a vesicle')
-    else:
-        point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
-        data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='3d')
-        if new_added_vesicle is None:
-            viewer.layers[POINT_LAYER_IDX].data = None
-            tomo_viewer.print('Not a good 3d Vesicle, please reselect')
+    with lock:
+        viewer = tomo_viewer.viewer
+        if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
+            show_info('Please add two points to define a vesicle')
+            tomo_viewer.print('Please add two points to define a vesicle')
         else:
-            add_picked_vesicle(tomo_viewer, data_to_add)
-            viewer.layers[POINT_LAYER_IDX].data = None
-            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-            update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
-            # tomo_viewer._save_history()
-            tomo_viewer.print('Successfully added 3d Vesicle')
+            point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
+            data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='3d')
+            if new_added_vesicle is None:
+                viewer.layers[POINT_LAYER_IDX].data = None
+                tomo_viewer.print('Not a good 3d Vesicle, please reselect')
+            else:
+                add_picked_vesicle(tomo_viewer, data_to_add)
+                viewer.layers[POINT_LAYER_IDX].data = None
+                save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+                update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+                # tomo_viewer._save_history()
+                tomo_viewer.print('Successfully added 3d Vesicle')
 
 def save_and_update_add_2d(tomo_viewer):
-    viewer = tomo_viewer.viewer
-    if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
-        show_info('Please add two points to define a vesicle')
-        tomo_viewer.print('Please add two points to define a vesicle')
-    else:
-        point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
-        data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='2d')
-        if new_added_vesicle is None:
-            tomo_viewer.print('Not a good 2d Vesicle, please reselect')
+    with lock:
+        viewer = tomo_viewer.viewer
+        if len(viewer.layers[POINT_LAYER_IDX].data) < 2:
+            show_info('Please add two points to define a vesicle')
+            tomo_viewer.print('Please add two points to define a vesicle')
         else:
-            add_picked_vesicle(tomo_viewer, data_to_add)
-            viewer.layers[POINT_LAYER_IDX].data = None
-            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-            update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
-            # tomo_viewer._save_history()
-            tomo_viewer.print('Successfully added 2d Vesicle')
+            point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
+            data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='2d')
+            if new_added_vesicle is None:
+                tomo_viewer.print('Not a good 2d Vesicle, please reselect')
+            else:
+                add_picked_vesicle(tomo_viewer, data_to_add)
+                viewer.layers[POINT_LAYER_IDX].data = None
+                save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+                update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+                # tomo_viewer._save_history()
+                tomo_viewer.print('Successfully added 2d Vesicle')
 
 def save_and_update_add_6pts(tomo_viewer):
-    viewer = tomo_viewer.viewer
-    if len(viewer.layers[POINT_LAYER_IDX].data) < 6:
-        show_info('Please add 6 points to fit a vesicle')
-        tomo_viewer.print('Please add 6 points to fit a vesicle')
-    else:
-        point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added_6pts')
-        data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='6pts')
-        if new_added_vesicle is None:
-            tomo_viewer.print('Not a good 2d Vesicle, please reselect')
+    with lock:
+        viewer = tomo_viewer.viewer
+        if len(viewer.layers[POINT_LAYER_IDX].data) < 6:
+            show_info('Please add 6 points to fit a vesicle')
+            tomo_viewer.print('Please add 6 points to fit a vesicle')
         else:
-            add_picked_vesicle(tomo_viewer, data_to_add)
-            viewer.layers[POINT_LAYER_IDX].data = None
-            save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-            update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
-            # tomo_viewer._save_history()
-            tomo_viewer.print('Successfully added 2d Vesicle')
+            point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added_6pts')
+            data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='6pts')
+            if new_added_vesicle is None:
+                tomo_viewer.print('Not a good 2d Vesicle, please reselect')
+            else:
+                add_picked_vesicle(tomo_viewer, data_to_add)
+                viewer.layers[POINT_LAYER_IDX].data = None
+                save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+                update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+                # tomo_viewer._save_history()
+                tomo_viewer.print('Successfully added 2d Vesicle')
 
 def register_save_shortcut_add(tomo_viewer):
     viewer = tomo_viewer.viewer
     @viewer.bind_key('g', overwrite=True)
     def save_point_image(viewer):
-        threading.Thread(target=save_and_update_add, args=(tomo_viewer,)).start()
+        save_and_update_add_with_queue(tomo_viewer)
     add_button = create_button(viewer, 'Add 3D label (Shortcut: g)', 'add', 'yellow', 0)
     add_button.clicked.connect(lambda: save_point_image(viewer))
 
@@ -271,7 +306,7 @@ def register_save_shortcut_add_2d(tomo_viewer):
     viewer = tomo_viewer.viewer
     @viewer.bind_key('f', overwrite=True)
     def save_point_image(viewer):
-        threading.Thread(target=save_and_update_add_2d, args=(tomo_viewer,)).start()
+        save_and_update_add_2d_with_queue(tomo_viewer)
     add_2d_button = create_button(viewer, 'Add 2D label (Shortcut: f)', 'add', 'white', 1)
     add_2d_button.clicked.connect(lambda: save_point_image(viewer))
 
@@ -279,7 +314,7 @@ def register_save_shortcut_add_6pts(tomo_viewer):
     viewer = tomo_viewer.viewer
     @viewer.bind_key('p', overwrite=True)
     def save_point_image(viewer):
-        threading.Thread(target=save_and_update_add_6pts, args=(tomo_viewer,)).start()
+        save_and_update_add_6pts_with_queue(tomo_viewer)
     add_6pts_button = create_button(viewer, 'Add 6pts label (Shortcut: p)', 'polygon_lasso', 'yellow', 2)
     add_6pts_button.clicked.connect(lambda: threading.Thread(target=save_and_update_add_6pts, args=(tomo_viewer,)).start())
 

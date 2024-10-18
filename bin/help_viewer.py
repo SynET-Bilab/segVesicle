@@ -1,9 +1,9 @@
 import sys
 import os
 import base64
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QListWidget
-from PyQt5.QtCore import QUrl
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from qtpy.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QListWidget
+from qtpy.QtCore import QUrl
+from qtpy.QtWebEngineWidgets import QWebEngineView
 import markdown
 import re
 
