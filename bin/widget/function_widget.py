@@ -21,9 +21,9 @@ class ToolbarWidget(QWidget):
         # Add tabs to the tab widget
         self.tabs.addTab(self.isonet_tab, "IsoNet")
         self.tabs.addTab(self.predict_tab, "Vesicle Predict")
-        self.tabs.addTab(self.memb_tab, "Membrane Segment")
+        # self.tabs.addTab(self.memb_tab, "Membrane Segment")
         # self.tabs.addTab(self.analysis_tab, "Analysis")
-        self.tabs.addTab(self.vesicle_analysis_tab, "Vesicle Analysis")
+        # self.tabs.addTab(self.vesicle_analysis_tab, "Vesicle Analysis")
         
         # Create layout for IsoNet tab and add buttons
         self.isonet_layout = QVBoxLayout()
@@ -40,12 +40,12 @@ class ToolbarWidget(QWidget):
         self.predict_button = self.add_button(self.predict_layout, "Predict")
         self.manual_annotation_button = self.add_button(self.predict_layout, "Manual Annotation Only")
 
-        # Create layout for the Memb tab and add buttons
-        self.memb_layout = QVBoxLayout()
-        self.memb_tab.setLayout(self.memb_layout)
-        self.draw_memb_button = self.add_button(self.memb_layout, "Draw Membrane Area Mod")
-        self.stsyseg_button = self.add_button(self.memb_layout, "Stsyseg")
-        self.visualize_button = self.add_button(self.memb_layout, "Visualize")
+        # # Create layout for the Memb tab and add buttons
+        # self.memb_layout = QVBoxLayout()
+        # self.memb_tab.setLayout(self.memb_layout)
+        # self.draw_memb_button = self.add_button(self.memb_layout, "Draw Membrane Area Mod")
+        # self.stsyseg_button = self.add_button(self.memb_layout, "Stsyseg")
+        # self.visualize_button = self.add_button(self.memb_layout, "Visualize")
 
         # Create layout for the Analysis tab and add buttons
         # self.analysis_layout = QVBoxLayout()
@@ -54,13 +54,13 @@ class ToolbarWidget(QWidget):
         # self.analyze_distance_button = self.add_button(self.analysis_layout, "Analyze by Membrane Distance")
         # self.show_single_vesicle = self.add_button(self.analysis_layout, "Show Single Vesicle")
 
-# Create layout for the Vesicle Analysis tab and add buttons
-        self.vesicle_analysis_layout = QVBoxLayout()  # New layout for Vesicle Analysis
-        self.vesicle_analysis_tab.setLayout(self.vesicle_analysis_layout)
-        self.distance_calc_button = self.add_button(self.vesicle_analysis_layout, "Calculate Vesicle to Membrane Distance")
-        self.filter_by_distance_button = self.add_button(self.vesicle_analysis_layout, "Filter Vesicles by Distance")
-        self.annotate_vesicle_type_button = self.add_button(self.vesicle_analysis_layout, "Annotate Vesicle Type")
-        self.multi_class_visualize_button = self.add_button(self.vesicle_analysis_layout, "Multi-class Visualization")
+        # Create layout for the Vesicle Analysis tab and add buttons
+        # self.vesicle_analysis_layout = QVBoxLayout()  # New layout for Vesicle Analysis
+        # self.vesicle_analysis_tab.setLayout(self.vesicle_analysis_layout)
+        # self.distance_calc_button = self.add_button(self.vesicle_analysis_layout, "Calculate Vesicle to Membrane Distance")
+        # self.filter_by_distance_button = self.add_button(self.vesicle_analysis_layout, "Filter Vesicles by Distance")
+        # self.annotate_vesicle_type_button = self.add_button(self.vesicle_analysis_layout, "Annotate Vesicle Type")
+        # self.multi_class_visualize_button = self.add_button(self.vesicle_analysis_layout, "Multi-class Visualization")
 
         # Set the main layout for the widget
         self.main_layout = QVBoxLayout()

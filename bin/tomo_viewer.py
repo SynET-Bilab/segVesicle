@@ -70,12 +70,14 @@ class TomoViewer:
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
         self.register_manualy_correction()
-        self.register_distance_calc()
-        self.register_filter_vesicle()
-        self.register_annotate_vesicle()
-        self.register_multi_class_visualize()
+        # self.register_distance_calc()
+        # self.register_filter_vesicle()
+        # self.register_annotate_vesicle()
+        # self.register_multi_class_visualize()
+        
         # self.register_analyze_by_volume()
         # self.register_show_single_vesicle()
+        
         try:
             self.toolbar_widget.finish_isonet_button.clicked.disconnect()
         except TypeError:
@@ -88,23 +90,23 @@ class TomoViewer:
             pass
         self.toolbar_widget.predict_button.clicked.connect(self.predict_clicked)
         
-        try:
-            self.toolbar_widget.draw_memb_button.clicked.disconnect()
-        except TypeError:
-            pass
-        self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
+        # try:
+        #     self.toolbar_widget.draw_memb_button.clicked.disconnect()
+        # except TypeError:
+        #     pass
+        # self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
         
-        try:
-            self.toolbar_widget.visualize_button.clicked.disconnect()
-        except TypeError:
-            pass
-        self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
+        # try:
+        #     self.toolbar_widget.visualize_button.clicked.disconnect()
+        # except TypeError:
+        #     pass
+        # self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
         
-        try:
-            self.toolbar_widget.stsyseg_button.clicked.disconnect()
-        except TypeError:
-            pass
-        self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
+        # try:
+        #     self.toolbar_widget.stsyseg_button.clicked.disconnect()
+        # except TypeError:
+        #     pass
+        # self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
         
     def register_open_ori_tomo(self):
         def button_clicked():
