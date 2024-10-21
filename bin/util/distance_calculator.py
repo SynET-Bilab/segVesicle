@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import numpy as np
 from util.structures import VesicleList, Surface  # Assuming these modules are available
@@ -48,6 +49,11 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
         # Process each vesicle
         for i, vesicle in enumerate(vl):
             ves_data = vesicles[i]
+            
+            name = ves_data.get('name', 'vesicle_0')  # Default to 'vesicle_0' if name not found
+            vesicle_id = int(re.search(r'\d+', name).group())  # Extract the number from the name
+            vesicle.setId(vesicle_id)  # Set the vesicle ID
+            
             radii = ves_data.get('radii', [0])
             center = ves_data.get('center', [0, 0, 0])
             directions = ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]])

@@ -70,10 +70,10 @@ class TomoViewer:
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
         self.register_manualy_correction()
-        # self.register_distance_calc()
-        # self.register_filter_vesicle()
-        # self.register_annotate_vesicle()
-        # self.register_multi_class_visualize()
+        self.register_distance_calc()
+        self.register_filter_vesicle()
+        self.register_annotate_vesicle()
+        self.register_multi_class_visualize()
         
         # self.register_analyze_by_volume()
         # self.register_show_single_vesicle()
@@ -90,23 +90,23 @@ class TomoViewer:
             pass
         self.toolbar_widget.predict_button.clicked.connect(self.predict_clicked)
         
-        # try:
-        #     self.toolbar_widget.draw_memb_button.clicked.disconnect()
-        # except TypeError:
-        #     pass
-        # self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
+        try:
+            self.toolbar_widget.draw_memb_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
         
-        # try:
-        #     self.toolbar_widget.visualize_button.clicked.disconnect()
-        # except TypeError:
-        #     pass
-        # self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
+        try:
+            self.toolbar_widget.visualize_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
         
-        # try:
-        #     self.toolbar_widget.stsyseg_button.clicked.disconnect()
-        # except TypeError:
-        #     pass
-        # self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
+        try:
+            self.toolbar_widget.stsyseg_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
         
     def register_open_ori_tomo(self):
         def button_clicked():
@@ -648,15 +648,14 @@ class TomoViewer:
         self.toolbar_widget.annotate_vesicle_type_button.clicked.connect(annotate_vesicle)
         
     def register_multi_class_visualize(self):
-        
         def multi_class_visualize():
             print("Starting multi-class visualization...")
             try:
-                # Parse the XML file
+                # 解析 XML 文件
                 tree = ET.parse(self.tomo_path_and_stage.class_xml_path)
                 root = tree.getroot()
 
-                # Define type mapping
+                # 定义类型映射
                 type_mapping = {
                     'false': 0,
                     'tether': 1,
@@ -669,34 +668,116 @@ class TomoViewer:
                     'others': 8
                 }
 
-                # Define the types to include
-                included_types = ['false', 'tether', 'contact', 'omega', 'pit', 'CCV', 'endosome', 'DCV', 'others']
+                # 定义要包含的类型
+                included_types = list(type_mapping.keys())
 
-                # Initialize the new label array
-                new_label = np.zeros_like(self.viewer.layers['label'].data, dtype=np.int32)
+                # 初始化新的标签数组
+                label_data = self.viewer.layers['label'].data
+                new_label = np.zeros_like(label_data, dtype=np.int32)
 
-                # Iterate over vesicles in the XML
+                # 遍历 XML 中的每个囊泡
                 for vesicle in root.findall('Vesicle'):
-                    vesicle_id = int(vesicle.get('vesicleId'))
                     vesicle_type_element = vesicle.find('Type')
                     if vesicle_type_element is not None:
                         vesicle_type = vesicle_type_element.get('t')
                         if vesicle_type in included_types:
-                            mapped_value = type_mapping[vesicle_type]
-                            # Set pixels corresponding to vesicle_id to mapped_value
-                            new_label[self.viewer.layers['label'].data == vesicle_id] = mapped_value
-                            print(f"Vesicle ID {vesicle_id} of type '{vesicle_type}' mapped to {mapped_value}.")
+                            # 获取中心坐标
+                            center = vesicle.find('Center')
+                            if center is not None:
+                                try:
+                                    x = float(center.attrib['X'])
+                                    y = float(center.attrib['Y'])
+                                    z = float(center.attrib['Z'])
+                                except (ValueError, KeyError) as coord_error:
+                                    print(f"Invalid center coordinates for vesicle: {coord_error}")
+                                    continue
 
-                # Add the new label layer
+                                # 将物理坐标转换为体素索引（假设坐标已经是索引，若需要转换请根据实际情况调整）
+                                z_idx = int(round(z))
+                                y_idx = int(round(y))
+                                x_idx = int(round(x))
+
+                                # 检查索引是否在 label_data 的范围内
+                                if (0 <= z_idx < label_data.shape[0] and
+                                    0 <= y_idx < label_data.shape[1] and
+                                    0 <= x_idx < label_data.shape[2]):
+                                    
+                                    vesicle_label = label_data[z_idx, y_idx, x_idx]
+                                    
+                                    if vesicle_label != 0:
+                                        mapped_value = type_mapping[vesicle_type]
+                                        # 将所有对应 vesicle_label 的像素设置为 mapped_value
+                                        new_label[label_data == vesicle_label] = mapped_value
+                                        print(f"Vesicle at ({z_idx}, {y_idx}, {x_idx}) with label {vesicle_label} of type '{vesicle_type}' mapped to {mapped_value}.")
+                                    else:
+                                        print(f"No label found at center coordinates ({z_idx}, {y_idx}, {x_idx}) for vesicle type '{vesicle_type}'.")
+                                else:
+                                    print(f"Center coordinates ({z}, {y}, {x}) out of bounds.")
+                            else:
+                                print("No Center element found for a vesicle.")
+                
+                # 添加新的多分类标签层
                 self.viewer.add_labels(new_label, name='multi_class_labels')
 
-                # Hide the original label layer
+                # 隐藏原始标签层
                 self.viewer.layers['label'].visible = False
 
                 self.print("Multi-class visualization completed successfully.")
 
+            except ET.ParseError as parse_err:
+                print(f"XML parsing error: {parse_err}")
+            except FileNotFoundError as fnf_error:
+                print(f"XML file not found: {fnf_error}")
             except Exception as e:
                 print(f"An error occurred during multi-class visualization: {e}")
+        # def multi_class_visualize():
+        #     print("Starting multi-class visualization...")
+        #     try:
+        #         # Parse the XML file
+        #         tree = ET.parse(self.tomo_path_and_stage.class_xml_path)
+        #         root = tree.getroot()
+
+        #         # Define type mapping
+        #         type_mapping = {
+        #             'false': 0,
+        #             'tether': 1,
+        #             'contact': 2,
+        #             'omega': 3,
+        #             'pit': 4,
+        #             'CCV': 5,
+        #             'endosome': 6,
+        #             'DCV': 7,
+        #             'others': 8
+        #         }
+
+        #         # Define the types to include
+        #         included_types = ['false', 'tether', 'contact', 'omega', 'pit', 'CCV', 'endosome', 'DCV', 'others']
+
+        #         # Initialize the new label array
+        #         new_label = np.zeros_like(self.viewer.layers['label'].data, dtype=np.int32)
+
+        #         # Iterate over vesicles in the XML
+        #         for vesicle in root.findall('Vesicle'):
+        #             vesicle_id = int(vesicle.get('vesicleId'))
+        #             vesicle_type_element = vesicle.find('Type')
+        #             if vesicle_type_element is not None:
+        #                 vesicle_type = vesicle_type_element.get('t')
+        #                 if vesicle_type in included_types:
+        #                     mapped_value = type_mapping[vesicle_type]
+        #                     # Set pixels corresponding to vesicle_id to mapped_value
+        #                     new_label[self.viewer.layers['label'].data == vesicle_id] = mapped_value
+        #                     print(f"Vesicle ID {vesicle_id} of type '{vesicle_type}' mapped to {mapped_value}.")
+
+        #         # Add the new label layer
+        #         self.viewer.add_labels(new_label, name='multi_class_labels')
+
+        #         # Hide the original label layer
+        #         self.viewer.layers['label'].visible = False
+
+        #         self.print("Multi-class visualization completed successfully.")
+
+        #     except Exception as e:
+        #         print(f"An error occurred during multi-class visualization: {e}")
 
         try:
             self.toolbar_widget.multi_class_visualize_button.clicked.disconnect()
