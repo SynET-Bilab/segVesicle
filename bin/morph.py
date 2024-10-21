@@ -5,7 +5,7 @@ import json
 import mrcfile
 import logging
 import numpy as np
-
+import multiprocessing
 from tqdm import tqdm
 from scipy import ndimage
 from scipy.sparse import csr_matrix
@@ -54,7 +54,6 @@ def morph_process(mask, area_file, pixelsize=17.14, elem_len=1, radius=10, save_
 
     kernel_pre = cube(11)
     pre_pro = opening(pre_pro, kernel_pre)
-    pre_pro = erosion(pre_pro, cube(3))
     pre_pro = erosion(pre_pro, cube(3))
     labeled_pre_pro = label(pre_pro) #process linked vesicles just after prediction, Part 1
 
@@ -145,13 +144,14 @@ def density_fit(data_iso,center,radius):
     shape = data_iso.shape
     # padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
     padwidth = 10
-    padwidth = 10
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
 
     center = np.round(center+padwidth).astype(np.int16)
     cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
+    with mrcfile.new('/share/data/CryoET_Data/lvzy/segVesicle_test/pp472/ves_seg/cube.mrc',overwrite=True) as m:
+        m.set_data(cube_.astype(np.float32))
     cube_ = ndimage.gaussian_filter(cube_,sigma=1)
     cube_reverse = -cube_.astype(np.float32)
     cube_normalize = (cube_reverse - np.min(cube_reverse))/(np.max(cube_reverse)-np.min(cube_reverse))
@@ -176,11 +176,11 @@ def density_fit(data_iso,center,radius):
     databool=cube_m_mask >0
     cube_m_mask=remove_small_objects(databool, min_size=50).astype(np.int8)
     
-    open=opening(cube_m_mask,cube(2))
+    open=opening(cube_m_mask)
     databool=open >0
     opened=remove_small_objects(databool, min_size=50).astype(np.int16)
     l = label(opened, connectivity=1)
-
+    
     d_min = 99999
     label_vaule = 0
     for i in range(np.max(l)):
@@ -201,7 +201,8 @@ def density_fit(data_iso,center,radius):
     if(np.sum(labeled)/np.sum(open)<0.8):
         labeled = opened
     idx=get_indices_sparse(labeled)
-    
+    with mrcfile.new('/share/data/CryoET_Data/lvzy/segVesicle_test/pp472/ves_seg/opened.mrc',overwrite=True) as m:
+        m.set_data(labeled.astype(np.float32))
     vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
     [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
     if np.min(center_cube) < 0: # if the shape of fitted ellipsoid is too strange
@@ -298,7 +299,6 @@ def density_fit_2d(data_iso,center,radius):
     shape = data_iso.shape
     # padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
     padwidth = 10
-    padwidth = 10
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
@@ -328,9 +328,7 @@ def density_fit_2d(data_iso,center,radius):
 
     img_m_mask=mask*img_m
     open=opening(img_m_mask,square(2))
-    open=opening(img_m_mask,square(2))
     databool=open >0
-    open=remove_small_objects(databool, min_size=10).astype(np.int16)
     open=remove_small_objects(databool, min_size=10).astype(np.int16)
 
     l = label(open, connectivity=1)
@@ -395,7 +393,30 @@ def fit_6pts(data_iso, points):
     # img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
     # ccf = CCF(img_normalize,tm)
     return [center_cube, evecs, radii, ccf]
+def measure_one(idx,data,vesicle_list,min_radius):
+    
+    [center0, evecs, radii]=ef.ellipsoid_fit(vesicle_list[idx])
+    if min(center0-max(radii))<=0 or min(np.array(data.shape)-1-center0-max(radii))<=0:
+        return
+    def if_normal(radii, threshold=0.22):
+        if np.std(radii)/np.mean(radii) >threshold:
+            a = False
+        elif np.mean(radii) < 0.6*min_radius or np.mean(radii) > min_radius*4:
+            a = False
+        else:
+            a = True
+        return a
 
+    [center, evecs, radii, ccf]=density_fit(data,center0,np.max(radii))
+    #[center, evecs, radii]=density_fit(data,center0,np.max(radii))
+    if ccf < 0.3: #delete wrong segments
+        return
+
+    if if_normal(radii):
+        info={'name':'vesicle_'+str(idx),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
+        #info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
+        return info
+        
 def vesicle_measure(data, vesicle_list, shape, min_radius, outfile):
     '''
     '''
@@ -425,71 +446,81 @@ def vesicle_measure(data, vesicle_list, shape, min_radius, outfile):
     
 
     logging.info('\nStart vesicle measurement\n')
+    
+    
+    idxs = range(len(vesicle_list))
     for i in tqdm(range(len(vesicle_list)), file=sys.stdout):
-        #print('fitting vesicle_',i)
-        [center0, evecs, radii]=ef.ellipsoid_fit(vesicle_list[i])
-        if min(center0-max(radii))<=0 or min(np.array(data.shape)-1-center0-max(radii))<=0:
-            continue
+        continue
+    #pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    poolnum = min(multiprocessing.cpu_count(), 4)
+    pool = multiprocessing.Pool(poolnum)
+    results = pool.starmap(measure_one, [(i,data,vesicle_list,min_radius) for i in idxs])
+    results = list(filter(None, results))
+    # for i in tqdm(range(len(vesicle_list)), file=sys.stdout):
+    #     #print('fitting vesicle_',i)
+    #     [center0, evecs, radii]=ef.ellipsoid_fit(vesicle_list[i])
+    #     if min(center0-max(radii))<=0 or min(np.array(data.shape)-1-center0-max(radii))<=0:
+    #         continue
 
 
-        [center, evecs, radii, ccf]=density_fit(data,center0,np.max(radii))
-        #[center, evecs, radii]=density_fit(data,center0,np.max(radii))
-        if ccf < 0.3: #delete wrong segments
-            continue
+    #     [center, evecs, radii, ccf]=density_fit(data,center0,np.max(radii))
+    #     #[center, evecs, radii]=density_fit(data,center0,np.max(radii))
+    #     if ccf < 0.3: #delete wrong segments
+    #         continue
 
-        if if_normal(radii):
-            info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
-            #info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
-            results.append(info)
-            '''
-            # check whether a vesicle in given presyn
-            c = np.delete(center, 0)
-            c[0], c[1] = c[1], c[0]
-            if Check(CH, len(CH), c):
-                results_in.append(info)
-                #print('in vesicle {}'.format(i))
-                in_count = in_count+1
-        # else:
-        #     print('bad vesicle {}'.format(i))
-            '''
-    '''
-    for i in range(len(vesicle_list_sup)):
-        print('fitting ellipse vesicle_',i)
-        z = vesicle_list_sup[i][:, 0]
-        Zc = np.mean(z)
-        X_temp = np.delete(vesicle_list_sup[i], 0, axis=1)
-        X = np.zeros(X_temp.shape)
-        X[:, 0] = X_temp[:, 1]
-        X[:, 1] = X_temp[:, 0]
-        mask = np.zeros((shape[2], shape[1]))
-        for k in range(len(X)):
-            mask[int(X[k][0]), int(X[k][1])] = 1
-        kernel = np.reshape([1, 1, 1, 1, 1, 1, 1, 1, 1], (3, 3))
-        boundaries = mask - erosion(mask, kernel)
-        bd_labeled = label(boundaries)
-        idx = get_indices_sparse(bd_labeled)
-        for id in range(1, len(idx)):
-            bd_shape += idx[id][0].shape[0]
-        bd_x = np.hstack((idx[j][0] for j in range(1, len(idx))))
-        bd_y = np.hstack((idx[j][1] for j in range(1, len(idx))))
-        #vesicle_sup = np.dstack((bd_x, bd_y))
+    #     if if_normal(radii):
+    #         info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
+    #         #info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
+    #         results.append(info)
+    #         '''
+    #         # check whether a vesicle in given presyn
+    #         c = np.delete(center, 0)
+    #         c[0], c[1] = c[1], c[0]
+    #         if Check(CH, len(CH), c):
+    #             results_in.append(info)
+    #             #print('in vesicle {}'.format(i))
+    #             in_count = in_count+1
+    #     # else:
+    #     #     print('bad vesicle {}'.format(i))
+    #         '''
+    # '''
+    # for i in range(len(vesicle_list_sup)):
+    #     print('fitting ellipse vesicle_',i)
+    #     z = vesicle_list_sup[i][:, 0]
+    #     Zc = np.mean(z)
+    #     X_temp = np.delete(vesicle_list_sup[i], 0, axis=1)
+    #     X = np.zeros(X_temp.shape)
+    #     X[:, 0] = X_temp[:, 1]
+    #     X[:, 1] = X_temp[:, 0]
+    #     mask = np.zeros((shape[2], shape[1]))
+    #     for k in range(len(X)):
+    #         mask[int(X[k][0]), int(X[k][1])] = 1
+    #     kernel = np.reshape([1, 1, 1, 1, 1, 1, 1, 1, 1], (3, 3))
+    #     boundaries = mask - erosion(mask, kernel)
+    #     bd_labeled = label(boundaries)
+    #     idx = get_indices_sparse(bd_labeled)
+    #     for id in range(1, len(idx)):
+    #         bd_shape += idx[id][0].shape[0]
+    #     bd_x = np.hstack((idx[j][0] for j in range(1, len(idx))))
+    #     bd_y = np.hstack((idx[j][1] for j in range(1, len(idx))))
+    #     #vesicle_sup = np.dstack((bd_x, bd_y))
 
-        [center, evecs, radii] = ef.ellipse_fit(bd_x, bd_y, Zc)
-        if if_normal(radii):
-            info_sup = {'name':'vesicle_'+str(i+len(vesicle_list)), 'center':center.tolist(), 'radii':radii.tolist(), 'evecs':evecs.tolist()}
-            #sup_results.append(info_sup)
-            results.append(info_sup)
-            c = np.delete(center, 0)
-            c[0], c[1] = c[1], c[0]
-            if Check(CH, len(CH), c):
-                #sup_results_in.append(info_sup)
-                results_in.append(info_sup)
-                print('in vesicle {}'.format(i+len(vesicle_list)))
-                in_count = in_count + 1
-                sup_in_count = sup_in_count + 1
-        else:
-            print('bad vesicle {}'.format(i+len(vesicle_list)))
-    '''    
+    #     [center, evecs, radii] = ef.ellipse_fit(bd_x, bd_y, Zc)
+    #     if if_normal(radii):
+    #         info_sup = {'name':'vesicle_'+str(i+len(vesicle_list)), 'center':center.tolist(), 'radii':radii.tolist(), 'evecs':evecs.tolist()}
+    #         #sup_results.append(info_sup)
+    #         results.append(info_sup)
+    #         c = np.delete(center, 0)
+    #         c[0], c[1] = c[1], c[0]
+    #         if Check(CH, len(CH), c):
+    #             #sup_results_in.append(info_sup)
+    #             results_in.append(info_sup)
+    #             print('in vesicle {}'.format(i+len(vesicle_list)))
+    #             in_count = in_count + 1
+    #             sup_in_count = sup_in_count + 1
+    #     else:
+    #         print('bad vesicle {}'.format(i+len(vesicle_list)))
+    # '''    
     # return vesicle information dict and save as json
     vesicle_info={'vesicles':results}
     #in_vesicle_info={'vesicles':results_in}
@@ -607,7 +638,6 @@ if __name__ == "__main__":
         ves_tomo = vesicle_rendering(args.output_file,shape)
         #labels = label(ves_tomo).astype(np.float32)
         with mrcfile.new(args.label,overwrite=True) as n:
-            n.set_data(ves_tomo.astype(np.int16))
             n.set_data(ves_tomo.astype(np.int16))
 
     print(f'morph cost {time.time()-t1} s')
