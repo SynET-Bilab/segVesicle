@@ -172,7 +172,8 @@ def update_json_file(tomo_viewer, points, mode, vesicle_to_add):
 def add_vesicle_show(tomo_viewer, point, add_mode):
     viewer = tomo_viewer.viewer
     ori_tomo = viewer.layers[0].data
-    label_idx = LABEL_START + added_vesicle_num
+    data_max = viewer.layers[LABEL_LAYER_IDX].data.max()
+    label_idx = max(data_max, LABEL_START) + added_vesicle_num
     data_to_add, new_added_vesicle = add_vesicle(ori_tomo, point, label_idx, add_mode)
     return data_to_add.astype(np.int16), new_added_vesicle
 

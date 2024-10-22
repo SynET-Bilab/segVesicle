@@ -32,6 +32,7 @@ from window.correction_window import CorrectionWindow
 from window.memb_segmentation_window import MembSegmentationWindow
 from window.distance_filter_window import DistanceFilterWindow
 from window.annotate_vesicle_class import VesicleAnnotationWindow
+from window.xml_exporter_dialog import export_final_xml
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample import resample_image
@@ -739,205 +740,13 @@ class TomoViewer:
         self.toolbar_widget.multi_class_visualize_button.clicked.connect(multi_class_visualize)
 
     def register_export_final_xml(self):
-        
-        def export_final_xml():
-            dialog = QtWidgets.QDialog(self.main_viewer)
-            dialog.setWindowTitle("Enter Original Pixel Size")
-            layout = QtWidgets.QVBoxLayout()
-            
-            input_layout = QtWidgets.QHBoxLayout()
-            label = QtWidgets.QLabel("Original Pixel Size (Å):")
-            input_field = QtWidgets.QLineEdit()
-            input_layout.addWidget(label)
-            input_layout.addWidget(input_field)
-            layout.addLayout(input_layout)
-            
-            apply_button = QtWidgets.QPushButton("Apply")
-            layout.addWidget(apply_button)
-            
-            dialog.setLayout(layout)
-
-            def on_apply():
-                ori_pixel_size_a = input_field.text()
-                try:
-                    ori_pixel_size_a = float(ori_pixel_size_a)
-                    if ori_pixel_size_a <= 0:
-                        raise ValueError("Pixel size must be a positive number.")
-                except ValueError as e:
-                    self.print(f"Invalid input: {e}")
-                    return
-                
-                ori_pixel_size_nm = ori_pixel_size_a * 0.1
-                
-                if not os.path.exists(self.tomo_path_and_stage.class_xml_path):
-                    self.print(f"XML file does not exist: {self.tomo_path_and_stage.class_xml_path}")
-                    return
-                
-                try:
-                    tree = ET.parse(self.tomo_path_and_stage.class_xml_path)
-                    root = tree.getroot()
-                except ET.ParseError as e:
-                    self.print(f"Failed to parse XML file: {e}")
-                    return
-                
-                current_pixel_size_str = root.attrib.get("pixelSize")
-                if current_pixel_size_str is None:
-                    self.print("XML file is missing the pixelSize attribute.")
-                    return
-                try:
-                    current_pixel_size_nm = float(current_pixel_size_str)
-                except ValueError:
-                    self.print("pixelSize attribute is not a valid number.")
-                    return
-                
-                scale = ori_pixel_size_nm / current_pixel_size_nm
-
-                vesicle_count = 0
-                for vesicle in root.findall('Vesicle'):
-                    vesicle_count += 1
-                    center = vesicle.find('Center')
-                    if center is not None:
-                        for coord in ['X', 'Y', 'Z']:
-                            val = center.attrib.get(coord)
-                            if val is not None:
-                                try:
-                                    scaled_val = float(val) * scale
-                                    center.set(coord, f"{scaled_val}")
-                                except ValueError:
-                                    self.print(f"Failed to scale Center coordinate: {coord}")
-                    
-                    center2d = vesicle.find('Center2D')
-                    if center2d is not None:
-                        for coord in ['X', 'Y', 'Z']:
-                            val = center2d.attrib.get(coord)
-                            if val is not None:
-                                try:
-                                    scaled_val = float(val) * scale
-                                    center2d.set(coord, f"{scaled_val}")
-                                except ValueError:
-                                    self.print(f"Failed to scale Center2D coordinate: {coord}")
-                    
-                    center3d = vesicle.find('Center3D')
-                    if center3d is not None:
-                        for coord in ['X', 'Y', 'Z']:
-                            val = center3d.attrib.get(coord)
-                            if val is not None:
-                                try:
-                                    scaled_val = float(val) * scale
-                                    center3d.set(coord, f"{scaled_val}")
-                                except ValueError:
-                                    self.print(f"Failed to scale Center3D coordinate: {coord}")
-                    
-                    radius = vesicle.find('Radius')
-                    if radius is not None:
-                        r = radius.attrib.get('r')
-                        if r is not None:
-                            try:
-                                scaled_r = float(r) * scale
-                                radius.set('r', f"{scaled_r}")
-                            except ValueError:
-                                self.print(f"Failed to scale Radius.")
-                    
-                    radius2d = vesicle.find('Radius2D')
-                    if radius2d is not None:
-                        for r_attr in ['r1', 'r2']:
-                            r = radius2d.attrib.get(r_attr)
-                            if r is not None:
-                                try:
-                                    scaled_r = float(r) * scale
-                                    radius2d.set(r_attr, f"{scaled_r}")
-                                except ValueError:
-                                    self.print(f"Failed to scale Radius2D: {r_attr}")
-                    
-                    radius3d = vesicle.find('Radius3D')
-                    if radius3d is not None:
-                        for r_attr in ['r1', 'r2', 'r3']:
-                            r = radius3d.attrib.get(r_attr)
-                            if r is not None:
-                                try:
-                                    scaled_r = float(r) * scale
-                                    radius3d.set(r_attr, f"{scaled_r}")
-                                except ValueError:
-                                    self.print(f"Failed to scale Radius3D: {r_attr}")
-                    
-                    distance = vesicle.find('Distance')
-                    if distance is not None:
-                        d = distance.attrib.get('d')
-                        if d is not None:
-                            try:
-                                scaled_d = float(d) * scale
-                                distance.set('d', f"{scaled_d}")
-                            except ValueError:
-                                self.print(f"Failed to scale Distance.")
-                    
-                    proj_point = vesicle.find('ProjectionPoint')
-                    if proj_point is not None:
-                        for coord in ['X', 'Y', 'Z']:
-                            val = proj_point.attrib.get(coord)
-                            if val is not None:
-                                try:
-                                    scaled_val = float(val) * scale
-                                    proj_point.set(coord, f"{scaled_val}")
-                                except ValueError:
-                                    self.print(f"Failed to scale ProjectionPoint: {coord}")
-                
-                # 在根元素的属性中添加 vesicleCount
-                root.set('pixelSize', f"{ori_pixel_size_nm}")
-                root.set('vesicleCount', str(vesicle_count))
-
-                try:
-                    self.write_xml_without_declaration(tree, self.tomo_path_and_stage.final_xml_path)
-                except Exception as e:
-                    self.print(f"Failed to write final XML file: {e}")
-                    return
-
-                def filter_vesicles(root, type_t):
-                    new_root = ET.Element(root.tag, root.attrib)
-                    vesicle_count = 0
-                    for vesicle in root.findall('Vesicle'):
-                        type_element = vesicle.find('Type')
-                        if type_element is not None and type_element.attrib.get('t') == type_t:
-                            vesicle_count += 1
-                            new_root.append(vesicle)
-                    # 更新子文件中的 vesicleCount
-                    new_root.set('vesicleCount', str(vesicle_count))
-                    return new_root
-
-                tether_root = filter_vesicles(root, 'tether')
-                tether_tree = ET.ElementTree(tether_root)
-                try:
-                    self.write_xml_without_declaration(tether_tree, self.tomo_path_and_stage.tether_xml_path)
-                except Exception as e:
-                    self.print(f"Failed to write tether XML file: {e}")
-                    return
-
-                contact_root = filter_vesicles(root, 'contact')
-                contact_tree = ET.ElementTree(contact_root)
-                try:
-                    self.write_xml_without_declaration(contact_tree, self.tomo_path_and_stage.contact_xml_path)
-                except Exception as e:
-                    self.print(f"Failed to write contact XML file: {e}")
-                    return
-
-                omega_root = filter_vesicles(root, 'omega')
-                omega_tree = ET.ElementTree(omega_root)
-                try:
-                    self.write_xml_without_declaration(omega_tree, self.tomo_path_and_stage.omega_xml_path)
-                except Exception as e:
-                    self.print(f"Failed to write omega XML file: {e}")
-                    return
-
-                self.print("XML files successfully resampled and saved.")
-                dialog.accept()
-
-            apply_button.clicked.connect(on_apply)
-            dialog.exec_()
-
         try:
             self.toolbar_widget.export_final_xml_button.clicked.disconnect()
         except TypeError:
             pass
-        self.toolbar_widget.export_final_xml_button.clicked.connect(export_final_xml)
+        self.toolbar_widget.export_final_xml_button.clicked.connect(
+            lambda: export_final_xml(self.main_viewer, self.tomo_path_and_stage, self.print)
+        )
 
 
     def write_xml_without_declaration(self, tree, path):
