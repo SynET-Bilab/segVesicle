@@ -67,7 +67,8 @@ def labels2json(labels_data,jsonfile):
         #label value 为 ID
         info={'vesicleID':str(ID),'center':v_center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
         results.append(info)
-    vesicle_info={'pixelsize':str(17.14),'number':str(len(results)),'vesicles':results}
+    #vesicle_info={'pixelsize':str(17.14),'number':str(len(results)),'vesicles':results}
+    vesicle_info={'vesicles':results}
     if jsonfile is not None:    
         with open(jsonfile,"w") as out:
             json.dump(vesicle_info,out)
