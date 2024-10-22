@@ -95,10 +95,10 @@ segVesicleHome = dirname(abspath(__file__))
 segVesicleHome = os.path.split(segVesicleHome)[0]+'/'
 
 
-# path_weights1 = segVesicleHome + 'pretrained/vesicle_seg_model_1.h5'
-# path_weights2 = segVesicleHome + 'pretrained/vesicle_seg_model_2.h5'
-path_weights1 = '/share/data/CryoET_Data/lvzy/seg/seg_vesicles/train0820/seg_iso.h5'
-path_weights2 = '/share/data/CryoET_Data/lvzy/seg/seg_vesicles/train0820/seg_dec.h5'
+path_weights1 = segVesicleHome + 'pretrained/vesicle_seg_model_1.h5'
+path_weights2 = segVesicleHome + 'pretrained/vesicle_seg_model_2.h5'
+# path_weights1 = '/share/data/CryoET_Data/lvzy/seg/seg_vesicles/train0820/seg_iso.h5'
+# path_weights2 = '/share/data/CryoET_Data/lvzy/seg/seg_vesicles/train0820/seg_dec.h5'
 
 tomopath1=args.tomo_file
 tomopath2=args.tomo_deconv_file

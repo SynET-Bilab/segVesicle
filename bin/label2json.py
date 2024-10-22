@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 import sys
 import json
 import mrcfile
@@ -89,7 +89,6 @@ def labels2json(labels_data,jsonfile):
 
 #去重
 def update_mrc(data):
-    IDset = np.unique(data)[1:]
     data_mask = data.copy()
     data_mask[data>10000] = 1
     data_mask[data<10000] = 0
@@ -109,14 +108,24 @@ if __name__ == "__main__":
     parser.add_argument('--jsonfile', type=str, default=None, help='output json file')
 
     args = parser.parse_args()
+
+    if os.path.exists(args.tomo + '_vesicle.json'):
+        os.system('mv ' + args.tomo + '_vesicle.json ' + args.tomo + '_vesicle_bak.json ')
+    
     if args.label is None:
         args.label = args.tomo + '_label_vesicle.mrc'
     if args.jsonfile is None:
-        args.jsonfile = args.tomo + '_vesicle_all.json'
+        args.jsonfile = args.tomo + '_vesicle.json'
     
+
     with mrcfile.open(args.label) as m:
         labeldata = m.data.astype(np.int16)
+
+    os.system('mv ' + args.label + ' ' + args.tomo + '_label_vesicle_bak.mrc ')
+
     label_data = update_mrc(labeldata).astype(np.int16)
+    with mrcfile.new(args.label,overwrite=True) as m:
+        m.set_data(label_data.astype(np.int16))
     t1 = time.time()
     vesicle_info = labels2json(label_data,args.jsonfile)
     print(f'done json generating, cost {time.time()-t1} s')
