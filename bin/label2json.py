@@ -65,7 +65,7 @@ def labels2json(labels_data,jsonfile):
         # v_center 为原label mrc下的坐标
         v_center = center_region -25 + center - 30
         #label value 为 ID
-        info={'vesicleID':str(ID),'center':v_center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(),'CCF':'1'}
+        info={'name':str(ID),'center':v_center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(),'CCF':'1'}
         results.append(info)
     #vesicle_info={'pixelsize':str(17.14),'number':str(len(results)),'vesicles':results}
     vesicle_info={'vesicles':results}
