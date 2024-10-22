@@ -767,7 +767,7 @@ class TomoViewer:
                     self.print(f"Invalid input: {e}")
                     return
                 
-                ori_pixel_size_nm = round(ori_pixel_size_a * 0.1, 3)
+                ori_pixel_size_nm = ori_pixel_size_a * 0.1
                 
                 if not os.path.exists(self.tomo_path_and_stage.class_xml_path):
                     self.print(f"XML file does not exist: {self.tomo_path_and_stage.class_xml_path}")
@@ -790,11 +790,11 @@ class TomoViewer:
                     self.print("pixelSize attribute is not a valid number.")
                     return
                 
-                # ls
-                # scale = ori_pixel_size_nm / current_pixel_size_nm
-                scale =  current_pixel_size_nm / ori_pixel_size_nm
+                scale = ori_pixel_size_nm / current_pixel_size_nm
 
+                vesicle_count = 0
                 for vesicle in root.findall('Vesicle'):
+                    vesicle_count += 1
                     center = vesicle.find('Center')
                     if center is not None:
                         for coord in ['X', 'Y', 'Z']:
@@ -881,10 +881,11 @@ class TomoViewer:
                                 except ValueError:
                                     self.print(f"Failed to scale ProjectionPoint: {coord}")
                 
+                # 在根元素的属性中添加 vesicleCount
                 root.set('pixelSize', f"{ori_pixel_size_nm}")
+                root.set('vesicleCount', str(vesicle_count))
 
                 try:
-                    # Ensure new lines between tags in XML output
                     self.write_xml_without_declaration(tree, self.tomo_path_and_stage.final_xml_path)
                 except Exception as e:
                     self.print(f"Failed to write final XML file: {e}")
@@ -892,10 +893,14 @@ class TomoViewer:
 
                 def filter_vesicles(root, type_t):
                     new_root = ET.Element(root.tag, root.attrib)
+                    vesicle_count = 0
                     for vesicle in root.findall('Vesicle'):
                         type_element = vesicle.find('Type')
                         if type_element is not None and type_element.attrib.get('t') == type_t:
+                            vesicle_count += 1
                             new_root.append(vesicle)
+                    # 更新子文件中的 vesicleCount
+                    new_root.set('vesicleCount', str(vesicle_count))
                     return new_root
 
                 tether_root = filter_vesicles(root, 'tether')
@@ -933,6 +938,7 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.export_final_xml_button.clicked.connect(export_final_xml)
+
 
     def write_xml_without_declaration(self, tree, path):
         """Write XML tree to file without the XML declaration."""
