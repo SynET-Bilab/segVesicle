@@ -103,29 +103,34 @@ if __name__ == "__main__":
     import argparse
     import time
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--tomo', type=str, default=None, help='tomo file')
-    parser.add_argument('--label', type=str, default=None, help='label mrc file')
-    parser.add_argument('--jsonfile', type=str, default=None, help='output json file')
+    parser.add_argument('--label', type=str, required=True, help='label mrc file')
+    parser.add_argument('--jsonfile', type=str, help='output json file')
 
     args = parser.parse_args()
 
-    if os.path.exists(args.tomo + '_vesicle.json'):
-        os.system('mv ' + args.tomo + '_vesicle.json ' + args.tomo + '_vesicle_bak.json ')
+    label_path = args.label
+    if not os.path.exists(label_path):
+        raise ValueError(f"Label file {label_path} does not exist.")
     
-    if args.label is None:
-        args.label = args.tomo + '_label_vesicle.mrc'
+    # 设置 jsonfile 默认值为 label 的对应 json 文件
     if args.jsonfile is None:
-        args.jsonfile = args.tomo + '_vesicle.json'
-    
+        args.jsonfile = label_path.replace("_label_vesicle.mrc", "_vesicle.json")
 
-    with mrcfile.open(args.label) as m:
+    # 如果已经存在 json 文件，则进行备份
+    if os.path.exists(args.jsonfile):
+        os.system(f'mv {args.jsonfile} {args.jsonfile.replace(".json", "_bak.json")}')
+
+    # 读取并处理 mrc 标签数据
+    with mrcfile.open(label_path) as m:
         labeldata = m.data.astype(np.int16)
 
-    os.system('mv ' + args.label + ' ' + args.tomo + '_label_vesicle_bak.mrc ')
+    os.system(f'mv {label_path} {label_path.replace(".mrc", "_bak.mrc")}')
 
     label_data = update_mrc(labeldata).astype(np.int16)
-    with mrcfile.new(args.label,overwrite=True) as m:
+    with mrcfile.new(label_path, overwrite=True) as m:
         m.set_data(label_data.astype(np.int16))
+
+    # 生成 json 文件
     t1 = time.time()
-    vesicle_info = labels2json(label_data,args.jsonfile)
-    print(f'done json generating, cost {time.time()-t1} s')
+    vesicle_info = labels2json(label_data, args.jsonfile)
+    print(f'done json generating, cost {time.time() - t1} s')
