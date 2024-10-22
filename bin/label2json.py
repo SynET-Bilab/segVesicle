@@ -26,8 +26,17 @@ def one_label_fit(data):
     [center, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
     return center, evecs, radii
 
-
-
+def one_label_2d_fit(data):
+    l = label(data)
+    cube_ = np.zeros((l.shape[0],l.shape[0],l.shape[0]))
+    circle = dilation(l,disk(1)) - erosion(l,disk(1))
+    cube_[cube_.shape[0]//2] = circle
+    cloud=np.where(cube_>0)
+    x = np.asarray(cloud[2])
+    y = np.asarray(cloud[1])
+    z = 0
+    [center, evecs, radii]=ef.ellipse_fit(x,y,z)
+    return center, evecs, radii
 
 def labels2json(labels_data,jsonfile):
     results = []
@@ -38,7 +47,7 @@ def labels2json(labels_data,jsonfile):
         data = data_pad.copy()
         data[data_pad!=ID] = 0
         data[data_pad==ID] = 1
-        if np.sum(data) < 400: continue
+        if np.sum(data) < 200: continue
 
         # # l = label(data)
         # # regions = regionprops(l)
@@ -59,13 +68,17 @@ def labels2json(labels_data,jsonfile):
         # this region为一个[0,1]的连通体球
         region = regionprops(data)[0]       
         center_region = np.array(region.centroid).astype(np.int16)
-        data_cube = data_pad[center_region[0]-25:center_region[0]+25, center_region[1]-25:center_region[1]+25,center_region[2]-25:center_region[2]+25]
-
-        center, evecs, radii = one_label_fit(data_cube)
-        # v_center 为原label mrc下的坐标
-        v_center = center_region -25 + center - 30
+        data_cube = data[center_region[0]-25:center_region[0]+25, center_region[1]-25:center_region[1]+25,center_region[2]-25:center_region[2]+25]
+        # 判断是2d/3d
+        if data_cube[24,25,25] == 0:
+            center, evecs, radii = one_label_2d_fit(data_cube[25])
+            v_center = center_region - 30
+        else:
+            center, evecs, radii = one_label_fit(data_cube)
+            # v_center 为原label mrc下的坐标
+            v_center = center_region -25 + center - 30
         #label value 为 ID
-        info={'name':str(ID),'center':v_center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(),'CCF':'1'}
+        info={'name':'vesicle_'+str(ID),'center':v_center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(),'CCF':'1'}
         results.append(info)
     #vesicle_info={'pixelsize':str(17.14),'number':str(len(results)),'vesicles':results}
     vesicle_info={'vesicles':results}
@@ -74,7 +87,17 @@ def labels2json(labels_data,jsonfile):
             json.dump(vesicle_info,out)
     return vesicle_info
 
-
+#去重
+def update_mrc(data):
+    IDset = np.unique(data)[1:]
+    data_mask = data.copy()
+    data_mask[data>10000] = 1
+    data_mask[data<10000] = 0
+    data_10000 = data_mask
+    label_10000 = label(data_10000) + 10000
+    data_new = np.zeros_like(data_10000)
+    data_new = label_10000 * data_mask + data * (1-data_mask)
+    return data_new
 
 if __name__ == "__main__":
     
@@ -93,6 +116,7 @@ if __name__ == "__main__":
     
     with mrcfile.open(args.label) as m:
         labeldata = m.data.astype(np.int16)
+    label_data = update_mrc(labeldata).astype(np.int16)
     t1 = time.time()
-    vesicle_info = labels2json(labeldata,args.jsonfile)
+    vesicle_info = labels2json(label_data,args.jsonfile)
     print(f'done json generating, cost {time.time()-t1} s')
