@@ -99,9 +99,13 @@ def update_mrc(data):
     return data_new
 
 if __name__ == "__main__":
-    
+
     import argparse
+    import os
     import time
+    import mrcfile
+    import numpy as np
+
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--label', type=str, required=True, help='label mrc file')
     parser.add_argument('--jsonfile', type=str, help='output json file')
@@ -111,21 +115,26 @@ if __name__ == "__main__":
     label_path = args.label
     if not os.path.exists(label_path):
         raise ValueError(f"Label file {label_path} does not exist.")
-    
+
     # 设置 jsonfile 默认值为 label 的对应 json 文件
     if args.jsonfile is None:
         args.jsonfile = label_path.replace("_label_vesicle.mrc", "_vesicle.json")
 
-    # 如果已经存在 json 文件，则进行备份
-    if os.path.exists(args.jsonfile):
-        os.system(f'mv {args.jsonfile} {args.jsonfile.replace(".json", "_bak.json")}')
+    # 如果已经存在 json 文件，并且备份文件不存在，则进行备份
+    backup_jsonfile = args.jsonfile.replace(".json", "_bak.json")
+    if os.path.exists(args.jsonfile) and not os.path.exists(backup_jsonfile):
+        os.system(f'mv {args.jsonfile} {backup_jsonfile}')
 
     # 读取并处理 mrc 标签数据
     with mrcfile.open(label_path) as m:
         labeldata = m.data.astype(np.int16)
 
-    os.system(f'mv {label_path} {label_path.replace(".mrc", "_bak.mrc")}')
+    # 如果备份的 MRC 文件不存在，则备份原始的 MRC 文件
+    backup_mrcfile = label_path.replace(".mrc", "_bak.mrc")
+    if not os.path.exists(backup_mrcfile):
+        os.system(f'mv {label_path} {backup_mrcfile}')
 
+    # 更新并保存新的 MRC 数据
     label_data = update_mrc(labeldata).astype(np.int16)
     with mrcfile.new(label_path, overwrite=True) as m:
         m.set_data(label_data.astype(np.int16))
