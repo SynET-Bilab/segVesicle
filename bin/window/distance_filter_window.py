@@ -164,7 +164,10 @@ class DistanceFilterWindow(QDialog):
                         type_elem.set('t', 'others')
             
             # 保存修改后的 XML
-            tree.write(self.tomo_viewer.tomo_path_and_stage.filter_xml_path, encoding='utf-8', xml_declaration=True)
+            tree.write(self.tomo_viewer.tomo_path_and_stage.filter_xml_path, encoding='utf-8', xml_declaration=False)
+            
+            if os.path.exists(self.tomo_viewer.tomo_path_and_stage.class_xml_path):
+                os.remove(self.tomo_viewer.tomo_path_and_stage.class_xml_path)
             
             # 重新解析修改后的 XML
             tree_new = ET.parse(self.tomo_viewer.tomo_path_and_stage.filter_xml_path)

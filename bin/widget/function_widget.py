@@ -59,6 +59,7 @@ class ToolbarWidget(QWidget):
         self.vesicle_analysis_tab.setLayout(self.vesicle_analysis_layout)
         self.distance_calc_button = self.add_button(self.vesicle_analysis_layout, "Calculate Vesicle to Membrane Distance")
         self.filter_by_distance_button = self.add_button(self.vesicle_analysis_layout, "Filter Vesicles by Distance")
+        self.annotate_pit_button = self.add_button(self.vesicle_analysis_layout, "Annotate pit")
         self.annotate_vesicle_type_button = self.add_button(self.vesicle_analysis_layout, "Annotate Vesicle Type")
         self.multi_class_visualize_button = self.add_button(self.vesicle_analysis_layout, "Multi-class Visualization")
         self.export_final_xml_button = self.add_button(self.vesicle_analysis_layout, "Export Final Vesicle Data")

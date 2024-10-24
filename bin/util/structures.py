@@ -340,6 +340,10 @@ class Vesicle:
 
     def getProjectionPoint(self):
         return self._projectionPoint
+    
+    # ls
+    def setProjectionPoint(self, projectionPoint):
+        self._projectionPoint = projectionPoint
 
     def getDistance(self):
         return self._distance

@@ -73,6 +73,7 @@ class TomoViewer:
         self.register_manualy_correction()
         self.register_distance_calc()
         self.register_filter_vesicle()
+        self.register_annotate_pit()
         self.register_annotate_vesicle()
         self.register_multi_class_visualize()
         self.register_export_final_xml()
@@ -739,6 +740,125 @@ class TomoViewer:
             pass
         self.toolbar_widget.multi_class_visualize_button.clicked.connect(multi_class_visualize)
 
+
+    def register_annotate_pit(self):
+        def annotate_pit():
+        # Step 1: Get the three point coordinates ABC(z, y, x) from 'edit vesicles' layer
+            if 'edit vesicles' not in self.viewer.layers:
+                self.print("Error: 'edit vesicles' layer not found.")
+                return
+
+            points = self.viewer.layers['edit vesicles'].data
+            if len(points) < 3:
+                self.print("Error: Need at least three points to define a pit.")
+                self.viewer.layers['edit vesicles'].data = None
+                return
+
+            # Get the last three points as A, B, and C
+            A = np.array(points[-3])
+            B = np.array(points[-2])
+            C = np.array(points[-1])
+            self.viewer.layers['edit vesicles'].data = None
+            
+            # Step 2: Read VesicleList from XML
+            from util.structures import Vesicle, VesicleList
+            import os
+
+            vl = VesicleList()
+            xml_path = None
+
+            if os.path.exists(self.tomo_path_and_stage.class_xml_path):
+                xml_path = self.tomo_path_and_stage.class_xml_path
+            elif os.path.exists(self.tomo_path_and_stage.filter_xml_path):
+                xml_path = self.tomo_path_and_stage.filter_xml_path
+            else:
+                self.print("Error: No XML file found.")
+                return
+
+            vl.fromXMLFile(xml_path)
+
+            # Step 3: Calculate the vesicle information
+            sv = Vesicle()
+            # Assume A and C are the base, B is the tip
+            sv.setType('pit')
+            center = (A + C) / 2  # Compute the center point
+            sv.setCenter(center[::-1])  # Reverse to (x, y, z) if necessary
+
+            # Calculate the radius
+            radius = np.linalg.norm(A - center)
+            sv.setRadius(radius)
+            sv.setRadius2D(np.array([radius, radius]))
+
+            sv.setDistance(0.0)
+            sv.setProjectionPoint(sv.getCenter())
+
+            # Set the vesicle ID
+            if len(vl) > 0:
+                new_id = vl[-1].getId() + 1
+            else:
+                new_id = 1
+            sv.setId(new_id)
+
+            vl.append(sv)
+
+            # Step 4: Save the new XML to class_xml_path
+            vl.toXMLFile(self.tomo_path_and_stage.class_xml_path)
+
+            # Step 5: Add a new label layer to display the pit
+            # Get the shape of the reference image layer (assumed to be the first layer)
+            image_shape = self.viewer.layers[0].data.shape
+            pit_layer_data = np.zeros(image_shape, dtype=np.uint8)
+
+            # Check if the three points have the same z-coordinate
+            if A[0] == B[0] and B[0] == C[0]:
+                z_slice = int(A[0])
+
+                # Enclose the points in the xy-plane and set the enclosed area to 1
+                from skimage.draw import polygon
+                rr, cc = polygon([A[1], B[1], C[1]], [A[2], B[2], C[2]], shape=pit_layer_data.shape[1:])
+                pit_layer_data[z_slice, rr, cc] = 1
+            else:
+                # Points have different z, create a 3D cylinder from min to max z
+                min_z = int(min(A[0], B[0], C[0]))
+                max_z = int(max(A[0], B[0], C[0])) + 1  # Include max_z
+
+                # Enclose the points in the xy-plane
+                from skimage.draw import polygon
+                rr, cc = polygon([A[1], B[1], C[1]], [A[2], B[2], C[2]], shape=pit_layer_data.shape[1:])
+
+                # Set the enclosed area to 1 across the z-range
+                pit_layer_data[min_z:max_z, rr, cc] = 1
+
+            # 检查是否已经存在名为 'pit' 的标签层
+            if 'pit' in self.viewer.layers:
+                # 获取现有的 'pit' 层
+                pit_layer = self.viewer.layers['pit'].data
+                
+                # 将新的 pit_layer_data 叠加到现有的层数据上
+                updated_data = np.maximum(pit_layer, pit_layer_data)
+                
+                # 更新 'pit' 层的数据
+                self.viewer.layers['pit'].data = updated_data
+            else:
+                # 如果 'pit' 层不存在，添加新的标签层
+                self.viewer.add_labels(pit_layer_data, name='pit')
+
+            if 'edit vesicles' in self.viewer.layers:
+                self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+            
+            # Step 6: Display a success message
+            self.print("Pit added successfully.")
+
+        # Step 7: Unbind 'p' and bind it to annotate_pit
+        self.viewer.bind_key('p', None)  # Unbind existing 'p' key
+        self.viewer.bind_key('p', lambda viewer: annotate_pit())  # Bind 'p' to annotate_pit
+
+        try:
+            self.toolbar_widget.annotate_pit_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.annotate_pit_button.clicked.connect(annotate_pit)
+
     def register_export_final_xml(self):
         try:
             self.toolbar_widget.export_final_xml_button.clicked.disconnect()
@@ -747,18 +867,6 @@ class TomoViewer:
         self.toolbar_widget.export_final_xml_button.clicked.connect(
             lambda: export_final_xml(self.main_viewer, self.tomo_path_and_stage, self.print)
         )
-
-
-    def write_xml_without_declaration(self, tree, path):
-        """Write XML tree to file without the XML declaration."""
-        with open(path, 'wb') as f:
-            tree.write(f, encoding='utf-8', xml_declaration=False)
-        with open(path, 'r') as f:
-            content = f.read()
-        # Add newline between <VesicleList> and first <Vesicle>
-        content = content.replace('><Vesicle', '>\n<Vesicle')
-        with open(path, 'w') as f:
-            f.write(content)
 
     # def register_analyze_by_volume(self):
     #     def get_info_from_json(json_file):
