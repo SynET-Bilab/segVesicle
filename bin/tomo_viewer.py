@@ -784,6 +784,10 @@ class TomoViewer:
             center = (A + C) / 2  # Compute the center point
             sv.setCenter(center[::-1])  # Reverse to (x, y, z) if necessary
 
+            # Set B as PitPoint (reverse from z, y, x to x, y, z)
+            pit_point = B[::-1]  # B is currently (z, y, x), we reverse it to (x, y, z)
+            sv.setPitPoint(pit_point)  # Store B as PitPoint
+
             # Calculate the radius
             radius = np.linalg.norm(A - center)
             sv.setRadius(radius)
@@ -791,6 +795,11 @@ class TomoViewer:
 
             sv.setDistance(0.0)
             sv.setProjectionPoint(sv.getCenter())
+
+            base_vector = C[[1, 2]] - A[[1, 2]]  # 只提取 y 和 x 分量
+            rotation_2d = np.arctan2(base_vector[0], base_vector[1])  # y分量在前，x分量在后，弧度是相对于 x 轴
+            # rotation_2d_deg = np.degrees(rotation_2d)  # 将弧度制转换为角度制
+            sv.setRotation2D(rotation_2d)
 
             # Set the vesicle ID
             if len(vl) > 0:

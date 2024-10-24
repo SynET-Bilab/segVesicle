@@ -64,6 +64,7 @@ def export_final_xml(main_viewer, tomo_path_and_stage, print_func):
             scale_radius(vesicle, 'Radius3D', scale, print_func)
             scale_distance(vesicle, 'Distance', scale, print_func)
             scale_coordinates(vesicle, 'ProjectionPoint', scale, print_func)
+            scale_coordinates(vesicle, 'PitPoint', scale, print_func)
 
         root.set('pixelSize', f"{ori_pixel_size_nm}")
         root.set('vesicleCount', str(vesicle_count))

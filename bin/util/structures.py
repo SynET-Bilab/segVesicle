@@ -18,13 +18,11 @@ class Vesicle:
     def __init__(self, recFile = None):
         self._vesicleId = 0
 
-
     def fromXML(self, xmlObj, pixelSize, isPytomFormat = False):
         if isPytomFormat:
             self.fromXMLPytom(xmlObj, pixelSize)
         else:
             self.fromXMLSynTomo(xmlObj, pixelSize)
-
 
     def fromXMLPytom(self, xmlObj, pixelSize):
         """from XML in pytom format
@@ -44,6 +42,15 @@ class Vesicle:
         classElement = vesicleElement.xpath('Class')[0]
         self._radius = float(classElement.get('Name')) / pixelSize /2.0
 
+        # ls: 解析 PitPoint 元素
+        pit_point_elements = vesicleElement.xpath('PitPoint')
+        if pit_point_elements:
+            pit_point_element = pit_point_elements[0]
+            self._pitPoint = [
+                float(pit_point_element.get('X')),
+                float(pit_point_element.get('Y')),
+                float(pit_point_element.get('Z'))
+            ]
 
     def fromXMLSynTomo(self, xmlObj, pixelSize):
         """from XMl in synTomo format
@@ -59,7 +66,8 @@ class Vesicle:
                    "Center3D", 
                    "Distance", 
                    "ProjectionPoint", 
-                   "Type"]
+                   "Type",
+                   "PitPoint"]  # ls: 添加 PitPoint 到参数列表
         argStrList = ["Type"]
         
         for item in argList:
@@ -70,6 +78,12 @@ class Vesicle:
 
                 if item in argStrList:
                     setattr(self, f"_{item[0].lower()}{item[1:]}", its[0][1])
+                elif item == "PitPoint":  # ls: 处理 PitPoint
+                    setattr(self, f"_{item[0].lower()}{item[1:]}", [
+                        float(its[0][1]),
+                        float(its[1][1]),
+                        float(its[2][1])
+                    ])
                 else:
                     array = np.array([float(val[1]) for val in its], dtype=float)
                     if len(array) == 1:
@@ -84,6 +98,15 @@ class Vesicle:
                 evecs[idx, :] = evec_values
             self._evecs = evecs
 
+        # ls: 解析 PitPoint 在 SynTomo 格式中
+        pit_point_elements = vesicleElement.xpath('PitPoint')
+        if pit_point_elements:
+            pit_point = pit_point_elements[0]
+            self._pitPoint = [
+                float(pit_point.get('X')),
+                float(pit_point.get('Y')),
+                float(pit_point.get('Z'))
+            ]
 
     def toXML(self, pixelSize):
         """
@@ -100,6 +123,7 @@ class Vesicle:
                                                 X = str(self._center[0]),\
                                                 Y = str(self._center[1]),\
                                                 Z = str(self._center[2] )))
+
         if hasattr(self,"_radius"):
             vesicleElement.append(etree.Element("Radius",\
                                                 r = str(self._radius)))
@@ -125,7 +149,7 @@ class Vesicle:
         if hasattr(self,"_rotation2D"):
             vesicleElement.append(etree.Element("Rotation2D",\
                                                 phi = str(self._rotation2D)))
-        
+
         if hasattr(self,"_evecs"):
             for i, evec in enumerate(self._evecs):
                 vesicleElement.append(etree.Element("Evecs",\
@@ -144,6 +168,13 @@ class Vesicle:
                                                 Y = str(self._projectionPoint[1]),\
                                                 Z = str(self._projectionPoint[2])))
 
+        # ls: 添加 PitPoint 元素
+        if hasattr(self, "_pitPoint"):
+            vesicleElement.append(etree.Element("PitPoint",\
+                                                X = str(self._pitPoint[0]),\
+                                                Y = str(self._pitPoint[1]),\
+                                                Z = str(self._pitPoint[2])))
+
         return vesicleElement
 
 
@@ -157,7 +188,6 @@ class Vesicle:
         
         return A
 
-
     def ellipse_in_plane(self):
         '''
         get the parameters of the 2D ellipse parallel to the xy-plane and the center of the 3D ellipsoid
@@ -168,7 +198,6 @@ class Vesicle:
         axes_lengths = np.sqrt(1 / eigvals)
 
         return self._center3D, axes_lengths, eigvecs
-
 
     def largest_cross_section(self):
         '''
@@ -182,7 +211,6 @@ class Vesicle:
         rotation_matrix = eigvecs[:, np.delete(np.arange(3), max_eigval_index)]
 
         return self._center3D, axes_lengths, rotation_matrix
-
 
     def distance_to_surface(self, surface, precision, tree, membrane_points):
         """
@@ -214,7 +242,6 @@ class Vesicle:
 
         return dis, PP0, nearest_point
 
-
     def sample_on_vesicle(self, precision : int) -> np.ndarray:
         """
         @param precision: number of points sampled on vesicle (2d max section)
@@ -238,8 +265,7 @@ class Vesicle:
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         
         return points
-    
-    
+
     def sample_on_vesicle_3d_fibonacci(self, precision : int) -> np.ndarray:
         '''
         to get uniform points on the surface of a 3D ellipsoid
@@ -267,8 +293,7 @@ class Vesicle:
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         
         return points
-    
-    
+
     def sample_on_vesicle_3d(self, precision : int) -> np.ndarray:
         '''
         to get random points on the surface of a 3D ellipsoid
@@ -290,8 +315,7 @@ class Vesicle:
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         
         return points
-    
-    
+
     def getCenter(self):
         if hasattr(self,'_center3D'):
             return self._center3D
@@ -345,6 +369,22 @@ class Vesicle:
     def setProjectionPoint(self, projectionPoint):
         self._projectionPoint = projectionPoint
 
+    # ls
+    def setRotation2D(self, Rotation2D):
+        self._rotation2D = Rotation2D
+    
+    # ls
+    def getRotation2D(self):
+        return self._rotation2D
+    
+    # ls
+    def setPitPoint(self, pitPoint):
+        self._pitPoint = pitPoint
+
+    # ls
+    def getPitPoint(self):
+        return self._pitPoint
+    
     def getDistance(self):
         return self._distance
 
@@ -357,6 +397,7 @@ class Vesicle:
     def setType(self,t):
         self._type = t
 
+    # ls: 如果需要，可以在这里添加对 PitPoint 的其他操作方法
 
 class VesicleList:
     """parameters(radius, distance, position etc.) stores in pixel. If you want to use nm, please multiply self.getPixelSize
