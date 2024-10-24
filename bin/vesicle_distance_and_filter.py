@@ -240,7 +240,7 @@ def filter_vesicles(xml_path, filter_xml_path, distance_nm):
                     type_elem.set('t', 'others')
 
         # Save the filtered XML
-        tree.write(filter_xml_path, encoding='utf-8', xml_declaration=True)
+        tree.write(filter_xml_path, encoding='utf-8', xml_declaration=False)
         print(f"Filtered vesicle XML successfully saved: {filter_xml_path}")
 
     except Exception as e:
