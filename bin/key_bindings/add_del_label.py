@@ -313,10 +313,10 @@ def register_save_shortcut_add_2d(tomo_viewer):
 
 def register_save_shortcut_add_6pts(tomo_viewer):
     viewer = tomo_viewer.viewer
-    @viewer.bind_key('p', overwrite=True)
+    @viewer.bind_key('h', overwrite=True)
     def save_point_image(viewer):
         save_and_update_add_6pts_with_queue(tomo_viewer)
-    add_6pts_button = create_button(viewer, 'Add 6pts label (Shortcut: p)', 'polygon_lasso', 'yellow', 2)
+    add_6pts_button = create_button(viewer, 'Add 6pts label (Shortcut: h)', 'polygon_lasso', 'yellow', 2)
     add_6pts_button.clicked.connect(lambda: threading.Thread(target=save_and_update_add_6pts, args=(tomo_viewer,)).start())
 
 def create_button(viewer, label, icon_key, icon_color, position):
