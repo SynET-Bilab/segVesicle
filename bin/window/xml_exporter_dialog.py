@@ -55,7 +55,10 @@ def export_final_xml(main_viewer, tomo_path_and_stage, print_func):
         scale =  current_pixel_size_nm / ori_pixel_size_nm
         vesicle_count = 0
         for vesicle in root.findall('Vesicle'):
-            vesicle_count += 1
+            type_element = vesicle.find('Type')
+            # 检查是否存在 'Type' 元素及其 't' 属性
+            if type_element is not None and type_element.attrib.get('t') != 'false':
+                vesicle_count += 1
             scale_coordinates(vesicle, 'Center', scale, print_func)
             scale_coordinates(vesicle, 'Center2D', scale, print_func)
             scale_coordinates(vesicle, 'Center3D', scale, print_func)

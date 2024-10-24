@@ -109,7 +109,10 @@ def process_xml(class_xml_path, original_pixel_size_a, print_func=print):
     scale = current_pixel_size_nm / original_pixel_size_nm
     vesicle_count = 0
     for vesicle in root.findall('Vesicle'):
-        vesicle_count += 1
+        type_element = vesicle.find('Type')
+        # 检查是否存在 'Type' 元素及其 't' 属性
+        if type_element is not None and type_element.attrib.get('t') != 'false':
+            vesicle_count += 1
         scale_coordinates(vesicle, 'Center', scale, print_func)
         scale_coordinates(vesicle, 'Center2D', scale, print_func)
         scale_coordinates(vesicle, 'Center3D', scale, print_func)
