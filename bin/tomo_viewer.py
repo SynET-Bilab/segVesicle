@@ -802,13 +802,35 @@ class TomoViewer:
             sv.setRotation2D(rotation_2d)
 
             # Set the vesicle ID
-            if len(vl) > 0:
-                new_id = vl[-1].getId() + 1
-            else:
-                new_id = 1
+            new_id = max(vl[-1].getId() + 1, 10000)
             sv.setId(new_id)
 
             vl.append(sv)
+
+            # 保存 ABC 三点坐标到 .point 文件
+            try:
+                # 获取 XML 文件所在目录
+                xml_dir = os.path.dirname(xml_path)
+
+                # 定义 pits 子文件夹路径
+                pits_dir = os.path.join(xml_dir, 'pits')
+
+                # 如果 pits 文件夹不存在，则创建
+                os.makedirs(pits_dir, exist_ok=True)
+
+                # 定义文件名和完整路径
+                filename = f"pit_1714_{new_id}.point"
+                file_path = os.path.join(pits_dir, filename)
+
+                # 将 A, B, C 点反转为 (x, y, z) 并保存为无标签、无括号格式
+                with open(file_path, 'w') as f:
+                    for point in [A, B, C]:
+                        x, y, z = point[::-1]
+                        f.write(f"{x} {y} {z}\n")
+
+                self.print(f"Pit points saved to {file_path}")
+            except Exception as e:
+                self.print(f"Error saving pit points: {e}")
 
             # Step 4: Save the new XML to class_xml_path
             vl.toXMLFile(self.tomo_path_and_stage.class_xml_path)

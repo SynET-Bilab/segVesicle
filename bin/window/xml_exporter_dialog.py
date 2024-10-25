@@ -1,6 +1,7 @@
 import os
 import xml.etree.ElementTree as ET
 from PyQt5 import QtWidgets
+import subprocess
 
 def export_final_xml(main_viewer, tomo_path_and_stage, print_func):
     dialog = QtWidgets.QDialog(main_viewer)
@@ -89,8 +90,32 @@ def export_final_xml(main_viewer, tomo_path_and_stage, print_func):
                 print_func(f"Failed to write {type_t} XML file: {e}")
                 return
 
-        print_func("XML files successfully resampled and saved.")
+        # Process .point files in the pits folder
+        pits_folder = os.path.join(os.path.dirname(tomo_path_and_stage.class_xml_path), 'pits')
+        if os.path.exists(pits_folder):
+            for vesicle in root.findall('Vesicle'):
+                vesicle_id = vesicle.attrib.get('vesicleId')
+                type_element = vesicle.find('Type')
+                
+                # Only process if 't' == 'pit'
+                if vesicle_id and type_element is not None and type_element.attrib.get('t') == 'pit':
+                    old_point_file = os.path.join(pits_folder, f'pit_1714_{vesicle_id}.point')
+                    if os.path.exists(old_point_file):
+                        try:
+                            # New point file without '1714_'
+                            new_point_file = os.path.join(pits_folder, f'pit_{vesicle_id}.point')
+                            # Resample the old point file and save it to the new location
+                            resample_point_file(old_point_file, new_point_file, scale, print_func)
+                            # Generate the corresponding .mod file
+                            generate_mod_file(new_point_file, print_func)
+                        except Exception as e:
+                            print_func(f"Failed to process point file for vesicle {vesicle_id}: {e}")
+        else:
+            print_func(f"Pits folder not found: {pits_folder}")
+
+        print_func("XML files and point files successfully resampled and saved.")
         dialog.accept()
+
 
     apply_button.clicked.connect(on_apply)
     dialog.exec_()
@@ -150,3 +175,28 @@ def write_xml_without_declaration(tree, path):
     content = content.replace('><Vesicle', '>\n<Vesicle')
     with open(path, 'w') as f:
         f.write(content)
+
+def resample_point_file(old_point_file, new_point_file, scale, print_func):
+    new_lines = []
+    with open(old_point_file, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            coords = list(map(float, line.split()))
+            if len(coords) == 3:
+                scaled_coords = [coord * scale for coord in coords]
+                new_lines.append(f"{scaled_coords[0]} {scaled_coords[1]} {scaled_coords[2]}\n")
+    
+    # Save the resampled coordinates to the new .point file
+    with open(new_point_file, 'w') as f:
+        f.writelines(new_lines)
+
+    # print_func(f"Resampled coordinates in {new_point_file}")
+
+def generate_mod_file(new_point_file, print_func):
+    mod_file = new_point_file.replace('.point', '.mod')
+    cmd = f"point2model {new_point_file} {mod_file}"
+    try:
+        subprocess.run(cmd, shell=True, check=True)
+        # print_func(f"Generated .mod file: {mod_file}")
+    except subprocess.CalledProcessError as e:
+        print_func(f"Failed to generate .mod file: {e}")
