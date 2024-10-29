@@ -311,8 +311,23 @@ class TomoViewer:
             self.progress_dialog.setWindowModality(Qt.WindowModal)
             self.progress_dialog.setValue(0)
             self.progress_dialog.show()
-            self.deconv_data = self.viewer.layers['deconv_tomo'].data
-            self.corrected_data = self.viewer.layers['corrected_tomo'].data
+            # self.deconv_data = self.viewer.layers['deconv_tomo'].data
+            # self.corrected_data = self.viewer.layers['corrected_tomo'].data
+            def get_tomo(path):
+                with mrcfile.open(path) as mrc:
+                    data = mrc.data
+                return data
+            # 检查并获取 deconv_data
+            if 'deconv_tomo' in self.viewer.layers:
+                self.deconv_data = self.viewer.layers['deconv_tomo'].data
+            else:
+                self.deconv_data = get_tomo(self.tomo_path_and_stage.deconv_tomo_path)
+
+            # 检查并获取 corrected_data
+            if 'corrected_tomo' in self.viewer.layers:
+                self.corrected_data = self.viewer.layers['corrected_tomo'].data
+            else:
+                self.corrected_data = get_tomo(self.tomo_path_and_stage.isonet_tomo_path)
             self.progress_dialog.setValue(20)
             self.label = predict_label(self.deconv_data, self.corrected_data)
             # self.label = self.viewer.layers['label'].data
