@@ -46,6 +46,7 @@ class ToolbarWidget(QWidget):
         self.draw_memb_button = self.add_button(self.memb_layout, "Draw Membrane Area Mod")
         self.stsyseg_button = self.add_button(self.memb_layout, "Stsyseg")
         self.visualize_button = self.add_button(self.memb_layout, "Visualize")
+        self.manualy_draw_button = self.add_button(self.memb_layout, "Manually Draw")
 
         # Create layout for the Analysis tab and add buttons
         # self.analysis_layout = QVBoxLayout()
