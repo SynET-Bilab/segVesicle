@@ -262,7 +262,7 @@ class Vesicle:
         points = np.stack([x, y, z], axis=-1)  # (num_phi, num_theta, 3)
         
         points *= self._radius3D
-        points = points @ self._evecs.T + self._center3D
+        points = points @ self._evecs + self._center3D
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         
@@ -285,7 +285,7 @@ class Vesicle:
         random_points /= np.linalg.norm(random_points, axis=-1, keepdims=True)
         
         points = random_points * self._radius3D
-        points = points @ self._evecs.T + self._center3D
+        points = points @ self._evecs + self._center3D
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         
