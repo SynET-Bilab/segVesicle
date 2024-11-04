@@ -27,8 +27,8 @@ class TomoPathAndStage:
         self.base_tomo_name = tomo_name.split('-1')[0] if '-1' in tomo_name else tomo_name
 
         # 初始化路径
-        # self.ori_tomo_path = os.path.join(self.current_path, tomo_name, base_tomo_name + '-bin4-wbp.rec')
-        self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-5i.rec')
+        self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-wbp.rec')
+        # self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-5i.rec')
         self.rec_tomo_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomoset', self.base_tomo_name + '_wbp_resample.mrc')
         self.tomograms_star_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomograms.star')
         self.deconv_tomo_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomo_deconv', self.base_tomo_name + '_wbp_resample.mrc')
@@ -50,6 +50,7 @@ class TomoPathAndStage:
         self.segment_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_segment.mrc')
         self.label_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_label_vesicle.mrc')
         self.json_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle.json')
+        self.xlsx_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle.xlsx')
         self.new_json_file_path = os.path.join(self.root_dir, 'vesicle_new_{}.json'.format(self.pid))
         self.new_label_file_path = os.path.join(self.root_dir, 'label_{}.mrc'.format(self.pid))
         self.ori_json_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle_ori.json')

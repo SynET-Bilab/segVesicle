@@ -39,6 +39,7 @@ class ToolbarWidget(QWidget):
         self.draw_tomo_area_button = self.add_button(self.predict_layout, "Draw Tomo Area")
         self.predict_button = self.add_button(self.predict_layout, "Predict")
         self.manual_annotation_button = self.add_button(self.predict_layout, "Manual Annotation Only")
+        self.export_xlsx_button = self.add_button(self.predict_layout, "Export XLSX")
 
         # # Create layout for the Memb tab and add buttons
         self.memb_layout = QVBoxLayout()

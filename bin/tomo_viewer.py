@@ -36,6 +36,7 @@ from window.xml_exporter_dialog import export_final_xml
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample import resample_image
+from util.json2xlsx import json_to_excel
 from widget.function_widget import ToolbarWidget
 
 
@@ -70,6 +71,7 @@ class TomoViewer:
         self.register_deconv_tomo()
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
+        self.register_export_xlsx()
         self.register_manualy_correction()
         self.register_distance_calc()
         self.register_filter_vesicle()
@@ -348,6 +350,24 @@ class TomoViewer:
             self.progress_dialog.setValue(100)
             self.show_current_state()
         
+    def register_export_xlsx(self):
+        def export_xlsx():
+            try:
+                # Attempt to execute the JSON to Excel conversion
+                json_to_excel(self.tomo_path_and_stage.new_json_file_path, 
+                            self.tomo_path_and_stage.xlsx_file_path)
+                # Inform the user of success
+                self.print(f"Excel file successfully saved at {self.tomo_path_and_stage.xlsx_file_path}.")
+            except Exception as e:
+                # Inform the user of any error that occurs
+                self.print(f"Failed to export Excel file: {str(e)}")
+        try:
+            self.toolbar_widget.export_xlsx_button.clicked.disconnect()
+        except TypeError:
+            pass
+        
+        self.toolbar_widget.export_xlsx_button.clicked.connect(export_xlsx)
+    
     def register_draw_memb_mod(self):
         # 保存为临时点文件并转换为 .mod 文件
         def write_model(model_file, model_df):
