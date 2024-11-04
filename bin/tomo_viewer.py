@@ -32,9 +32,11 @@ from window.correction_window import CorrectionWindow
 from window.memb_segmentation_window import MembSegmentationWindow
 from window.distance_filter_window import DistanceFilterWindow
 from window.annotate_vesicle_class import VesicleAnnotationWindow
+from window.xml_exporter_dialog import export_final_xml
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample import resample_image
+from util.json2xlsx import json_to_excel
 from widget.function_widget import ToolbarWidget
 
 
@@ -69,12 +71,15 @@ class TomoViewer:
         self.register_deconv_tomo()
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
+        self.register_export_xlsx()
         self.register_manualy_correction()
-        # self.register_distance_calc()
-        # self.register_filter_vesicle()
-        # self.register_annotate_vesicle()
-        # self.register_multi_class_visualize()
-        
+        self.register_distance_calc()
+        self.register_filter_vesicle()
+        self.register_annotate_pit()
+        self.register_annotate_vesicle()
+        self.register_multi_class_visualize()
+        self.register_export_final_xml()
+        self.register_manualy_draw_memb()
         # self.register_analyze_by_volume()
         # self.register_show_single_vesicle()
         
@@ -90,23 +95,23 @@ class TomoViewer:
             pass
         self.toolbar_widget.predict_button.clicked.connect(self.predict_clicked)
         
-        # try:
-        #     self.toolbar_widget.draw_memb_button.clicked.disconnect()
-        # except TypeError:
-        #     pass
-        # self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
+        try:
+            self.toolbar_widget.draw_memb_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
         
-        # try:
-        #     self.toolbar_widget.visualize_button.clicked.disconnect()
-        # except TypeError:
-        #     pass
-        # self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
+        try:
+            self.toolbar_widget.visualize_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.visualize_button.clicked.connect(self.register_vis_memb)
         
-        # try:
-        #     self.toolbar_widget.stsyseg_button.clicked.disconnect()
-        # except TypeError:
-        #     pass
-        # self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
+        try:
+            self.toolbar_widget.stsyseg_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.stsyseg_button.clicked.connect(self.open_segmentation_window)
         
     def register_open_ori_tomo(self):
         def button_clicked():
@@ -308,8 +313,23 @@ class TomoViewer:
             self.progress_dialog.setWindowModality(Qt.WindowModal)
             self.progress_dialog.setValue(0)
             self.progress_dialog.show()
-            self.deconv_data = self.viewer.layers['deconv_tomo'].data
-            self.corrected_data = self.viewer.layers['corrected_tomo'].data
+            # self.deconv_data = self.viewer.layers['deconv_tomo'].data
+            # self.corrected_data = self.viewer.layers['corrected_tomo'].data
+            def get_tomo(path):
+                with mrcfile.open(path) as mrc:
+                    data = mrc.data
+                return data
+            # 检查并获取 deconv_data
+            if 'deconv_tomo' in self.viewer.layers:
+                self.deconv_data = self.viewer.layers['deconv_tomo'].data
+            else:
+                self.deconv_data = get_tomo(self.tomo_path_and_stage.deconv_tomo_path)
+
+            # 检查并获取 corrected_data
+            if 'corrected_tomo' in self.viewer.layers:
+                self.corrected_data = self.viewer.layers['corrected_tomo'].data
+            else:
+                self.corrected_data = get_tomo(self.tomo_path_and_stage.isonet_tomo_path)
             self.progress_dialog.setValue(20)
             self.label = predict_label(self.deconv_data, self.corrected_data)
             # self.label = self.viewer.layers['label'].data
@@ -330,6 +350,24 @@ class TomoViewer:
             self.progress_dialog.setValue(100)
             self.show_current_state()
         
+    def register_export_xlsx(self):
+        def export_xlsx():
+            try:
+                # Attempt to execute the JSON to Excel conversion
+                json_to_excel(self.tomo_path_and_stage.new_json_file_path, 
+                            self.tomo_path_and_stage.xlsx_file_path)
+                # Inform the user of success
+                self.print(f"Excel file successfully saved at {self.tomo_path_and_stage.xlsx_file_path}.")
+            except Exception as e:
+                # Inform the user of any error that occurs
+                self.print(f"Failed to export Excel file: {str(e)}")
+        try:
+            self.toolbar_widget.export_xlsx_button.clicked.disconnect()
+        except TypeError:
+            pass
+        
+        self.toolbar_widget.export_xlsx_button.clicked.connect(export_xlsx)
+    
     def register_draw_memb_mod(self):
         # 保存为临时点文件并转换为 .mod 文件
         def write_model(model_file, model_df):
@@ -576,6 +614,102 @@ class TomoViewer:
             pass
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
         
+    def register_manualy_draw_memb(self):
+        def manualy_draw_memb():
+            """
+            手动绘制膜并保存为 .mod 文件。
+            
+            要求：
+            1. 每个 z 值有一个或多个点。
+            2. 在连续的 z 轴上进行标注。
+            3. 同一个 z 的点保存在同一个 contour 中，每个 z 创建一个 contour。
+            4. 保存为 .mod 文件到 self.tomo_path_and_stage.manualy_memb_path。
+            """
+            
+            def write_model(model_file, model_df):
+                """ 将点文件转换为 .mod 文件 """
+                model = np.asarray(model_df)
+            
+                # 提取model_file的文件夹路径
+                model_dir = os.path.dirname(model_file)
+            
+                # 如果文件夹不存在，则创建文件夹
+                if not os.path.exists(model_dir):
+                    os.makedirs(model_dir)
+            
+                with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+                    # 保存点文件
+                    point_file = temp_file.name
+                    np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
+            
+                    # 使用 point2model 命令将点文件转换为 .mod 文件
+                    cmd = f"point2model -op {point_file} {model_file} >/dev/null"
+                    subprocess.run(cmd, shell=True, check=True)
+            
+            def validate_and_group_points(points):
+                """ 验证点并按连续的 z 值分组 """
+                if len(points) == 0:
+                    self.print("Error: No input points provided.")
+                    return None
+                
+                # 按 z 值分组
+                z_groups = {}
+                for point in points:
+                    z = point[0]
+                    if z not in z_groups:
+                        z_groups[z] = []
+                    z_groups[z].append(point)
+                
+                # 检查 z 值是否连续
+                sorted_z = sorted(z_groups.keys())
+                for i in range(1, len(sorted_z)):
+                    if sorted_z[i] - sorted_z[i-1] != 1:
+                        self.print(f"Error: Z values are not continuous. Gap found between z={sorted_z[i-1]} and z={sorted_z[i]}.")
+                        return None
+                
+                return z_groups
+            
+            # 获取点数据
+            points = self.viewer.layers['edit vesicles'].data
+            
+            # 验证并分组点数据
+            z_groups = validate_and_group_points(points)
+            
+            # 如果验证不通过，直接退出并清空点数据
+            if z_groups is None:
+                self.viewer.layers['edit vesicles'].data = None
+                return
+            
+            # 准备保存的点数据
+            data = []
+            object_id = 1  # 只有一个 object
+            contour_id = 1  # contour 从1开始
+            sorted_z = sorted(z_groups.keys())
+            
+            for z in sorted_z:
+                group = z_groups[z]
+                for point in group:
+                    # 假设点的格式为 [z, y, x]
+                    # object_id, contour_id, x, y, z (1-based for object and contour)
+                    data.append([object_id, contour_id, point[2], point[1], point[0]])
+                contour_id += 1  # 每个 z 创建一个新的 contour
+            
+            # 转换为 DataFrame
+            df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
+            
+            # 保存为 .mod 文件
+            write_model(self.tomo_path_and_stage.manualy_memb_path, df)
+            self.print("Points validated and saved successfully.")
+            
+            # 最后清空点数据
+            self.viewer.layers['edit vesicles'].data = None
+    
+        try:
+            self.toolbar_widget.manualy_draw_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.manualy_draw_button.clicked.connect(manualy_draw_memb)
+        
     def register_manualy_correction(self):
         
         def init_lable_file():
@@ -648,15 +782,14 @@ class TomoViewer:
         self.toolbar_widget.annotate_vesicle_type_button.clicked.connect(annotate_vesicle)
         
     def register_multi_class_visualize(self):
-        
         def multi_class_visualize():
             print("Starting multi-class visualization...")
             try:
-                # Parse the XML file
+                # 解析 XML 文件
                 tree = ET.parse(self.tomo_path_and_stage.class_xml_path)
                 root = tree.getroot()
 
-                # Define type mapping
+                # 定义类型映射
                 type_mapping = {
                     'false': 0,
                     'tether': 1,
@@ -669,32 +802,66 @@ class TomoViewer:
                     'others': 8
                 }
 
-                # Define the types to include
-                included_types = ['false', 'tether', 'contact', 'omega', 'pit', 'CCV', 'endosome', 'DCV', 'others']
+                # 定义要包含的类型
+                included_types = list(type_mapping.keys())
 
-                # Initialize the new label array
-                new_label = np.zeros_like(self.viewer.layers['label'].data, dtype=np.int32)
+                # 初始化新的标签数组
+                label_data = self.viewer.layers['label'].data
+                new_label = np.zeros_like(label_data, dtype=np.int32)
 
-                # Iterate over vesicles in the XML
+                # 遍历 XML 中的每个囊泡
                 for vesicle in root.findall('Vesicle'):
-                    vesicle_id = int(vesicle.get('vesicleId'))
                     vesicle_type_element = vesicle.find('Type')
                     if vesicle_type_element is not None:
                         vesicle_type = vesicle_type_element.get('t')
                         if vesicle_type in included_types:
-                            mapped_value = type_mapping[vesicle_type]
-                            # Set pixels corresponding to vesicle_id to mapped_value
-                            new_label[self.viewer.layers['label'].data == vesicle_id] = mapped_value
-                            print(f"Vesicle ID {vesicle_id} of type '{vesicle_type}' mapped to {mapped_value}.")
+                            # 获取中心坐标
+                            center = vesicle.find('Center')
+                            if center is not None:
+                                try:
+                                    x = float(center.attrib['X'])
+                                    y = float(center.attrib['Y'])
+                                    z = float(center.attrib['Z'])
+                                except (ValueError, KeyError) as coord_error:
+                                    print(f"Invalid center coordinates for vesicle: {coord_error}")
+                                    continue
 
-                # Add the new label layer
+                                # 将物理坐标转换为体素索引（假设坐标已经是索引，若需要转换请根据实际情况调整）
+                                z_idx = int(round(z))
+                                y_idx = int(round(y))
+                                x_idx = int(round(x))
+
+                                # 检查索引是否在 label_data 的范围内
+                                if (0 <= z_idx < label_data.shape[0] and
+                                    0 <= y_idx < label_data.shape[1] and
+                                    0 <= x_idx < label_data.shape[2]):
+                                    
+                                    vesicle_label = label_data[z_idx, y_idx, x_idx]
+                                    
+                                    if vesicle_label != 0:
+                                        mapped_value = type_mapping[vesicle_type]
+                                        # 将所有对应 vesicle_label 的像素设置为 mapped_value
+                                        new_label[label_data == vesicle_label] = mapped_value
+                                        print(f"Vesicle at ({z_idx}, {y_idx}, {x_idx}) with label {vesicle_label} of type '{vesicle_type}' mapped to {mapped_value}.")
+                                    else:
+                                        print(f"No label found at center coordinates ({z_idx}, {y_idx}, {x_idx}) for vesicle type '{vesicle_type}'.")
+                                else:
+                                    print(f"Center coordinates ({z}, {y}, {x}) out of bounds.")
+                            else:
+                                print("No Center element found for a vesicle.")
+                
+                # 添加新的多分类标签层
                 self.viewer.add_labels(new_label, name='multi_class_labels')
 
-                # Hide the original label layer
+                # 隐藏原始标签层
                 self.viewer.layers['label'].visible = False
 
                 self.print("Multi-class visualization completed successfully.")
 
+            except ET.ParseError as parse_err:
+                print(f"XML parsing error: {parse_err}")
+            except FileNotFoundError as fnf_error:
+                print(f"XML file not found: {fnf_error}")
             except Exception as e:
                 print(f"An error occurred during multi-class visualization: {e}")
 
@@ -704,101 +871,161 @@ class TomoViewer:
             pass
         self.toolbar_widget.multi_class_visualize_button.clicked.connect(multi_class_visualize)
 
-    # def register_analyze_by_volume(self):
-    #     def get_info_from_json(json_file):
-    #         """
-    #         从 JSON 文件中读取囊泡信息并构建 KDTree。
 
-    #         Parameters:
-    #         - json_file (str): JSON 文件的路径。
+    def register_annotate_pit(self):
+        def annotate_pit():
+        # Step 1: Get the three point coordinates ABC(z, y, x) from 'edit vesicles' layer
+            if 'edit vesicles' not in self.viewer.layers:
+                self.print("Error: 'edit vesicles' layer not found.")
+                return
 
-    #         Returns:
-    #         - vesicles (list): 囊泡信息的列表。
-    #         - tree (KDTree): 基于囊泡中心坐标构建的 KDTree。
-    #         """
-    #         with open(json_file, "r") as f:
-    #             data = json.load(f)
-    #             vesicles = data.get('vesicles', [])
-            
-    #         centers = [vesicle['center'] for vesicle in vesicles]
-    #         centers = np.asarray(centers)
-            
-    #         if centers.size == 0:
-    #             centers = np.empty((0, 3))
-    #             tree = KDTree(np.empty((0, 3)))
-    #         else:
-    #             tree = KDTree(centers, leaf_size=2)
-            
-    #         return vesicles, tree
-    #     def analyze_by_volume():
-    #         """
-    #         根据 JSON 文件中的囊泡信息更换 MRC 数据中的囊泡颜色（mask 值）。
+            points = self.viewer.layers['edit vesicles'].data
+            if len(points) < 3:
+                self.print("Error: Need at least three points to define a pit.")
+                self.viewer.layers['edit vesicles'].data = None
+                return
 
-    #         Parameters:
-    #         - json_file (str): JSON 文件的路径。
-    #         - mrc_data (numpy.ndarray): 读取的 MRC 数据，形状为 (z, y, x)。
-
-    #         Returns:
-    #         - None: 直接修改传入的 mrc_data 数组。
-    #         """
-    #         vesicles, tree = get_info_from_json(self.tomo_path_and_stage.new_json_file_path)
-    #         new_label_data = np.copy(self.viewer.layers['label'].data)
+            # Get the last three points as A, B, and C
+            A = np.array(points[-3])
+            B = np.array(points[-2])
+            C = np.array(points[-1])
+            self.viewer.layers['edit vesicles'].data = None
             
-    #         for vesicle in vesicles:
-    #             # 计算平均半径
-    #             radii = vesicle.get('radii', [])
-    #             if not radii:
-    #                 self.print(f"Vesicle {vesicle.get('name', 'unknown')} has no radius information, skipping.")
-    #                 continue
-    #             avg_radii = np.mean(radii)
+            # Step 2: Read VesicleList from XML
+            from util.structures import Vesicle, VesicleList
+            import os
+
+            vl = VesicleList()
+            xml_path = None
+
+            if os.path.exists(self.tomo_path_and_stage.class_xml_path):
+                xml_path = self.tomo_path_and_stage.class_xml_path
+            elif os.path.exists(self.tomo_path_and_stage.filter_xml_path):
+                xml_path = self.tomo_path_and_stage.filter_xml_path
+            else:
+                self.print("Error: No XML file found.")
+                return
+
+            vl.fromXMLFile(xml_path)
+
+            # Step 3: Calculate the vesicle information
+            sv = Vesicle()
+            # Assume A and C are the base, B is the tip
+            sv.setType('pit')
+            center = (A + C) / 2  # Compute the center point
+            sv.setCenter(center[::-1])  # Reverse to (x, y, z) if necessary
+
+            # Set B as PitPoint (reverse from z, y, x to x, y, z)
+            pit_point = B[::-1]  # B is currently (z, y, x), we reverse it to (x, y, z)
+            sv.setPitPoint(pit_point)  # Store B as PitPoint
+
+            # Calculate the radius
+            radius = np.linalg.norm(A - center)
+            sv.setRadius(radius)
+            sv.setRadius2D(np.array([radius, radius]))
+
+            sv.setDistance(0.0)
+            sv.setProjectionPoint(sv.getCenter())
+
+            base_vector = C[[1, 2]] - A[[1, 2]]  # 只提取 y 和 x 分量
+            rotation_2d = np.arctan2(base_vector[0], base_vector[1])  # y分量在前，x分量在后，弧度是相对于 x 轴
+            # rotation_2d_deg = np.degrees(rotation_2d)  # 将弧度制转换为角度制
+            sv.setRotation2D(rotation_2d)
+
+            # Set the vesicle ID
+            new_id = max(vl[-1].getId() + 1, 10000)
+            sv.setId(new_id)
+
+            vl.append(sv)
+
+            # 保存 ABC 三点坐标到 .point 文件
+            try:
+                # 获取 XML 文件所在目录
+                xml_dir = os.path.dirname(xml_path)
+
+                # 定义 pits 子文件夹路径
+                pits_dir = os.path.join(xml_dir, 'pits')
+
+                # 如果 pits 文件夹不存在，则创建
+                os.makedirs(pits_dir, exist_ok=True)
+
+                # 定义文件名和完整路径
+                filename = f"pit_1714_{new_id}.point"
+                file_path = os.path.join(pits_dir, filename)
+
+                # 将 A, B, C 点反转为 (x, y, z) 并保存为无标签、无括号格式
+                with open(file_path, 'w') as f:
+                    for point in [A, B, C]:
+                        x, y, z = point[::-1]
+                        f.write(f"{x} {y} {z}\n")
+
+                self.print(f"Pit points saved to {file_path}")
+            except Exception as e:
+                self.print(f"Error saving pit points: {e}")
+
+            # Step 4: Save the new XML to class_xml_path
+            vl.toXMLFile(self.tomo_path_and_stage.class_xml_path)
+
+            # Step 5: Add a new label layer to display the pit
+            # Get the shape of the reference image layer (assumed to be the first layer)
+            image_shape = self.viewer.layers[0].data.shape
+            pit_layer_data = np.zeros(image_shape, dtype=np.uint8)
+
+            # Check if the three points have the same z-coordinate
+            if A[0] == B[0] and B[0] == C[0]:
+                z_slice = int(A[0])
+
+                # Enclose the points in the xy-plane and set the enclosed area to 1
+                from skimage.draw import polygon
+                rr, cc = polygon([A[1], B[1], C[1]], [A[2], B[2], C[2]], shape=pit_layer_data.shape[1:])
+                pit_layer_data[z_slice, rr, cc] = 1
+            else:
+                # Points have different z, create a 3D cylinder from min to max z
+                min_z = int(min(A[0], B[0], C[0]))
+                max_z = int(max(A[0], B[0], C[0])) + 1  # Include max_z
+
+                # Enclose the points in the xy-plane
+                from skimage.draw import polygon
+                rr, cc = polygon([A[1], B[1], C[1]], [A[2], B[2], C[2]], shape=pit_layer_data.shape[1:])
+
+                # Set the enclosed area to 1 across the z-range
+                pit_layer_data[min_z:max_z, rr, cc] = 1
+
+            # 检查是否已经存在名为 'pit' 的标签层
+            if 'pit' in self.viewer.layers:
+                # 获取现有的 'pit' 层
+                pit_layer = self.viewer.layers['pit'].data
                 
-    #             # 确定新的 mask 值
-    #             if avg_radii < 10:
-    #                 new_value = 1
-    #             elif 10 <= avg_radii <= 15:
-    #                 new_value = 2
-    #             else:
-    #                 new_value = 3
+                # 将新的 pit_layer_data 叠加到现有的层数据上
+                updated_data = np.maximum(pit_layer, pit_layer_data)
                 
-    #             # 获取中心坐标并转换为整数索引
-    #             center = vesicle.get('center', [])
-    #             if len(center) != 3:
-    #                 self.print(f"Vesicle {vesicle.get('name', 'unknown')} has invalid center coordinates, skipping.")
-    #                 continue
-    #             z, y, x = map(int, np.round(center))
-                
-    #             # 检查索引是否在 MRC 数据范围内
-    #             z = np.clip(z, 0, new_label_data.shape[0]-1)
-    #             y = np.clip(y, 0, new_label_data.shape[1]-1)
-    #             x = np.clip(x, 0, new_label_data.shape[2]-1)
-                
-    #             # Get the current mask value
-    #             old_value = new_label_data[z, y, x]
-                
-    #             if old_value == 0:
-    #                 self.print(f"Warning: Vesicle {vesicle.get('name', 'unknown')} has a mask value of 0 at ({z}, {y}, {x}), possibly unmarked.")
-    #                 continue
-        
-    #             # Update all corresponding mask values
-    #             new_label_data[new_label_data == old_value] = new_value
-    #             self.print(f"Vesicle {vesicle.get('name', 'unknown')} mask value updated from {old_value} to {new_value}.")
-    
-    #         self.print("Vesicle color changes complete.")
-    #         self.viewer.add_labels(new_label_data, name="Updated Vesicle Labels")
-        
-    #     try:
-    #         self.toolbar_widget.analyze_volume_button.clicked.disconnect()
-    #     except TypeError:
-    #         pass
-    #     self.toolbar_widget.analyze_volume_button.clicked.connect(analyze_by_volume)
-        
-    # def register_show_single_vesicle(self):
-        # def show_single_vesicle():
-        #     # 初始化 VesicleViewer
-        #     self.vesicle_viewer = VesicleViewer(self.viewer, self.tomo_path_and_stage.new_json_file_path)
-        #     self.vesicle_viewer.show()
-        # try:
-        #     self.toolbar_widget.show_single_vesicle.clicked.disconnect()
-        # except TypeError:
-        #     pass
-        # self.toolbar_widget.show_single_vesicle.clicked.connect(show_single_vesicle)
+                # 更新 'pit' 层的数据
+                self.viewer.layers['pit'].data = updated_data
+            else:
+                # 如果 'pit' 层不存在，添加新的标签层
+                self.viewer.add_labels(pit_layer_data, name='pit')
+
+            if 'edit vesicles' in self.viewer.layers:
+                self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+            
+            # Step 6: Display a success message
+            self.print("Pit added successfully.")
+
+        # Step 7: Unbind 'p' and bind it to annotate_pit
+        self.viewer.bind_key('p', None)  # Unbind existing 'p' key
+        self.viewer.bind_key('p', lambda viewer: annotate_pit())  # Bind 'p' to annotate_pit
+
+        try:
+            self.toolbar_widget.annotate_pit_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.annotate_pit_button.clicked.connect(annotate_pit)
+
+    def register_export_final_xml(self):
+        try:
+            self.toolbar_widget.export_final_xml_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.export_final_xml_button.clicked.connect(
+            lambda: export_final_xml(self.main_viewer, self.tomo_path_and_stage, self.print)
+        )

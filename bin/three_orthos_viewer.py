@@ -25,6 +25,7 @@ from help_viewer import HelpViewer
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16") and parse_version(napari.__version__) < parse_version("0.5.1")
+# NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
 
 import concurrent.futures
 from qtpy.QtCore import QTimer, Signal, QObject
@@ -184,7 +185,7 @@ class CrossWidget(QCheckBox):
         self.pending_update = False
         
         self.update_timer = QTimer()
-        self.update_timer.setInterval(100)  # 100毫秒更新一次
+        self.update_timer.setInterval(50)  # 100毫秒更新一次
         self.update_timer.timeout.connect(self._process_pending_updates)
         
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)

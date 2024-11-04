@@ -7,6 +7,70 @@ from sklearn.neighbors import KDTree
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from lxml import etree
+import tempfile
+import subprocess
+import pandas as pd
+
+# save_points_as_mod(points, object_id=1, model_file="/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/vesicle_analysis/sampled_points.mod")
+
+def save_points_as_mod(points: np.ndarray, object_id: int, model_file: str):
+    """
+    Saves the sampled points as a .mod file, grouping them by z and creating contours.
+    
+    :param points: An array of points to save, where each unique z defines a new group.
+    :param object_id: The object ID to use in the .mod file.
+    :param model_file: The path to save the .mod file.
+    """
+    # Round z values to the nearest integer
+    points[:, 2] = np.round(points[:, 2]).astype(int)
+    
+    # Group points by z-value
+    z_groups = {}
+    for point in points:
+        z = point[2]
+        if z not in z_groups:
+            z_groups[z] = []
+        z_groups[z].append(point)
+    
+    # Prepare data for DataFrame
+    data = []
+    contour_count = 0
+    for z, group in z_groups.items():
+        if len(group) > 1:  # Check group size and limit contour count
+            for point in group:
+                # object_id, contour_id, x, y, z (1-based for object and contour)
+                data.append([object_id, contour_count + 1, point[0], point[1], point[2]])
+            contour_count += 1
+
+    # Create DataFrame and write to .mod file
+    df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
+    write_model(model_file, df)
+
+def write_model(model_file: str, model_df: pd.DataFrame):
+    """
+    Converts the point data to a .mod file format using the IMOD tool point2model.
+    
+    :param model_file: Path where the .mod file will be saved.
+    :param model_df: DataFrame containing the point data.
+    """
+    model = np.asarray(model_df)
+
+    # Ensure the directory exists
+    model_dir = os.path.dirname(model_file)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+
+    # Save points to a temporary file and convert to .mod
+    with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+        # Save point data to a temporary .pt file
+        point_file = temp_file.name
+        np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
+
+        # Use point2model to convert the point file to a .mod file
+        cmd = f"point2model -op {point_file} {model_file} >/dev/null"
+        subprocess.run(cmd, shell=True, check=True)
+    print(f".mod file saved successfully to {model_file}")
+
 
 
 class Vesicle:
@@ -236,7 +300,7 @@ class Vesicle:
         points = np.vstack((x, y, z)).T + self._center2D
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
-        
+        save_points_as_mod(points, object_id=1, model_file="/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/vesicle_analysis/sampled_points.mod")
         return points
     
     
@@ -262,10 +326,10 @@ class Vesicle:
         points = np.stack([x, y, z], axis=-1)  # (num_phi, num_theta, 3)
         
         points *= self._radius3D
-        points = points @ self._evecs.T + self._center3D
+        points = points @ self._evecs + self._center3D
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
-        
+        save_points_as_mod(points, object_id=1, model_file="/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/vesicle_analysis/sampled_points.mod")
         return points
     
     
@@ -285,7 +349,7 @@ class Vesicle:
         random_points /= np.linalg.norm(random_points, axis=-1, keepdims=True)
         
         points = random_points * self._radius3D
-        points = points @ self._evecs.T + self._center3D
+        points = points @ self._evecs + self._center3D
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         
@@ -328,6 +392,9 @@ class Vesicle:
     
     def setEvecs(self, evecs):
         self._evecs = evecs
+    
+    def setRotation2D(self, rotation2D):
+        self._rotation2D = rotation2D
     
     def getEvecs(self):
         return self._evecs
@@ -461,11 +528,6 @@ class VesicleList:
 
 
     def toXMLFile(self, outputXMLFile):
-        # ls
-        output_dir = os.path.dirname(outputXMLFile)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        
         xmlString = etree.tostring(self.toXML(), pretty_print = True).decode('utf-8')
         with open(outputXMLFile, 'w') as f:
             f.write(xmlString)
@@ -516,8 +578,7 @@ class VesicleList:
             tree = KDTree(sample_triangle_arr, leaf_size=2)
 
         # distance calculation
-        # ls
-        for i,vesicle in tqdm(enumerate(self._vesicleList), dynamic_ncols=True, mininterval=0.5):
+        for i,vesicle in tqdm(enumerate(self._vesicleList)):
             # for pits defined by three points, set distance to 0 and projection point is the center
             if vesicle.getType() == 'pit':
                 vesicle._distance = 0.
@@ -537,10 +598,9 @@ class VesicleList:
                 modtxtFile.append(np.concatenate((np.array([1, i+1]), PP0)))
         
         modtxtFile = np.asarray(modtxtFile)
-        # ls
-        # np.savetxt('nearest_point.txt', np.reshape(modtxtFile, (-1, 5)), fmt='%d')
-        # cmd = 'point2model -sp 10 nearest_point.txt nearest_point.mod'
-        # os.system(cmd)
+        np.savetxt('nearest_point.txt', np.reshape(modtxtFile, (-1, 5)), fmt='%d')
+        cmd = 'point2model -sp 10 nearest_point.txt nearest_point.mod'
+        os.system(cmd)
         # return self._distance, self._projectionPoint
 
 
@@ -930,6 +990,7 @@ class Surface:
         
         plt.tight_layout()
         plt.show()
+
 
 
 

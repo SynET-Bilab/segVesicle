@@ -1,12 +1,13 @@
 import os
 import json
 import argparse
+import re
 import numpy as np
 import xml.etree.ElementTree as ET
 import mrcfile
 from util.structures import VesicleList, Surface  # Assuming these modules are available
 
-def get_patch_around_point(data, z, y, x, size=64):
+def get_patch_around_point(data, z, y, x, size=128):
     """
     Extracts a patch of a specified size from 3D data, handles boundaries, and fills missing parts with 0.
     
@@ -136,6 +137,11 @@ def vesicle_distance_and_filter(json_path, mod_path, xml_output_path, filter_xml
         # Process each vesicle
         for i, vesicle in enumerate(vl):
             ves_data = vesicles[i]
+            
+            name = ves_data.get('name', 'vesicle_0')  # Default to 'vesicle_0' if name not found
+            vesicle_id = int(re.search(r'\d+', name).group())  # Extract the number from the name
+            vesicle.setId(vesicle_id)  # Set the vesicle ID
+    
             radii = ves_data.get('radii', [0])
             center = ves_data.get('center', [0, 0, 0])
             directions = ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
@@ -234,7 +240,7 @@ def filter_vesicles(xml_path, filter_xml_path, distance_nm):
                     type_elem.set('t', 'others')
 
         # Save the filtered XML
-        tree.write(filter_xml_path, encoding='utf-8', xml_declaration=True)
+        tree.write(filter_xml_path, encoding='utf-8', xml_declaration=False)
         print(f"Filtered vesicle XML successfully saved: {filter_xml_path}")
 
     except Exception as e:

@@ -172,7 +172,8 @@ def update_json_file(tomo_viewer, points, mode, vesicle_to_add):
 def add_vesicle_show(tomo_viewer, point, add_mode):
     viewer = tomo_viewer.viewer
     ori_tomo = viewer.layers[0].data
-    label_idx = LABEL_START + added_vesicle_num
+    data_max = viewer.layers[LABEL_LAYER_IDX].data.max()
+    label_idx = max(data_max, LABEL_START) + added_vesicle_num
     data_to_add, new_added_vesicle = add_vesicle(ori_tomo, point, label_idx, add_mode)
     return data_to_add.astype(np.int16), new_added_vesicle
 
@@ -312,10 +313,10 @@ def register_save_shortcut_add_2d(tomo_viewer):
 
 def register_save_shortcut_add_6pts(tomo_viewer):
     viewer = tomo_viewer.viewer
-    @viewer.bind_key('p', overwrite=True)
+    @viewer.bind_key('h', overwrite=True)
     def save_point_image(viewer):
         save_and_update_add_6pts_with_queue(tomo_viewer)
-    add_6pts_button = create_button(viewer, 'Add 6pts label (Shortcut: p)', 'polygon_lasso', 'yellow', 2)
+    add_6pts_button = create_button(viewer, 'Add 6pts label (Shortcut: h)', 'polygon_lasso', 'yellow', 2)
     add_6pts_button.clicked.connect(lambda: threading.Thread(target=save_and_update_add_6pts, args=(tomo_viewer,)).start())
 
 def create_button(viewer, label, icon_key, icon_color, position):

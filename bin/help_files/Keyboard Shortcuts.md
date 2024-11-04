@@ -10,7 +10,7 @@ This document lists the keyboard shortcuts available for adding and deleting lab
   - Use this shortcut to add a 3D label.
 - **Add 2D Label**: `f`
   - Use this shortcut to add a 2D label.
-- **Add 6pts Label**: `p`
+- **Add 6pts Label**: `h`
   - Use this shortcut to add a 6pts label.
 
 ### Delete Label
