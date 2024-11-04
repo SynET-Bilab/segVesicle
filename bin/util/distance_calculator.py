@@ -47,7 +47,7 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
         surface = Surface()
         surface.from_model_auto_segment(mod_path, objNum=2)
 
-        # 定义需要保留的属性，用于后续删除不需要的属性
+        # 定义2d囊泡需要保留的属性，用于后续删除不需要的属性
         attributes_to_keep = [
             '_vesicleId', '_type', '_center', '_radius', 
             '_center2D', '_radius2D', '_rotation2D'
@@ -81,15 +81,14 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             # 4. 提取并处理 evecs
             evecs = ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
             evecs_np = np.asarray(evecs, dtype=float)
-            # 转换每个 evec 从 zyx 到 xyz
-            evecs_xyz = evecs_np[:, [2, 1, 0]]   # 转换 zyx 到 xyz
-            evecs_xyz[:, 1] = -evecs_xyz[:, 1]                  # 翻转 y 轴
+            # 转换位置，从 [[x1, x2, x3], [y1, y2, y3], [z1, z2, z3]] 到 [[x1, y1, z1], [x2, y2, z2], [x3, y3, z3]]
+            evecs_xyz = evecs_np.T
             vesicle._evecs = evecs_xyz             # 设置方向向量
             
             # 5. 设置类型
             vesicle.setType('vesicle')
             
-            # 6. 计算并设置 2D 半径和旋转角度
+            # *6. 计算并设置 2D 半径和旋转角度
             _, radius2D, eigvecs = vesicle.ellipse_in_plane()
             radius2D_scaled = np.asarray(radius2D, dtype=float) * ratio
             vesicle.setRadius2D(radius2D_scaled)    # 设置 2D 半径
@@ -97,7 +96,7 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
             # vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0])
             
-            # 7. 检查是否为 2D 膜囊，并进行校正
+            # *7. 检查是否为 2D 膜囊，并进行校正
             # 通过检查第一个 evec 是否等于 [0.0, 0.0, 1.0] 来判断是否为 2D
             if hasattr(vesicle, '_evecs') and np.array_equal(vesicle._evecs[0], [0.0, 0.0, 1.0]):
                 print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
