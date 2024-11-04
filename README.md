@@ -37,3 +37,16 @@ export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_ISONET_FOLDER:$PYTHONPATH
 export PATH=PATH_TO_SEGVESICLE_FOLDER/bin:$PATH
 export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_SEGVESICLE_FOLDER:$PYTHONPATH
 ```
+
+5. Open GUI
+
+```bash
+cd PARENT_PATH_OF_TOMO/
+segvesicle.py
+```
+
+## Tutorial
+
+For for details, please refer to GUI
+
+![Tutorial](bin/help_files/img/tutorial.png)

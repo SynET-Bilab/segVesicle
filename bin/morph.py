@@ -150,8 +150,6 @@ def density_fit(data_iso,center,radius):
 
     center = np.round(center+padwidth).astype(np.int16)
     cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
-    with mrcfile.new('/share/data/CryoET_Data/lvzy/segVesicle_test/pp472/ves_seg/cube.mrc',overwrite=True) as m:
-        m.set_data(cube_.astype(np.float32))
     cube_ = ndimage.gaussian_filter(cube_,sigma=1)
     cube_reverse = -cube_.astype(np.float32)
     cube_normalize = (cube_reverse - np.min(cube_reverse))/(np.max(cube_reverse)-np.min(cube_reverse))
@@ -201,8 +199,6 @@ def density_fit(data_iso,center,radius):
     if(np.sum(labeled)/np.sum(open)<0.8):
         labeled = opened
     idx=get_indices_sparse(labeled)
-    with mrcfile.new('/share/data/CryoET_Data/lvzy/segVesicle_test/pp472/ves_seg/opened.mrc',overwrite=True) as m:
-        m.set_data(labeled.astype(np.float32))
     vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
     [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
     if np.min(center_cube) < 0: # if the shape of fitted ellipsoid is too strange

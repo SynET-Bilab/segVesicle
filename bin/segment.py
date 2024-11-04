@@ -10,8 +10,8 @@ from segVesicle.models import resunet3D as models
 def segment(path_weights,tomopath,patch_size=192):
     with mrcfile.open(tomopath) as m:
         dataArray=m.data
-    
-    pcrop = 48  # how many pixels to crop from border
+    pcrop = max((patch_size - dataArray.shape[0])//2 + 2 ,48)
+    # pcrop = 48  # how many pixels to crop from border
 
     P = patch_size
     Ncl=2
