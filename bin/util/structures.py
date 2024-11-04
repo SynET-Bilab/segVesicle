@@ -68,6 +68,51 @@ def write_model(model_file: str, model_df: pd.DataFrame):
         point_file = temp_file.name
         np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
 
+
+    points[:, 2] = np.round(points[:, 2]).astype(int)
+    
+    # Group points by z-value
+    z_groups = {}
+    for point in points:
+        z = point[2]
+        if z not in z_groups:
+            z_groups[z] = []
+        z_groups[z].append(point)
+    
+    # Prepare data for DataFrame
+    data = []
+    contour_count = 0
+    for z, group in z_groups.items():
+        if len(group) > 1:  # Check group size and limit contour count
+            for point in group:
+                # object_id, contour_id, x, y, z (1-based for object and contour)
+                data.append([object_id, contour_count + 1, point[0], point[1], point[2]])
+            contour_count += 1
+
+    # Create DataFrame and write to .mod file
+    df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
+    write_model(model_file, df)
+
+def write_model(model_file: str, model_df: pd.DataFrame):
+    """
+    Converts the point data to a .mod file format using the IMOD tool point2model.
+    
+    :param model_file: Path where the .mod file will be saved.
+    :param model_df: DataFrame containing the point data.
+    """
+    model = np.asarray(model_df)
+
+    # Ensure the directory exists
+    model_dir = os.path.dirname(model_file)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+
+    # Save points to a temporary file and convert to .mod
+    with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+        # Save point data to a temporary .pt file
+        point_file = temp_file.name
+        np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
+
         # Use point2model to convert the point file to a .mod file
         cmd = f"point2model -op {point_file} {model_file} >/dev/null"
         subprocess.run(cmd, shell=True, check=True)
@@ -108,7 +153,16 @@ class Vesicle:
                         float(positionElement.get('Z'))]
 
         classElement = vesicleElement.xpath('Class')[0]
-        self._radius = float(classElement.get('Name')) / pixelSize /2.0
+        
+        # ls: 解析 PitPoint 元素
+        pit_point_elements = vesicleElement.xpath('PitPoint')
+        if pit_point_elements:
+            pit_point_element = pit_point_elements[0]
+            self._pitPoint = [
+                float(pit_point_element.get('X')),
+                float(pit_point_element.get('Y')),
+                float(pit_point_element.get('Z'))
+            ]
 
 
     def fromXMLSynTomo(self, xmlObj, pixelSize):
@@ -125,7 +179,8 @@ class Vesicle:
                    "Center3D", 
                    "Distance", 
                    "ProjectionPoint", 
-                   "Type"]
+                   "Type",
+                   "PitPoint"]  # ls: 添加 PitPoint 到参数列表
         argStrList = ["Type"]
         
         for item in argList:
@@ -136,6 +191,12 @@ class Vesicle:
 
                 if item in argStrList:
                     setattr(self, f"_{item[0].lower()}{item[1:]}", its[0][1])
+                elif item == "PitPoint":  # ls: 处理 PitPoint
+                    setattr(self, f"_{item[0].lower()}{item[1:]}", [
+                        float(its[0][1]),
+                        float(its[1][1]),
+                        float(its[2][1])
+                    ])
                 else:
                     array = np.array([float(val[1]) for val in its], dtype=float)
                     if len(array) == 1:
@@ -149,6 +210,16 @@ class Vesicle:
                 evec_values = [float(evec.get(coord)) for coord in ["X", "Y", "Z"]]
                 evecs[idx, :] = evec_values
             self._evecs = evecs
+
+        # ls: 解析 PitPoint 在 SynTomo 格式中
+        pit_point_elements = vesicleElement.xpath('PitPoint')
+        if pit_point_elements:
+            pit_point = pit_point_elements[0]
+            self._pitPoint = [
+                float(pit_point.get('X')),
+                float(pit_point.get('Y')),
+                float(pit_point.get('Z'))
+            ]
 
 
     def toXML(self, pixelSize):
@@ -209,6 +280,12 @@ class Vesicle:
                                                 X = str(self._projectionPoint[0]),\
                                                 Y = str(self._projectionPoint[1]),\
                                                 Z = str(self._projectionPoint[2])))
+        # ls: 添加 PitPoint 元素
+        if hasattr(self, "_pitPoint"):
+            vesicleElement.append(etree.Element("PitPoint",\
+                                                X = str(self._pitPoint[0]),\
+                                                Y = str(self._pitPoint[1]),\
+                                                Z = str(self._pitPoint[2])))
 
         return vesicleElement
 
@@ -302,6 +379,7 @@ class Vesicle:
         points = np.vstack((x, y, z)).T + self._center2D
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
+        save_points_as_mod(points, object_id=1, model_file="/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/vesicle_analysis/sampled_points.mod")
         
         return points
     
@@ -329,9 +407,9 @@ class Vesicle:
         
         points *= self._radius3D
         points = points @ self._evecs.T + self._center3D
+
         points = points[:, [2,1,0]] #xyz
-        # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
-        
+        # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"        
         return points
     
     
@@ -353,7 +431,7 @@ class Vesicle:
         points = random_points * self._radius3D
         points = points @ self._evecs.T + self._center3D
         points = points[:, [2,1,0]] #xyz
-        
+
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         
         return points
@@ -396,9 +474,6 @@ class Vesicle:
     def setEvecs(self, evecs):
         self._evecs = evecs
     
-    # ls
-    def setRotation2D(self, rotation2D):
-        self._rotation2D = rotation2D
     
     def getEvecs(self):
         return self._evecs
@@ -411,6 +486,27 @@ class Vesicle:
 
     def getProjectionPoint(self):
         return self._projectionPoint
+
+    # ls
+    def setProjectionPoint(self, projectionPoint):
+        self._projectionPoint = projectionPoint
+
+    # ls
+    def setRotation2D(self, Rotation2D):
+        self._rotation2D = Rotation2D
+    
+    # ls
+    def getRotation2D(self):
+        return self._rotation2D
+    
+    # ls
+    def setPitPoint(self, pitPoint):
+        self._pitPoint = pitPoint
+        
+    # ls
+    def getPitPoint(self):
+        return self._pitPoint
+    
 
     def getDistance(self):
         return self._distance
@@ -532,6 +628,11 @@ class VesicleList:
 
 
     def toXMLFile(self, outputXMLFile):
+        # ls
+        output_dir = os.path.dirname(outputXMLFile)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
         xmlString = etree.tostring(self.toXML(), pretty_print = True).decode('utf-8')
         with open(outputXMLFile, 'w') as f:
             f.write(xmlString)
@@ -582,7 +683,7 @@ class VesicleList:
             tree = KDTree(sample_triangle_arr, leaf_size=2)
 
         # distance calculation
-        for i,vesicle in tqdm(enumerate(self._vesicleList)):
+        for i,vesicle in tqdm(enumerate(self._vesicleList), dynamic_ncols=True, mininterval=0.5):
             # for pits defined by three points, set distance to 0 and projection point is the center
             if vesicle.getType() == 'pit':
                 vesicle._distance = 0.
@@ -601,10 +702,10 @@ class VesicleList:
                 modtxtFile.append(np.concatenate((np.array([1, i+1]), nearest_point)))
                 modtxtFile.append(np.concatenate((np.array([1, i+1]), PP0)))
         
-        modtxtFile = np.asarray(modtxtFile)
-        np.savetxt('nearest_point.txt', np.reshape(modtxtFile, (-1, 5)), fmt='%d')
-        cmd = 'point2model -sp 10 nearest_point.txt nearest_point.mod'
-        os.system(cmd)
+        # ls
+        # np.savetxt('nearest_point.txt', np.reshape(modtxtFile, (-1, 5)), fmt='%d')
+        # cmd = 'point2model -sp 10 nearest_point.txt nearest_point.mod'
+        # os.system(cmd)
         # return self._distance, self._projectionPoint
 
 
