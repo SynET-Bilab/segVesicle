@@ -67,7 +67,8 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             radii = ves_data.get('radii', [0])
             radii_np = np.asarray(radii, dtype=float)  # 转换为 numpy 数组
             radii_scaled = radii_np * ratio
-            radii_xyz = radii_scaled[[2, 1, 0]]  # 转换 zyx 到 xyz
+            # radii_xyz = radii_scaled[[2, 1, 0]]  # 转换 zyx 到 xyz
+            radii_xyz = radii_scaled
             vesicle.setRadius(np.mean(radii_xyz))       # 设置平均半径
             vesicle.setRadius3D(radii_xyz)              # 设置 3D 半径
             
@@ -75,13 +76,15 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             center = ves_data.get('center', [0, 0, 0])
             center_np = np.asarray(center, dtype=float)
             center_scaled = center_np * ratio
-            center_xyz = center_scaled[[2, 1, 0]]  # 转换 zyx 到 xyz
+            # center_xyz = center_scaled[[2, 1, 0]]  # 转换 zyx 到 xyz
+            center_xyz = center_scaled
             vesicle.setCenter(center_xyz)          # 设置中心点
             
             # 4. 提取并处理 evecs
             evecs = ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
             evecs_np = np.asarray(evecs, dtype=float)
-            # 转换位置，从 [[x1, x2, x3], [y1, y2, y3], [z1, z2, z3]] 到 [[x1, y1, z1], [x2, y2, z2], [x3, y3, z3]]
+            # evecs_np = evecs_np[::-1,:]
+            # 转换位置，从 [[z1, z2, z3], [y1, y2, y3], [x1, x2, x3]] 到 [[z1, y1, x1], [z2, y2, x2], [z3, y3, x3]]
             evecs_xyz = evecs_np.T
             vesicle._evecs = evecs_xyz             # 设置方向向量
             
