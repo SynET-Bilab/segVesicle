@@ -370,7 +370,8 @@ class Vesicle:
         
         # phi = np.float64(self._rotation2D) + np.pi/2
         # ls
-        phi = np.float64(self._rotation2D) 
+        phi = np.float64(self._rotation2D)
+         
         a = np.float64(self._radius2D[0])
         b = np.float64(self._radius2D[1])
         
