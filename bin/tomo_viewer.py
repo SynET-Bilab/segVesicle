@@ -32,6 +32,7 @@ from window.correction_window import CorrectionWindow
 from window.memb_segmentation_window import MembSegmentationWindow
 from window.distance_filter_window import DistanceFilterWindow
 from window.annotate_vesicle_class import VesicleAnnotationWindow
+from window.fix_false_negative_vesicle import FixFNWindow
 from window.xml_exporter_dialog import export_final_xml
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
@@ -82,6 +83,7 @@ class TomoViewer:
         self.register_manualy_draw_memb()
         # self.register_analyze_by_volume()
         # self.register_show_single_vesicle()
+        self.register_fix_fn_vesicle()
         
         try:
             self.toolbar_widget.finish_isonet_button.clicked.disconnect()
@@ -780,6 +782,53 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.annotate_vesicle_type_button.clicked.connect(annotate_vesicle)
+        
+    def register_fix_fn_vesicle(self):
+        
+        def fix_fn_vesicle():
+            
+            def verify_files_exist():
+                # Check if the required XML paths exist
+                class_xml_path = self.tomo_path_and_stage.class_xml_path
+                ori_filter_xml_path = self.tomo_path_and_stage.ori_filter_xml_path
+                filter_xml_path = self.tomo_path_and_stage.filter_xml_path
+                return all(os.path.exists(path) for path in [class_xml_path, ori_filter_xml_path, filter_xml_path])
+                # Perform checks before creating FixFNWindow
+                
+            def filter_vesicle_ids(self):
+                # Load ori_filter_xml and filter_xml files
+                ori_tree = ET.parse(self.ori_filter_xml_path)
+                ori_root = ori_tree.getroot()
+                filter_tree = ET.parse(self.filter_xml_path)
+                filter_root = filter_tree.getroot()
+
+                # Find vesicle IDs that are Type='vesicle' in ori_filter_xml and Type='other' in filter_xml
+                ori_vesicles = {vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
+                                for vesicle in ori_root.findall('Vesicle') if vesicle.find('Type')}
+                filter_vesicles = {vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
+                                for vesicle in filter_root.findall('Vesicle') if vesicle.find('Type')}
+
+                # Identify IDs to be annotated
+                vesicle_ids = [vesicle_id for vesicle_id, v_type in ori_vesicles.items()
+                            if v_type == 'vesicle' and filter_vesicles.get(vesicle_id) == 'other']
+                return vesicle_ids
+                
+            if not verify_files_exist():
+                QMessageBox.information(None, "Notice", "No need to modify categories.")
+                return
+            
+            vesicle_ids = filter_vesicle_ids()
+            if not vesicle_ids:
+                QMessageBox.information(None, "Notice", "No need to modify categories.")
+                return
+            window = FixFNWindow(self)
+            window.show()
+
+        try:
+            self.toolbar_widget.fix_fn_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.fix_fn_button.clicked.connect(fix_fn_vesicle)
         
     def register_multi_class_visualize(self):
         def multi_class_visualize():
