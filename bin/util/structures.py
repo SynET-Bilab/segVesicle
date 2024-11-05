@@ -368,7 +368,9 @@ class Vesicle:
         """
         -> fix bugs on 230604 by Lu Zhenhang, the self._rotation2D starts from -pi/2, and it belongs to the first axis, not the major axis"""
         
-        phi = np.float64(self._rotation2D) + np.pi/2
+        # phi = np.float64(self._rotation2D) + np.pi/2
+        # ls
+        phi = np.float64(self._rotation2D) 
         a = np.float64(self._radius2D[0])
         b = np.float64(self._radius2D[1])
         
@@ -376,7 +378,10 @@ class Vesicle:
         x = a * np.cos(np.linspace(0, 2 * np.pi, precision)) * np.cos(phi) - b * np.sin(np.linspace(0, 2 * np.pi, precision)) * np.sin(phi)
         y = a * np.cos(np.linspace(0, 2 * np.pi, precision)) * np.sin(phi) + b * np.sin(np.linspace(0, 2 * np.pi, precision)) * np.cos(phi)
         z = np.ones(precision)
-        points = np.vstack((x, y, z)).T + self._center2D
+        
+        # ls
+        points = np.vstack((z, y, x)).T + self._center2D
+        points = points[:, [2,1,0]] #xyz
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         save_points_as_mod(points, object_id=1, model_file="/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/vesicle_analysis/sampled_points.mod")

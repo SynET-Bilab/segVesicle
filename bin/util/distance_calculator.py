@@ -101,37 +101,22 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             
             # *7. 检查是否为 2D 膜囊，并进行校正
             # 通过检查第一个 evec 是否等于 [0.0, 0.0, 1.0] 来判断是否为 2D
-            if hasattr(vesicle, '_evecs') and np.array_equal(vesicle._evecs[0], [0.0, 0.0, 1.0]):
+            if hasattr(vesicle, '_evecs') and np.array_equal(vesicle._evecs[0], [1.0, 0.0, 0.0]):
                 print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
                 
                 # 7.1 使用 Radius3D 的 r1 和 r2 更新 Radius2D
                 if hasattr(vesicle, '_radius3D') and len(vesicle.getRadius3D()) >= 2:
-                    r1, r2 = vesicle.getRadius3D()[0], vesicle.getRadius3D()[1]
+                    r1, r2 = vesicle.getRadius3D()[1], vesicle.getRadius3D()[2]
                     vesicle.setRadius2D([r1, r2])
                     print(f"Updated Radius2D to r1: {r1}, r2: {r2}")
                 else:
                     print(f"Warning: Vesicle ID {vesicle.getId()} lacks valid Radius3D data. Skipping Radius2D update.")
                     continue  # 如果 Radius3D 无效，跳过后续步骤
                 
-                # 7.2 修改 Evecs
-                if hasattr(vesicle, '_evecs') and vesicle._evecs.shape == (3, 3):
-                    evecs = vesicle._evecs.copy()
-                    original_evec = evecs[1].copy()
-                    # 修改第二个 evec
-                    evecs[1, 0] = evecs[1, 1]  # X = Y
-                    evecs[1, 1] = evecs[1, 2]  # Y = Z
-                    evecs[1, 2] = 0.0           # Z = 0
-                    vesicle.setEvecs(evecs)
-                    print(f"Modified Evecs for vesicle ID {vesicle.getId()}:")
-                    print(f"Original Evecs[1]: {original_evec}")
-                    print(f"New Evecs[1]: {evecs[1]}")
-                else:
-                    print(f"Warning: Vesicle ID {vesicle.getId()} lacks valid Evecs data. Skipping Evecs modification.")
-                    continue  # 如果 Evecs 无效，跳过后续步骤
                 
                 # 7.3 计算 Rotation2D
-                X, Y = vesicle._evecs[1, 0], vesicle._evecs[1, 1]
-                phi = np.arctan2(X, Y)
+                X, Y = vesicle._evecs[2, 1], vesicle._evecs[1, 1]
+                phi = np.arctan2(Y, X)
                 vesicle.setRotation2D(phi)
                 print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
                 
