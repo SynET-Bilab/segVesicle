@@ -63,45 +63,29 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             vesicle_id = int(match.group()) if match else i  # 如果未找到数字，则使用索引作为 ID
             vesicle.setId(vesicle_id)  # 设置 Vesicle ID
             
-            # 2. 提取并处理 radii
-            radii = ves_data.get('radii', [0])
-            radii_np = np.asarray(radii, dtype=float)  # 转换为 numpy 数组
-            radii_scaled = radii_np * ratio
-            # radii_xyz = radii_scaled[[2, 1, 0]]  # 转换 zyx 到 xyz
-            radii_xyz = radii_scaled
-            vesicle.setRadius(np.mean(radii_xyz))       # 设置平均半径
-            vesicle.setRadius3D(radii_xyz)              # 设置 3D 半径
+            # 2. 设置缩放后的半径
+            radii = np.asarray(ves_data.get('radii', [0]), dtype=float) * ratio
+            vesicle.setRadius(np.mean(radii))       # 设置平均半径
+            vesicle.setRadius3D(radii)              # 设置 3D 半径
             
-            # 3. 提取并处理 center
-            center = ves_data.get('center', [0, 0, 0])
-            center_np = np.asarray(center, dtype=float)
-            center_scaled = center_np * ratio
-            # center_xyz = center_scaled[[2, 1, 0]]  # 转换 zyx 到 xyz
-            center_xyz = center_scaled
-            vesicle.setCenter(center_xyz)          # 设置中心点
+            # 3. 设置缩放后的中心点
+            center = np.asarray(ves_data.get('center', [0, 0, 0]), dtype=float) * ratio
+            vesicle.setCenter(center)       # 设置中心点
             
-            # 4. 提取并处理 evecs
-            evecs = ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-            evecs_np = np.asarray(evecs, dtype=float)
-            # evecs_np = evecs_np[::-1,:]
-            # 转换位置，从 [[z1, z2, z3], [y1, y2, y3], [x1, x2, x3]] 到 [[z1, y1, x1], [z2, y2, x2], [z3, y3, x3]]
-            evecs_xyz = evecs_np.T
-            vesicle._evecs = evecs_xyz             # 设置方向向量
+            # 4. 设置方向向量(已转置)
+            evecs = np.asarray(ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]]), dtype=float).T
+            vesicle._evecs = evecs  # 设置方向向量
             
             # 5. 设置类型
             vesicle.setType('vesicle')
             
-            # *6. 计算并设置 2D 半径和旋转角度
+            # * 6. 计算并设置 2D 半径和旋转角度
             _, radius2D, eigvecs = vesicle.ellipse_in_plane()
-            radius2D_scaled = np.asarray(radius2D, dtype=float) * ratio
-            vesicle.setRadius2D(radius2D_scaled)    # 设置 2D 半径
-            # 计算旋转角度
+            vesicle.setRadius2D(np.asarray(radius2D, dtype=float) * ratio)
             vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
-            # vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0])
             
-            # *7. 检查是否为 2D 膜囊，并进行校正
-            # 通过检查第一个 evec 是否等于 [0.0, 0.0, 1.0] 来判断是否为 2D
-            if hasattr(vesicle, '_evecs') and np.array_equal(vesicle._evecs[0], [1.0, 0.0, 0.0]):
+            # 7. 若为 2D 膜囊泡，进行校正
+            if np.array_equal(vesicle._evecs[0], [1.0, 0.0, 0.0]):
                 print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
                 
                 # 7.1 使用 Radius3D 的 r1 和 r2 更新 Radius2D
@@ -120,7 +104,7 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
                 vesicle.setRotation2D(phi)
                 print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
                 
-                # 7.4 移除不需要的属性
+                # 7.4 移除2d囊泡不需要的属性
                 current_attrs = list(vars(vesicle).keys())
                 for attr in current_attrs:
                     if attr not in attributes_to_keep:

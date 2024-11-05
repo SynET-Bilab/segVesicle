@@ -384,7 +384,7 @@ class Vesicle:
         points = points[:, [2,1,0]] #xyz
         
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
-        save_points_as_mod(points, object_id=1, model_file="/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/vesicle_analysis/sampled_points.mod")
+        # save_points_as_mod(points, object_id=1, model_file="/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/vesicle_analysis/sampled_points.mod")
         
         return points
     
