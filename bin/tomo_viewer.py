@@ -73,6 +73,7 @@ class TomoViewer:
         self.register_open_ori_tomo()
         self.register_draw_area_mod()
         self.register_export_xlsx()
+        self.register_finetune_model()
         self.register_manualy_correction()
         self.register_distance_calc()
         self.register_filter_vesicle()
@@ -712,6 +713,175 @@ class TomoViewer:
             pass
         self.toolbar_widget.manualy_draw_button.clicked.connect(manualy_draw_memb)
         
+    def register_finetune_model(self):
+        def finetune_model():
+            from skimage.measure import regionprops, label
+            try:
+                if os.path.exists(self.tomo_path_and_stage.new_label_file_path):
+                    os.system('cp {} {}'.format(self.tomo_path_and_stage.new_label_file_path, self.tomo_path_and_stage.label_path))
+
+                if os.path.exists(self.tomo_path_and_stage.new_json_file_path):
+                    os.system('cp {} {}'.format(self.tomo_path_and_stage.new_json_file_path, self.tomo_path_and_stage.json_file_path))
+                    
+                # 1. 获取当前工作目录
+                current_path = self.tomo_path_and_stage.current_path
+                print(f"当前工作目录: {current_path}")
+
+                # 1.2 读取 segVesicle_QCheckBox_state.json 文件
+                json_path = os.path.join(current_path, "segVesicle_QCheckBox_state.json")
+                if not os.path.exists(json_path):
+                    print(f"配置文件不存在: {json_path}")
+                    return
+                
+                with open(json_path, 'r') as f:
+                    seg_vesicle_state = json.load(f)
+                print(f"读取到的配置: {seg_vesicle_state}")
+
+                # 1.3 获取所有为 true 的 tomo_name 并设置 base_tomo_name
+                active_tomos = [tomo_name for tomo_name, state in seg_vesicle_state.items() if state]
+                if not active_tomos:
+                    print("没有需要处理的 tomo。")
+                    return
+
+                print(f"需要处理的 tomo 列表: {active_tomos}")
+
+                processed_tomos = []
+                base_tomo_names = []
+
+                for tomo_name in active_tomos:
+                    if '-1' in tomo_name:
+                        base_tomo_name = tomo_name.split('-1')[0]
+                    else:
+                        base_tomo_name = tomo_name
+                    base_tomo_names.append(base_tomo_name)
+                    processed_tomos.append((tomo_name, base_tomo_name))
+                
+                # 1.4 获取每个 tomo 的三个关键路径
+                tomo_paths = []
+                for tomo_name, base_tomo_name in processed_tomos:
+                    deconv_tomo_path = os.path.join(current_path, tomo_name, 'ves_seg', 'tomo_deconv', f"{base_tomo_name}_wbp_resample.mrc")
+                    isonet_tomo_path = os.path.join(current_path, tomo_name, 'ves_seg', f"{base_tomo_name}_wbp_corrected.mrc")
+                    label_path = os.path.join(current_path, tomo_name, 'ves_seg', f"{base_tomo_name}_label_vesicle.mrc")
+                    
+                    # 检查文件是否存在
+                    if not all(os.path.exists(p) for p in [deconv_tomo_path, isonet_tomo_path, label_path]):
+                        print(f"部分关键文件不存在，跳过 tomo: {tomo_name}")
+                        continue
+                    
+                    tomo_paths.append({
+                        'tomo_name': tomo_name,
+                        'base_tomo_name': base_tomo_name,
+                        'deconv_tomo_path': deconv_tomo_path,
+                        'isonet_tomo_path': isonet_tomo_path,
+                        'label_path': label_path
+                    })
+                
+                if not tomo_paths:
+                    print("没有有效的 tomo 需要处理。")
+                    return
+
+                # 2. 创建 subtomo 文件夹及其子文件夹
+                subtomo_dir = os.path.join(current_path, 'subtomo')
+                iso_dir = os.path.join(subtomo_dir, 'iso')
+                dec_dir = os.path.join(subtomo_dir, 'dec')
+                label_dir = os.path.join(subtomo_dir, 'label')
+
+                os.makedirs(iso_dir, exist_ok=True)
+                os.makedirs(dec_dir, exist_ok=True)
+                os.makedirs(label_dir, exist_ok=True)
+
+                print(f"创建切片保存目录: {subtomo_dir}")
+
+                image_list = []
+                label_list = []
+                slice_counter = 0
+
+                # 2.1 对每个 tomo 的三个关键文件进行切片处理
+                for tomo in tomo_paths:
+                    print(f"处理 tomo: {tomo['tomo_name']}")
+                    
+                    # 读取 deconv 文件并转换为 int8
+                    with mrcfile.open(tomo['deconv_tomo_path']) as f:
+                        dec_data = f.data
+                    dec_data = np.pad(dec_data, 40, 'constant', constant_values=np.mean(dec_data)).astype(np.int8)
+
+                    # 读取 isonet 文件并转换为 int8
+                    with mrcfile.open(tomo['isonet_tomo_path']) as f:
+                        iso_data = f.data
+                    iso_data = np.pad(iso_data, 40, 'constant', constant_values=np.mean(iso_data)).astype(np.int8)
+
+                    # 读取 label 文件并转换为 int16
+                    with mrcfile.open(tomo['label_path']) as f:
+                        label_data = f.data
+                    label_data = np.pad(label_data, 40, 'constant', constant_values=0).astype(np.int16)
+
+                    # 计算连通体
+                    labeled = label(label_data)
+                    regions = regionprops(labeled)
+                    print(f"找到 {len(regions)} 个连通体。")
+
+                    for region in regions:
+                        center = np.round(region.centroid).astype(np.int16)
+                        x, y, z = center
+
+                        # 确保切片不会超出数据边界
+                        sbtm_iso = iso_data[x-32:x+32, y-32:y+32, z-32:z+32]
+                        sbtm_dec = dec_data[x-32:x+32, y-32:y+32, z-32:z+32]
+                        sblbl = label_data[x-32:x+32, y-32:y+32, z-32:z+32]
+                        sblbl = np.sign(sblbl).astype(np.int8)
+
+                        # 切片命名
+                        slice_name = f"vesicle_{str(slice_counter).zfill(8)}"
+                        
+                        # 保存 iso 切片
+                        iso_slice_path = os.path.join(iso_dir, f"{slice_name}.mrc")
+                        with mrcfile.new(iso_slice_path, overwrite=True) as m:
+                            m.set_data(sbtm_iso)
+                        image_list.append(os.path.basename(iso_slice_path))
+
+                        # 保存 dec 切片
+                        dec_slice_path = os.path.join(dec_dir, f"{slice_name}.mrc")
+                        with mrcfile.new(dec_slice_path, overwrite=True) as m:
+                            m.set_data(sbtm_dec)
+
+                        # 保存 label 切片
+                        label_slice_path = os.path.join(label_dir, f"{slice_name}_label.mrc")
+                        with mrcfile.new(label_slice_path, overwrite=True) as m:
+                            m.set_data(sblbl)
+                        label_list.append(os.path.basename(label_slice_path))
+
+                        slice_counter += 1
+
+                print(f"总共切片数量: {slice_counter}")
+
+                # 2.3 保存名称列表
+                image_txt_path = os.path.join(subtomo_dir, 'image.txt')
+                label_txt_path = os.path.join(subtomo_dir, 'label.txt')
+
+                with open(image_txt_path, 'w') as f:
+                    for img in image_list:
+                        f.write(f"{img}\n")
+                print(f"保存 image.txt 到: {image_txt_path}")
+
+                with open(label_txt_path, 'w') as f:
+                    for lbl in label_list:
+                        f.write(f"{lbl}\n")
+                print(f"保存 label.txt 到: {label_txt_path}")
+
+                # 3. 训练函数待实现
+                # 在此处添加训练模型的代码
+
+                print("finetune_model 函数执行完毕。")
+            
+            except Exception as e:
+                print(f"执行 finetune_model 时发生错误: {e}")
+        
+        try:
+            self.toolbar_widget.finetune_model_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.finetune_model_button.clicked.connect(finetune_model)
+        
     def register_manualy_correction(self):
         
         def init_lable_file():
@@ -795,11 +965,11 @@ class TomoViewer:
                 return all(os.path.exists(path) for path in [class_xml_path, ori_filter_xml_path, filter_xml_path])
                 # Perform checks before creating FixFNWindow
                 
-            def filter_vesicle_ids(self):
+            def filter_vesicle_ids():
                 # Load ori_filter_xml and filter_xml files
-                ori_tree = ET.parse(self.ori_filter_xml_path)
+                ori_tree = ET.parse(self.tomo_path_and_stage.ori_filter_xml_path)
                 ori_root = ori_tree.getroot()
-                filter_tree = ET.parse(self.filter_xml_path)
+                filter_tree = ET.parse(self.tomo_path_and_stage.filter_xml_path)
                 filter_root = filter_tree.getroot()
 
                 # Find vesicle IDs that are Type='vesicle' in ori_filter_xml and Type='other' in filter_xml
