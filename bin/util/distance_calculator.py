@@ -100,7 +100,7 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
                 
                 # 7.3 计算 Rotation2D
                 X, Y = vesicle._evecs[2, 1], vesicle._evecs[1, 1]
-                phi = np.arctan2(Y, X)
+                phi = np.arctan2(Y, X) - np.pi / 2
                 vesicle.setRotation2D(phi)
                 print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
                 
