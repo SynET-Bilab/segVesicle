@@ -249,10 +249,7 @@ class Vesicle:
         """
         -> fix bugs on 230604 by Lu Zhenhang, the self._rotation2D starts from -pi/2, and it belongs to the first axis, not the major axis"""
         
-        # phi = np.float64(self._rotation2D) + np.pi/2
-        # ls
-        phi = np.float64(self._rotation2D)
-         
+        phi = np.float64(self._rotation2D) + np.pi/2
         a = np.float64(self._radius2D[0])
         b = np.float64(self._radius2D[1])
         
@@ -261,7 +258,7 @@ class Vesicle:
         y = a * np.cos(np.linspace(0, 2 * np.pi, precision)) * np.sin(phi) + b * np.sin(np.linspace(0, 2 * np.pi, precision)) * np.cos(phi)
         z = np.ones(precision)
         
-        # ls
+        # ls TODO: in xml file, center, radii, evecs should to xyz format (at least center should)
         points = np.vstack((z, y, x)).T + self._center2D
         points = points[:, [2, 1, 0]]  # zyx to xyz
         
@@ -288,19 +285,19 @@ class Vesicle:
         x = np.sin(phi) * np.cos(theta)
         y = np.sin(phi) * np.sin(theta)
         z = np.cos(phi)
-        points = np.stack([x, y, z], axis=-1)  # (num_phi, num_theta, 3)
+        points = np.stack([x, y, z], axis=-1)  # (precision, 3), points is an isotropic sphere
         
         points *= self._radius3D
         points = points @ self._evecs.T + self._center3D
 
-        points = points[:, [2,1,0]] #xyz
+        points = points[:, [2, 1, 0]]  # zyx to xyz
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"        
         return points
     
     
     def sample_on_vesicle_3d(self, precision : int) -> np.ndarray:
         '''
-        to get random points on the surface of a 3D ellipsoid
+        to get random points on the surface of a 3D ellipsoid. For distance calculating, waste of points num.
         
         C: center of ellipsoid: (3, )
         R: radii of ellipsoid: (3, )
@@ -315,10 +312,9 @@ class Vesicle:
         
         points = random_points * self._radius3D
         points = points @ self._evecs.T + self._center3D
-        points = points[:, [2,1,0]] #xyz
+        points = points[:, [2, 1, 0]]  # zyx to xyz
 
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
-        
         return points
     
     
@@ -359,7 +355,6 @@ class Vesicle:
     def setEvecs(self, evecs):
         self._evecs = evecs
     
-    
     def getEvecs(self):
         return self._evecs
 
@@ -372,27 +367,21 @@ class Vesicle:
     def getProjectionPoint(self):
         return self._projectionPoint
 
-    # ls
     def setProjectionPoint(self, projectionPoint):
         self._projectionPoint = projectionPoint
 
-    # ls
     def setRotation2D(self, Rotation2D):
         self._rotation2D = Rotation2D
-    
-    # ls
+
     def getRotation2D(self):
         return self._rotation2D
-    
-    # ls
+
     def setPitPoint(self, pitPoint):
         self._pitPoint = pitPoint
-        
-    # ls
+
     def getPitPoint(self):
         return self._pitPoint
     
-
     def getDistance(self):
         return self._distance
 
@@ -587,7 +576,11 @@ class VesicleList:
                 modtxtFile.append(np.concatenate((np.array([1, i+1]), nearest_point)))
                 modtxtFile.append(np.concatenate((np.array([1, i+1]), PP0)))
         
-        # ls
+        '''
+        nearest_point.mod contains n contours, where n equals to the number of vesicles.
+        Each contour contains 2 points on the vesicle and the membrane, respectively.
+        Just to check the correctness of the distance calculation.
+        '''
         # np.savetxt('nearest_point.txt', np.reshape(modtxtFile, (-1, 5)), fmt='%d')
         # cmd = 'point2model -sp 10 nearest_point.txt nearest_point.mod'
         # os.system(cmd)
@@ -645,7 +638,7 @@ class Triangle:
         return (self.p1+self.p2+self.p3)/3.0
 
 
-    def point_triangle_distance(self, p, standard = False):
+    def point_triangle_distance(self, p):
         """calculate distance from a point to the triangle.
         @param p: a list of 3 floats
         @param standard: use the standard way to measure distance.
@@ -653,26 +646,7 @@ class Triangle:
         if not, requires the triangle be sampled by self.sampling_triangle()
         @return distance, nearest point:
         """
-        if standard:
-            return self.point_triangle_distance_standard(p)
-        else:
-            return self.point_triangle_distance_using_sample_points(p)
-
-
-    def point_triangle_distance_standard(self, p):
-        """calculate distance from a point to the triangle.
-
-        """
-        import numpy as np
-        p = np.array(p, dtype = np.float)
-        from scipy.io import savemat
-        savemat('values.mat', {'triangle':[self.p1,self.p2,self.p3],'p':p})
-        from subprocess import check_output
-        s = "matlab -nodisplay  -r \"load('values.mat');[dis, PP0]=pointTriangleDistance(triangle,p);disp(num2str(dis));disp(num2str(PP0)); quit;\" | sed -n '11,12p'"
-        distance =  check_output(s, shell=True)
-        distance = distance.split()
-        distance = list(map(float,distance))
-        return distance[0], distance[1:4]
+        return self.point_triangle_distance_using_sample_points(p)
 
 
     def point_triangle_distance_using_sample_points(self, p):
@@ -700,6 +674,7 @@ class Triangle:
         It is better self.p1 is the cross over point of  longest and middle edge of the triangle
         @param samplingStep: distance between points
         @return: a list of points
+        @Auther: Liu Yuntao
         """
         import numpy as np
         a = self.p2 - self.p1
@@ -752,7 +727,7 @@ class Triangle:
     
     def to_points(self) -> np.ndarray:
         '''
-        output: a np.ndarray with shape (3, 3)
+        output: vertices of the triangle, shape in (3, 3)
         '''
         return np.array([self.p1, self.p2, self.p3])
 
