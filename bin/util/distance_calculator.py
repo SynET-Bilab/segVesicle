@@ -1,9 +1,12 @@
 import os
 import re
 import json
-from tqdm import tqdm  # 用于显示进度条
 import numpy as np
-from util.structures import VesicleList, Surface  # Assuming these modules are available
+
+from tqdm import tqdm
+from util.structures import VesicleList, Surface
+
+
 
 def distance_calc(json_path, mod_path, xml_output_path, print_func):
     try:
@@ -11,22 +14,18 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
         resampled_pix_size = 1.714
         ratio = resampled_pix_size / ori_pix_size
 
-        # Check if json_path and mod_path exist
         if not os.path.exists(json_path):
             print_func(f"JSON file path does not exist: {json_path}")
             return
-        
         if not os.path.exists(mod_path):
             print_func(f"Mod file path does not exist: {mod_path}")
             return
 
-        # Read JSON file
         with open(json_path, 'r') as f:
             data = json.load(f)
 
         vesicles = data.get('vesicles', [])
         if not vesicles:
-            # Log the error if 'vesicles' data is missing in the JSON
             print_func("No 'vesicles' data found in the JSON file.")
             return
 
@@ -35,15 +34,10 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             center = ratio * np.asarray(vesicle.get('center', [0, 0, 0]))
             center_list.append(center)
         center_list = np.asarray(center_list)
-        
-        # Convert zyx to xyz
-        center_list = center_list[:, [2, 1, 0]]
+        center_list = center_list[:, [2, 1, 0]]  # zyx to xyz
 
-        # Initialize VesicleList
         vl = VesicleList(ori_pix_size)
         vl.fromCenterList(center_list)
-
-        # Initialize Surface and read the .mod file
         surface = Surface()
         surface.from_model_auto_segment(mod_path, objNum=2)
 
@@ -53,7 +47,6 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             '_center2D', '_radius2D', '_rotation2D'
         ]
 
-        # 主循环，使用 tqdm 显示进度
         for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
             ves_data = vesicles[i]
             
@@ -61,25 +54,25 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             name = ves_data.get('name', f'vesicle_{i}')  # 默认名称为 'vesicle_i'，避免重复默认 'vesicle_0'
             match = re.search(r'\d+', name)
             vesicle_id = int(match.group()) if match else i  # 如果未找到数字，则使用索引作为 ID
-            vesicle.setId(vesicle_id)  # 设置 Vesicle ID
+            vesicle.setId(vesicle_id)
             
             # 2. 设置缩放后的半径
             radii = np.asarray(ves_data.get('radii', [0]), dtype=float) * ratio
-            vesicle.setRadius(np.mean(radii))       # 设置平均半径
-            vesicle.setRadius3D(radii)              # 设置 3D 半径
+            vesicle.setRadius(np.mean(radii))
+            vesicle.setRadius3D(radii)
             
             # 3. 设置缩放后的中心点
             center = np.asarray(ves_data.get('center', [0, 0, 0]), dtype=float) * ratio
-            vesicle.setCenter(center)       # 设置中心点
+            vesicle.setCenter(center)
             
             # 4. 设置方向向量(已转置)
             evecs = np.asarray(ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]]), dtype=float).T
-            vesicle._evecs = evecs  # 设置方向向量
+            vesicle._evecs = evecs
             
             # 5. 设置类型
             vesicle.setType('vesicle')
             
-            # * 6. 计算并设置 2D 半径和旋转角度
+            # * 6. for 2D section parralleled to xy plane of 3D vesicle
             _, radius2D, eigvecs = vesicle.ellipse_in_plane()
             vesicle.setRadius2D(np.asarray(radius2D, dtype=float) * ratio)
             vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
@@ -100,7 +93,7 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
                 
                 # 7.3 计算 Rotation2D
                 X, Y = vesicle._evecs[2, 1], vesicle._evecs[1, 1]
-                phi = np.arctan2(Y, X) - np.pi / 2
+                phi = np.arctan2(Y, X) - np.pi / 2  # to same definition of phi: vesicle._rotation2D
                 vesicle.setRotation2D(phi)
                 print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
                 
@@ -113,13 +106,9 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
 
         # Calculate the distance to the surface
         vl.distance_to_surface(surface, 3600, 'dense')
-
-        # Output the XML file
+        
         vl.toXMLFile(xml_output_path)
-
-        # Notify user of success
         print_func(f"XML file successfully generated at: {xml_output_path}")
 
     except Exception as e:
-        # Handle exceptions and notify user of error
         print_func(f"Distance calculation failed: {str(e)}")
