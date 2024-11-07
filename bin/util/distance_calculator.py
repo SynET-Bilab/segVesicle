@@ -57,16 +57,17 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             vesicle.setId(vesicle_id)
             
             # 2. 设置缩放后的半径
-            radii = np.asarray(ves_data.get('radii', [0]), dtype=float) * ratio
+            radii = np.asarray(ves_data.get('radii', [0]), dtype=float)[::-1] * ratio
             vesicle.setRadius(np.mean(radii))
             vesicle.setRadius3D(radii)
             
             # 3. 设置缩放后的中心点
-            center = np.asarray(ves_data.get('center', [0, 0, 0]), dtype=float) * ratio
+            center = np.asarray(ves_data.get('center', [0, 0, 0]), dtype=float)[[2, 1, 0]] * ratio
             vesicle.setCenter(center)
             
             # 4. 设置方向向量(已转置)
             evecs = np.asarray(ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]]), dtype=float).T
+            evecs = evecs[:, [2, 1, 0]]
             vesicle._evecs = evecs
             
             # 5. 设置类型
@@ -78,12 +79,12 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
             
             # 7. 若为 2D 膜囊泡，进行校正
-            if np.array_equal(vesicle._evecs[0], [1.0, 0.0, 0.0]):
+            if np.array_equal(vesicle._evecs[0], [0.0, 0.0, 1.0]):
                 print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
                 
                 # 7.1 使用 Radius3D 的 r1 和 r2 更新 Radius2D
                 if hasattr(vesicle, '_radius3D') and len(vesicle.getRadius3D()) >= 2:
-                    r1, r2 = vesicle.getRadius3D()[1], vesicle.getRadius3D()[2]
+                    r1, r2 = vesicle.getRadius3D()[1], vesicle.getRadius3D()[0]
                     vesicle.setRadius2D([r1, r2])
                     print(f"Updated Radius2D to r1: {r1}, r2: {r2}")
                 else:

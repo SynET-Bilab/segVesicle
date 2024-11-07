@@ -259,9 +259,9 @@ class Vesicle:
         z = np.ones(precision)
         
         # ls TODO: in xml file, center, radii, evecs should to xyz format (at least center should)
-        points = np.vstack((z, y, x)).T + self._center2D
-        points = points[:, [2, 1, 0]]  # zyx to xyz
-        
+        points = np.vstack((x, y, z)).T + self._center2D
+        # points = points[:, [2, 1, 0]]  # ls: dont need to change zyx to xyz 
+
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         return points
     
@@ -290,7 +290,7 @@ class Vesicle:
         points *= self._radius3D
         points = points @ self._evecs.T + self._center3D
 
-        points = points[:, [2, 1, 0]]  # zyx to xyz
+        # points = points[:, [2, 1, 0]]  # ls: dont need to change zyx to xyz 
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"        
         return points
     
