@@ -5,6 +5,7 @@ import re
 import numpy as np
 import xml.etree.ElementTree as ET
 import mrcfile
+import tqdm
 from util.structures import VesicleList, Surface  # Assuming these modules are available
 
 def get_patch_around_point(data, z, y, x, size=128):
@@ -134,30 +135,69 @@ def vesicle_distance_and_filter(json_path, mod_path, xml_output_path, filter_xml
         surface = Surface()
         surface.from_model_auto_segment(mod_path, objNum=2)
 
-        # Process each vesicle
-        for i, vesicle in enumerate(vl):
+        ## 定义2d囊泡需要保留的属性，用于后续删除不需要的属性
+        attributes_to_keep = [
+            '_vesicleId', '_type', '_center', '_radius', 
+            '_center2D', '_radius2D', '_rotation2D'
+        ]
+
+        for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
             ves_data = vesicles[i]
             
-            name = ves_data.get('name', 'vesicle_0')  # Default to 'vesicle_0' if name not found
-            vesicle_id = int(re.search(r'\d+', name).group())  # Extract the number from the name
-            vesicle.setId(vesicle_id)  # Set the vesicle ID
-    
-            radii = ves_data.get('radii', [0])
-            center = ves_data.get('center', [0, 0, 0])
-            directions = ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-
-            center_scaled = ratio * np.asarray(center)
-            center_xyz = center_scaled[[2, 1, 0]]  # Convert z, y, x to x, y, z
-
-            vesicle.setRadius(np.mean(ratio * np.asarray(radii)))  # Set average radius
-            vesicle.setRadius3D(ratio * np.asarray(radii))         # Set 3D radius
-            vesicle.setCenter(center_xyz)                          # Set center point
-            vesicle.setType('vesicle')                             # Set type
-            vesicle._evecs = np.asarray(directions)                # Set direction vectors
-
+            # 1. 提取并设置名称和 ID
+            name = ves_data.get('name', f'vesicle_{i}')  # 默认名称为 'vesicle_i'，避免重复默认 'vesicle_0'
+            match = re.search(r'\d+', name)
+            vesicle_id = int(match.group()) if match else i  # 如果未找到数字，则使用索引作为 ID
+            vesicle.setId(vesicle_id)
+            
+            # 2. 设置缩放后的半径
+            radii = np.asarray(ves_data.get('radii', [0]), dtype=float)[::-1] * ratio
+            vesicle.setRadius(np.mean(radii))
+            vesicle.setRadius3D(radii)
+            
+            # 3. 设置缩放后的中心点
+            center = np.asarray(ves_data.get('center', [0, 0, 0]), dtype=float)[[2, 1, 0]] * ratio
+            vesicle.setCenter(center)
+            
+            # 4. 设置方向向量(已转置)
+            evecs = np.asarray(ves_data.get('evecs', [[1, 0, 0], [0, 1, 0], [0, 0, 1]]), dtype=float).T
+            evecs = evecs[:, [2, 1, 0]]
+            vesicle._evecs = evecs
+            
+            # 5. 设置类型
+            vesicle.setType('vesicle')
+            
+            # * 6. for 2D section parralleled to xy plane of 3D vesicle
             _, radius2D, eigvecs = vesicle.ellipse_in_plane()
-            vesicle.setRadius2D(ratio * np.asarray(radius2D))      # Set 2D radius
-            vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2  # Set 2D rotation angle
+            vesicle.setRadius2D(np.asarray(radius2D, dtype=float) * ratio)
+            vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
+            
+            # 7. 若为 2D 膜囊泡，进行校正
+            if np.array_equal(vesicle._evecs[0], [0.0, 0.0, 1.0]):
+                print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
+                
+                # 7.1 使用 Radius3D 的 r1 和 r2 更新 Radius2D
+                if hasattr(vesicle, '_radius3D') and len(vesicle.getRadius3D()) >= 2:
+                    r1, r2 = vesicle.getRadius3D()[1], vesicle.getRadius3D()[0]
+                    vesicle.setRadius2D([r1, r2])
+                    print(f"Updated Radius2D to r1: {r1}, r2: {r2}")
+                else:
+                    print(f"Warning: Vesicle ID {vesicle.getId()} lacks valid Radius3D data. Skipping Radius2D update.")
+                    continue  # 如果 Radius3D 无效，跳过后续步骤
+                
+                
+                # 7.3 计算 Rotation2D
+                X, Y = vesicle._evecs[2, 1], vesicle._evecs[1, 1]
+                phi = np.arctan2(Y, X) - np.pi / 2  # to same definition of phi: vesicle._rotation2D
+                vesicle.setRotation2D(phi)
+                print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
+                
+                # 7.4 移除2d囊泡不需要的属性
+                current_attrs = list(vars(vesicle).keys())
+                for attr in current_attrs:
+                    if attr not in attributes_to_keep:
+                        delattr(vesicle, attr)
+                print(f"Removed unwanted attributes for vesicle ID {vesicle.getId()}")
 
         # Calculate distance to the surface
         vl.distance_to_surface(surface, 3600, 'dense')
