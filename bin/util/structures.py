@@ -43,8 +43,6 @@ class Vesicle:
                         float(positionElement.get('Y')),
                         float(positionElement.get('Z'))]
 
-        classElement = vesicleElement.xpath('Class')[0]
-
 
     def fromXMLSynTomo(self, xmlObj, pixelSize):
         """from XMl in synTomo format
