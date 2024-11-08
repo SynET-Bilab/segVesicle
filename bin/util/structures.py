@@ -566,7 +566,8 @@ class VesicleList:
                 modtxtFile.append(np.concatenate((np.array([1, i+1]), vesicle.getCenter())))
                 modtxtFile.append(np.concatenate((np.array([1, i+1]), vesicle.getCenter())))
 
-            elif vesicle.getType() == 'vesicle':
+            # elif vesicle.getType() == 'vesicle':
+            else:
                 dis, PP0, nearest_point = vesicle.distance_to_surface(surface, precision, tree, surface._densePoints)
                 self._distance.append(dis)
                 self._projectionPoint.append(PP0)
@@ -806,47 +807,48 @@ class Surface:
         postmembrane: object num: 3
         '''
         
-        def custom_round(x, base=0.5):
-            '''
-            set coordinate to the nearest 0.5
-            '''
-            return np.round(x / base) * base
+        # def custom_round(x, base=0.5):
+        #     '''
+        #     set coordinate to the nearest 0.5
+        #     '''
+        #     return np.round(x / base) * base
         
-        def filter_equ_x(points, idx):
-            '''
-            get average y of points with equal x
-            '''
-            obj, _, x, _, z = points[0]
-            y = custom_round(points[:, 3].mean()).astype(np.float64)
-            return np.array([obj, idx, x, y, z])
+        # def filter_equ_x(points, idx):
+        #     '''
+        #     get average y of points with equal x
+        #     '''
+        #     obj, _, x, _, z = points[0]
+        #     y = custom_round(points[:, 3].mean()).astype(np.float64)
+        #     return np.array([obj, idx, x, y, z])
         
-        def max_filter(unfiltered):
-            '''
-            to fix conflicts that in the same contour, points with the same x have different y (here just do a adjusted NMS by mean y)
-            '''
-            filtered = []
-            contours = []
+        # def max_filter(unfiltered):
+        #     '''
+        #     to fix conflicts that in the same contour, points with the same x have different y (here just do a adjusted NMS by mean y)
+        #     '''
+        #     filtered = []
+        #     contours = []
             
-            for z in sorted(list(set(unfiltered[:, -1].tolist()))):
-                contours.append(unfiltered[unfiltered[:, -1] == z])
+        #     for z in sorted(list(set(unfiltered[:, -1].tolist()))):
+        #         contours.append(unfiltered[unfiltered[:, -1] == z])
             
-            for i, contour in enumerate(contours):
-                idx = i + 1
-                point_x_set = sorted(list(set(contour[:, 2].tolist())))
-                for x in point_x_set:
-                    point_equ_x = contour[contour[:, 2] == x]
-                    filtered.append(filter_equ_x(point_equ_x, idx))
-            filtered = np.array(filtered)
+        #     for i, contour in enumerate(contours):
+        #         idx = i + 1
+        #         point_x_set = sorted(list(set(contour[:, 2].tolist())))
+        #         for x in point_x_set:
+        #             point_equ_x = contour[contour[:, 2] == x]
+        #             filtered.append(filter_equ_x(point_equ_x, idx))
+        #     filtered = np.array(filtered)
             
-            return filtered
+        #     return filtered
         
         # cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
         # os.system(cmd)
         untreated = np.loadtxt(model.replace('.mod', '.point'))
         untreated = untreated[untreated[:, 0] == objNum]
         
-        membrane = max_filter(untreated)
-        # np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
+        # membrane = max_filter(untreated)
+        membrane = untreated
+        np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
         
         self._densePoints = membrane[:, 2:]
         self._make_triangle_list_denseInput()
