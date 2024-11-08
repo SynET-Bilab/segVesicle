@@ -848,7 +848,7 @@ class Surface:
         
         # membrane = max_filter(untreated)
         membrane = untreated
-        np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
+        # np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
         
         self._densePoints = membrane[:, 2:]
         self._make_triangle_list_denseInput()
