@@ -39,11 +39,11 @@ def determine_new_type(type_filter, type_ori_filter, type_ori_class):
     """
     根据规则确定新的Type属性值。
     """
-    if type_filter == 'other' and type_ori_filter == 'vesicle':
-        return 'other'
-    elif type_filter == 'vesicle' and type_ori_filter == 'other':
+    if type_filter == 'others' and type_ori_filter == 'vesicle':
+        return 'others'
+    elif type_filter == 'vesicle' and type_ori_filter == 'others':
         return 'vesicle'
-    elif type_filter == 'other' and type_ori_filter == 'other':
+    elif type_filter == 'others' and type_ori_filter == 'others':
         return type_ori_class
     elif type_filter == 'vesicle' and type_ori_filter == 'vesicle':
         return 'vesicle'

@@ -840,13 +840,13 @@ class Surface:
             
             return filtered
         
-        cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
-        os.system(cmd)
+        # cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
+        # os.system(cmd)
         untreated = np.loadtxt(model.replace('.mod', '.point'))
         untreated = untreated[untreated[:, 0] == objNum]
         
         membrane = max_filter(untreated)
-        np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
+        # np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
         
         self._densePoints = membrane[:, 2:]
         self._make_triangle_list_denseInput()

@@ -5,8 +5,7 @@ import re
 import numpy as np
 import xml.etree.ElementTree as ET
 import mrcfile
-import tqdm
-from util.structures import VesicleList, Surface  # Assuming these modules are available
+from util.structures import VesicleList, Surface
 
 def get_patch_around_point(data, z, y, x, size=128):
     """
@@ -141,7 +140,7 @@ def vesicle_distance_and_filter(json_path, mod_path, xml_output_path, filter_xml
             '_center2D', '_radius2D', '_rotation2D'
         ]
 
-        for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
+        for i, vesicle in enumerate(vl):
             ves_data = vesicles[i]
             
             # 1. 提取并设置名称和 ID
