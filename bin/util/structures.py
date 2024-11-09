@@ -5,6 +5,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 from sklearn.neighbors import KDTree
 from sklearn.decomposition import PCA
+from skimage.measure import label, regionprops
 from tqdm import tqdm
 from lxml import etree
 from io import *
@@ -840,6 +841,59 @@ class Surface:
         #     filtered = np.array(filtered)
             
         #     return filtered
+
+        def avg_for_1d(idxs, length):
+            '''
+            average for 1d slice of x(or y)
+            '''
+            arr = np.zeros((length,)).astype(np.int16)
+            idxs_from0 = (np.array(idxs)-min(idxs)).astype(np.int16)
+            arr[idxs_from0] = 1
+            lbl = label(arr)
+            regions = regionprops(np.stack([lbl,lbl]))
+            idxs_mean = []
+            for r in regions:
+                rx = r.centroid
+                idxs_mean.append(np.round(rx[1] + min(idxs)))
+            
+            return idxs_mean
+
+        def max_filter(unfiltered):
+            '''
+            to fix conflicts that in the same contour, points with the same x(or y) have different y(or x) (here just do a adjusted NMS by mean y(or x))
+            '''
+            filtered = []
+            contours = []
+            obj, _, _, _, _ = unfiltered[0]
+            for z in sorted(list(set(unfiltered[:, -1].tolist()))):
+                contours.append(unfiltered[unfiltered[:, -1] == z])
+             
+            for i, contour in enumerate(contours):
+                idx = i + 1
+                point_x_set = sorted(list(set(contour[:, 2].tolist())))
+                point_y_set = sorted(list(set(contour[:, 3].tolist())))
+                x_diff = max(point_x_set) - min(point_x_set)
+                y_diff = max(point_y_set) - min(point_y_set)
+                if x_diff < y_diff: # membrane is vertical, so average along the x axis
+                    length = x_diff + 5
+                    for y in point_y_set:
+                        point_equ_y = contour[contour[:, 3] == y]
+                        idxs = point_equ_y[:, 2]
+                        idxs_mean = avg_for_1d(idxs, length)
+                        for x in idxs_mean:
+                            filtered.append([obj, idx, x, y, z])
+                else: # membrane is horizontal, so average along the y axis
+                    length = y_diff + 5
+                    for x in point_x_set:
+                        point_equ_x = contour[contour[:, 2] == x]
+                        idxs = point_equ_x[:, 3]
+                        idxs_mean = avg_for_1d(idxs, length)
+                        for y in idxs_mean:
+                            filtered.append([obj, idx, x, y, z])
+
+            filtered = np.array(filtered)
+            
+            return filtered
         
         # cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
         # os.system(cmd)
