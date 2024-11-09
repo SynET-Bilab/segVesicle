@@ -958,6 +958,240 @@ class Surface:
 
 
 
+class Membrane:
+    def __init__(self, membrane_model, pixel_size = 0.87):
+        self.membrane_model = membrane_model
+        self.__membrane_points = None
+        self.__membrane_area = None
+        self.__area_pixel_ratio = None
+        self.pixel_size = pixel_size
+        self.redo = True
+        self.__membrane_trans = None
+        self.__membrane_mean = None
+        self.__boundary = None
+        self.__convex_boundary = None
+        self.__max_distance_to_boundary = None
+        self.__membrane_vector = None
+
+    @property
+    def membrane_points(self):
+        '''
+        membrane in nm
+        '''
+        if self.__membrane_points is None:
+            from subprocess import call
+            import os
+            pid = os.getpid()
+            s="model2point {} {}_postmembrane.points > /dev/null".format(self.membrane_model, pid)
+            # print(s)
+            call(s,shell=True)
+            self.__membrane_points=np.loadtxt('{}_postmembrane.points'.format(pid))
+
+            s = "rm {}_postmembrane.points".format(pid)
+            call(s,shell = True)
+        return self.__membrane_points * self.pixel_size
+
+    @property
+    def membrane_area(self):
+        '''
+        Causion:Unit !!!!!!!!! Check next time u use it
+        '''
+        if self.__membrane_area is None:
+            from subprocess import call,check_output
+            if self.redo:
+                s="imodmesh -l -T {}".format(self.membrane_model)
+                call(s,shell=True)
+            s="imodinfo {} | grep area | cut -d ' ' -f 6".format(self.membrane_model)
+            area = check_output(s, shell=True)#call(s,shell=True)
+            #self.__membrane_area = np.loadtxt('tmp') * self.pixel_size * self.pixel_size / 10000.0
+            self.__membrane_area = float(area) * self.pixel_size * self.pixel_size / 10000.0
+        return self.__membrane_area
+
+    @property
+    def area_pixel_ratio(self):
+
+        if self.__area_pixel_ratio is None:
+            self.__area_pixel_ratio = self.membrane_area / len(self.membrane_points)
+
+        return self.__area_pixel_ratio
+
+    def random_membrane_points(self, num_points = 100, remove_overlap = False, overlap_threshold = 7.0):
+        #print(remove_overlap)
+        if remove_overlap == False:
+            rds=np.random.rand(num_points)
+            idx=rds*len(self.membrane_points)
+            idx=[int(item) for item in idx]
+            return self.membrane_points[idx]
+
+        else:
+            result = []
+            count = 0
+            while count < num_points:
+                one_point = self.random_membrane_points(num_points = 1, remove_overlap = False, overlap_threshold = overlap_threshold)[0]
+
+                sign = 1
+                for i,refPoint in enumerate(result):
+                    if np.linalg.norm(one_point-refPoint) < overlap_threshold:
+                        sign = 0
+                        break
+
+                if sign == 1:
+                    result.append(one_point)
+                    count = count + 1
+            return np.array(result)
+
+    def get_nearest_points(self, points):
+        res=[]
+        for item in points:
+            a=np.linalg.norm(item-self.membrane_points,axis=1)
+            res.append(self.membrane_points[np.argmin(a)])
+        return np.array(res)
+
+    @property
+    def membrane_mean(self):
+        if self.__membrane_mean is None:
+            self.__membrane_mean = np.average(self.membrane_points, axis = 0)
+        return self.__membrane_mean
+
+    def ppp(self, membraneName):
+        import numpy as np
+        membrane = np.loadtxt(membraneName)
+        N = membrane.shape[0]
+        m = np.mean(membrane, axis = 0)
+        data_m = membrane - np.tile(m, (N,1))
+        covar = np.dot(data_m.T, data_m) / (N)
+        U, S, V = np.linalg.svd(covar)
+        V = V.T
+
+        zVector = np.array([0,0,1])
+        if np.abs(np.dot(zVector, V[:, 0])) + np.abs(np.dot(zVector, V[:, 1])) < 0.5:
+            transVector = V[:, [0, 2]]
+        else:
+            transVector = V[:, :2]
+        # reduced_m = np.dot(data_m, transVector)
+
+        out = transVector
+        np.savetxt(membraneName, out)
+
+
+    @property
+    def membrane_trans(self):
+        if self.__membrane_trans is None:
+            import os
+            pid = os.getpid()
+            np.savetxt('{}_membrane.point'.format(pid), self.membrane_points)
+            from subprocess import call
+            # s="/Applications/MATLAB_R2021a.app/bin/matlab -nodisplay -nodesktop -nosplash -nojvm -r \"addpath(\'/storage/home-backup/home/lytao/software/synTomo/GABAAR\');ppp(\'{}_membrane.point\');exit;\" > /dev/null".format(pid)
+            # call(s,shell=True)
+            self.ppp('{}_membrane.point'.format(pid))
+
+            membrane2D=np.loadtxt('{}_membrane.point'.format(pid))
+            self.__membrane_trans=membrane2D[:3]
+
+            s = "rm {}_membrane.point".format(pid)
+            call(s,shell = True)
+
+
+            # from shapely.geometry import Polygon
+            # self.__boundary = Polygon(membrane2D[3:])
+
+        return self.__membrane_trans
+
+    def membrane_vector(self):
+        '''
+        Causion this vector can be either direction
+        '''
+        mat = self.membrane_trans
+        if mat[0,0] * mat[1,1] - mat[0,1] * mat[1,0] == 0:
+            z = 0
+            if mat[0,0] != 0:
+                y = 1
+                x = mat[0,1]/mat[0,0]
+            else:
+                x = 1
+                y = mat[0,0]/mat[0,1]
+        else:
+            z = 1
+            a = np.array([mat[:2, 0],mat[:2, 1]])
+            b = mat[2]
+            (x,y)= np.linalg.solve(a, b)
+
+        result = np.array([x,y,z])
+        return result/ np.linalg.norm(result)
+
+
+    @property
+    def boundary(self):
+        if self.__boundary is None:
+            tmp = self.membrane_trans
+        return self.__boundary
+
+    @property
+    def convex_boundary(self):
+        if self.__convex_boundary is None:
+            from scipy.spatial import ConvexHull
+            membrane2D = self.transform2D(self.membrane_points)
+            # membrane2D = np.reshape(self.transform2D(self.membrane_points), (-1,3))
+            vertices = membrane2D[ConvexHull(membrane2D).vertices]
+            from shapely.geometry import Polygon
+            self.__convex_boundary=Polygon(vertices)
+        return self.__convex_boundary
+
+
+    def transform2D(self, point3D):
+        return np.matmul(point3D - self.membrane_mean, self.membrane_trans)
+
+    def distance_to_boundary(self, points, boundary = None):
+        if boundary is None:
+            boundary = self.boundary
+
+        points = np.array(points)
+        if len(points.shape) == 1:
+            points = np.array([points])
+
+        from shapely.geometry import Point
+        def d(pt):
+            pt_point = Point(pt)
+            if boundary.contains(pt_point):
+                return boundary.exterior.distance(pt_point)
+            else:
+                return -boundary.exterior.distance(pt_point)
+        return np.array(list(map(d, points)))
+
+    def max_membrane_distance_to_boundary(self, boundary = None):
+        old = False
+        if old:
+            from scipy.spatial.distance import cdist
+            b = np.array(list(self.boundary.exterior.coords))
+            distance_matrix = cdist(self.transform2D(self.membrane_points), b)
+            print(distance_matrix.shape)
+            distance_min = np.min(distance_matrix, axis = 1)
+            print(distance_min.shape)
+            print(np.max(distance_min))
+            return np.max(distance_min)
+        else:
+            if boundary is None:
+                boundary = self.boundary
+
+            from shapely.geometry import Point
+            distance = 0
+            for pt in self.transform2D(self.membrane_points):
+                pt_point = Point(pt)
+                if boundary.contains(pt_point):
+                    d = boundary.exterior.distance(pt_point)
+                    if d> distance:
+                        distance = d
+                else:
+                    continue
+            return distance
+
+    @property
+    def max_distance_to_boundary(self):
+        if self.__max_distance_to_boundary is None:
+            self.__max_distance_to_boundary = self.max_membrane_distance_to_boundary()
+        return self.__max_distance_to_boundary
+
+
 
 if __name__ == "__main__":
     a = VesicleList(0.87)
