@@ -16,6 +16,7 @@ class FixFNWindow(QMainWindow):
         self.viewer = parent.viewer
         self.current_index = 0  # Current vesicle start index
 
+        self.verify_files_exist()
         # Filter vesicles based on ori_filter_xml_path and filter_xml_path
         vesicle_ids = self.filter_vesicle_ids()
 
@@ -62,14 +63,20 @@ class FixFNWindow(QMainWindow):
         filter_root = filter_tree.getroot()
 
         # Find vesicle IDs that are Type='vesicle' in ori_filter_xml and Type='other' in filter_xml
-        ori_vesicles = {vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
-                        for vesicle in ori_root.findall('Vesicle') if vesicle.find('Type')}
-        filter_vesicles = {vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
-                           for vesicle in filter_root.findall('Vesicle') if vesicle.find('Type')}
+        ori_vesicles = {
+            vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
+            for vesicle in ori_root.findall('Vesicle') 
+            if vesicle.find('Type') is not None
+        }
+        filter_vesicles = {
+            vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
+            for vesicle in filter_root.findall('Vesicle') 
+            if vesicle.find('Type') is not None
+        }
 
         # Identify IDs to be annotated
         vesicle_ids = [vesicle_id for vesicle_id, v_type in ori_vesicles.items()
-                       if v_type == 'vesicle' and filter_vesicles.get(vesicle_id) == 'other']
+                       if v_type == 'vesicle' and filter_vesicles.get(vesicle_id) == 'others']
         return vesicle_ids
 
     def load_target_vesicles_from_xml(self, vesicle_ids):
@@ -199,10 +206,120 @@ class FixFNWindow(QMainWindow):
             file.seek(0)
             file.write(content.replace('"><', '">\n<'))
 
+    def prev_vesicles(self):
+        self.save_current_classes()
+        if self.current_index >= 11:
+            self.current_index -= 11
+            self.display_current_vesicles()
+        else:
+            QMessageBox.information(self, "Warning", "This is the first page.")
+
+    def next_vesicles(self):
+        self.save_current_classes()
+        if self.current_index + 11 < len(self.vesicles):
+            self.current_index += 11
+            self.display_current_vesicles()
+        else:
+            QMessageBox.information(self, "Congratulation!", "You have finished annotations!")
+
     def closeEvent(self, event):
         # Check if 'vesicles' is defined before attempting to save
         if hasattr(self, 'vesicles'):
             self.save_current_classes()
         super().closeEvent(event)
         
-    
+    def get_patch_around_point(self, z, y, x, size=128):
+        half_size = size // 2
+        data = self.viewer.layers[0].data  # 假设图像数据在第一个层
+        z, y, x = int(round(z)), int(round(y)), int(round(x))
+        
+        # 定义裁剪区域的起始和结束坐标
+        z_min = z - half_size
+        z_max = z + half_size
+        y_min = y - half_size
+        y_max = y + half_size
+        x_min = x - half_size
+        x_max = x + half_size
+
+        # 初始化填充后的patch，默认值为0（可根据需要修改）
+        patch = np.zeros((size, size, size), dtype=data.dtype)
+        
+        # 计算图像数据的维度
+        z_dim, y_dim, x_dim = data.shape
+        
+        # 计算裁剪区域与图像边界的重叠部分
+        # 对Z轴
+        if z_min < 0:
+            patch_z_start = -z_min
+            z_min = 0
+        else:
+            patch_z_start = 0
+        if z_max > z_dim:
+            patch_z_end = size - (z_max - z_dim)
+            z_max = z_dim
+        else:
+            patch_z_end = z_max - (z + half_size)
+
+        # 对Y轴
+        if y_min < 0:
+            patch_y_start = -y_min
+            y_min = 0
+        else:
+            patch_y_start = 0
+        if y_max > y_dim:
+            patch_y_end = size - (y_max - y_dim)
+            y_max = y_dim
+        else:
+            patch_y_end = y_max - (y + half_size)
+
+        # 对X轴
+        if x_min < 0:
+            patch_x_start = -x_min
+            x_min = 0
+        else:
+            patch_x_start = 0
+        if x_max > x_dim:
+            patch_x_end = size - (x_max - x_dim)
+            x_max = x_dim
+        else:
+            patch_x_end = x_max - (x + half_size)
+
+        # 计算在图像数据中的有效区域
+        data_z_start = z_min
+        data_z_end = z_max
+        data_y_start = y_min
+        data_y_end = y_max
+        data_x_start = x_min
+        data_x_end = x_max
+
+        # 计算在patch中的放置位置
+        patch_z_start = max(patch_z_start, 0)
+        patch_z_end = patch_z_start + (data_z_end - data_z_start)
+        patch_y_start = max(patch_y_start, 0)
+        patch_y_end = patch_y_start + (data_y_end - data_y_start)
+        patch_x_start = max(patch_x_start, 0)
+        patch_x_end = patch_x_start + (data_x_end - data_x_start)
+
+        # 将有效数据填充到patch中
+        patch[patch_z_start:patch_z_end, patch_y_start:patch_y_end, patch_x_start:patch_x_end] = \
+            data[data_z_start:data_z_end, data_y_start:data_y_end, data_x_start:data_x_end]
+        
+        return patch
+        # half_size = size // 2
+        # data = self.viewer.layers[0].data  # 假设图像数据在第一个层
+        # z, y, x = int(round(z)), int(round(y)), int(round(x))
+        # z_min = max(z - half_size, 0)
+        # z_max = min(z + half_size, data.shape[0])
+        # y_min = max(y - half_size, 0)
+        # y_max = min(y + half_size, data.shape[1])
+        # x_min = max(x - half_size, 0)
+        # x_max = min(x + half_size, data.shape[2])
+        # patch = data[z_min:z_max, y_min:y_max, x_min:x_max]
+        # return patch
+        
+    def update_class(self, idx, value):
+        # 更新类别字典
+        vesicle_idx = self.current_index + idx
+        if vesicle_idx < len(self.vesicles):
+            vesicle_id = self.vesicles[vesicle_idx].attrib['vesicleId']
+            self.classes[vesicle_id] = value

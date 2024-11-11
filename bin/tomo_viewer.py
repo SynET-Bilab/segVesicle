@@ -973,14 +973,20 @@ class TomoViewer:
                 filter_root = filter_tree.getroot()
 
                 # Find vesicle IDs that are Type='vesicle' in ori_filter_xml and Type='other' in filter_xml
-                ori_vesicles = {vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
-                                for vesicle in ori_root.findall('Vesicle') if vesicle.find('Type')}
-                filter_vesicles = {vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
-                                for vesicle in filter_root.findall('Vesicle') if vesicle.find('Type')}
+                ori_vesicles = {
+                    vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
+                    for vesicle in ori_root.findall('Vesicle') 
+                    if vesicle.find('Type') is not None
+                }
+                filter_vesicles = {
+                    vesicle.attrib['vesicleId']: vesicle.find('Type').attrib.get('t')
+                    for vesicle in filter_root.findall('Vesicle') 
+                    if vesicle.find('Type') is not None
+                }
 
                 # Identify IDs to be annotated
                 vesicle_ids = [vesicle_id for vesicle_id, v_type in ori_vesicles.items()
-                            if v_type == 'vesicle' and filter_vesicles.get(vesicle_id) == 'other']
+                            if v_type == 'vesicle' and filter_vesicles.get(vesicle_id) == 'others']
                 return vesicle_ids
                 
             if not verify_files_exist():
