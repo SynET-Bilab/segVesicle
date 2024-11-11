@@ -10,8 +10,8 @@ import xml.etree.ElementTree as ET
 
 from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import (
-    QMainWindow, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout,
-    QHBoxLayout, QGridLayout, QSpinBox, QMessageBox
+    QLabel, QLineEdit, QPushButton, 
+    QVBoxLayout, QHBoxLayout, QMessageBox
 )
 
 from napari.utils.notifications import show_info
@@ -21,12 +21,9 @@ from pathlib import Path
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
 from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
-from sklearn.neighbors import KDTree
-
-from collections import deque
 
 from util.distance_calculator import distance_calc
-from window.vesicle_window import VesicleViewer
+# from window.vesicle_window import VesicleViewer
 from window.deconv_window import DeconvWindow
 from window.correction_window import CorrectionWindow
 from window.memb_segmentation_window import MembSegmentationWindow
