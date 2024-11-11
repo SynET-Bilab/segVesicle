@@ -1,6 +1,9 @@
-from tensorflow.keras.layers import Input, concatenate
-from tensorflow.keras.layers import Conv3D, MaxPooling3D, UpSampling3D, BatchNormalization
-from tensorflow.keras.models import Model
+try:
+    from tensorflow.keras.layers import Input, concatenate
+    from tensorflow.keras.layers import Conv3D, MaxPooling3D, UpSampling3D, BatchNormalization
+    from tensorflow.keras.models import Model
+except ImportError:
+    pass
 
 def resblock(x, filter=24):
     res=x

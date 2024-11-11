@@ -2,11 +2,14 @@ import numpy as np
 import mrcfile as mf
 import os
 import random
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.models import load_model
+try:
+    from tensorflow.keras.optimizers import Adam
+    from tensorflow.keras.utils import to_categorical
+    from tensorflow.keras.models import load_model
 
-import tensorflow.keras.backend as K
+    import tensorflow.keras.backend as K
+except ImportError:
+    pass
 import time
 
 from sklearn.metrics import precision_recall_fscore_support
@@ -14,7 +17,7 @@ import h5py
 import matplotlib
 matplotlib.use('agg')  # necessary else: AttributeError: 'NoneType' object has no attribute 'is_interactive'
 import matplotlib.pyplot as plt
-import sys
+# import sys
 from datetime import datetime
 
 # # 添加自定义模块路径

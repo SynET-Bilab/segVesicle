@@ -4,9 +4,11 @@
 # Copyright (C) Inria,  Emmanuel Moebel, Charles Kervrann, All Rights Reserved, 2015-2021, v1.0
 # License: GPL v3.0. See <https://www.gnu.org/licenses/>
 # =============================================================================================
-
-import tensorflow as tf
-from tensorflow.keras import backend as K
+try:
+    import tensorflow as tf
+    from tensorflow.keras import backend as K
+except ImportError:
+    pass
 
 # had to replace sometimes K by tf, because else: TypeError: An op outside of the function building code is being passed
 #     a "Graph" tensor. It is possible to have Graph tensors
