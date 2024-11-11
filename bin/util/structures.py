@@ -808,11 +808,11 @@ class Surface:
         postmembrane: object num: 3
         '''
         
-        # def custom_round(x, base=0.5):
-        #     '''
-        #     set coordinate to the nearest 0.5
-        #     '''
-        #     return np.round(x / base) * base
+        def custom_round(x, base=0.5):
+            '''
+            set coordinate to the nearest 0.5
+            '''
+            return np.round(x / base) * base
         
         # def filter_equ_x(points, idx):
         #     '''
@@ -846,17 +846,18 @@ class Surface:
             '''
             average for 1d slice of x(or y)
             '''
-            arr = np.zeros((length,)).astype(np.int16)
-            idxs_from0 = (np.array(idxs)-min(idxs)).astype(np.int16)
+            arr = np.zeros((length, )).astype(np.int16)
+            idxs_from0 = (np.array(idxs) - min(idxs)).astype(np.int16)
             arr[idxs_from0] = 1
             lbl = label(arr)
-            regions = regionprops(np.stack([lbl,lbl]))
+            regions = regionprops(np.stack([lbl, lbl]))
             idxs_mean = []
             for r in regions:
                 rx = r.centroid
-                idxs_mean.append(np.round(rx[1] + min(idxs)))
+                idxs_mean.append(custom_round(rx[1] + min(idxs)))
             
             return idxs_mean
+
 
         def max_filter(unfiltered):
             '''
@@ -867,7 +868,7 @@ class Surface:
             obj, _, _, _, _ = unfiltered[0]
             for z in sorted(list(set(unfiltered[:, -1].tolist()))):
                 contours.append(unfiltered[unfiltered[:, -1] == z])
-             
+            
             for i, contour in enumerate(contours):
                 idx = i + 1
                 point_x_set = sorted(list(set(contour[:, 2].tolist())))
@@ -875,17 +876,20 @@ class Surface:
                 x_diff = max(point_x_set) - min(point_x_set)
                 y_diff = max(point_y_set) - min(point_y_set)
                 if x_diff < y_diff: # membrane is vertical, so average along the x axis
-                    length = x_diff + 5
+                    length = int(x_diff + 5)
                     for y in point_y_set:
                         point_equ_y = contour[contour[:, 3] == y]
+                        obj, _, _, y, z = point_equ_y[0]
                         idxs = point_equ_y[:, 2]
                         idxs_mean = avg_for_1d(idxs, length)
                         for x in idxs_mean:
                             filtered.append([obj, idx, x, y, z])
+                            
                 else: # membrane is horizontal, so average along the y axis
-                    length = y_diff + 5
+                    length = int(y_diff + 5)
                     for x in point_x_set:
                         point_equ_x = contour[contour[:, 2] == x]
+                        obj, _, x, _, z = point_equ_x[0]
                         idxs = point_equ_x[:, 3]
                         idxs_mean = avg_for_1d(idxs, length)
                         for y in idxs_mean:
@@ -895,14 +899,14 @@ class Surface:
             
             return filtered
         
-        # cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
-        # os.system(cmd)
+        
+        cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
+        os.system(cmd)
         untreated = np.loadtxt(model.replace('.mod', '.point'))
         untreated = untreated[untreated[:, 0] == objNum]
         
-        # membrane = max_filter(untreated)
-        membrane = untreated
-        # np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
+        membrane = max_filter(untreated)
+        np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
         
         self._densePoints = membrane[:, 2:]
         self._make_triangle_list_denseInput()
