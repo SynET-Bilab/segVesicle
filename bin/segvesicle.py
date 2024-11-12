@@ -17,6 +17,9 @@ from key_bindings.increment_dims_keys import KeyBinder
 from tomo_viewer import TomoViewer
 import center_cross
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 def add_folder_list_widget(tomo_viewer: TomoViewer):
     folder_list_widget = FolderListWidget(tomo_viewer)
     tomo_viewer.viewer.window.add_dock_widget(folder_list_widget, area='right')
