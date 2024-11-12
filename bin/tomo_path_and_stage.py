@@ -21,7 +21,11 @@ class TomoPathAndStage:
 
     def set_tomo_name(self, tomo_name):
         self.tomo_name = tomo_name
-        self.root_dir = os.path.join(self.current_path, self.tomo_name, 'ves_seg', 'temp')
+        
+        user_home_dir = os.path.expanduser("~")
+        # 设置隐藏的临时存储路径
+        self.root_dir = os.path.join(user_home_dir, '.segvesicle')
+        # self.root_dir = os.path.join(self.current_path, self.tomo_name, 'ves_seg', 'temp')
 
         # 检查是否包含 `*-1`，并获取基本路径
         self.base_tomo_name = tomo_name.split('-1')[0] if '-1' in tomo_name else tomo_name
