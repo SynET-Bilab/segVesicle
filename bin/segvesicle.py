@@ -44,14 +44,18 @@ def main():
     napari.run()
     
     if tomo_viewer.tomo_path_and_stage.tomo_name != None:
-        os.system('mv {} {}'.format(tomo_viewer.tomo_path_and_stage.new_label_file_path, tomo_viewer.tomo_path_and_stage.label_path))
-        os.system('mv {} {}'.format(tomo_viewer.tomo_path_and_stage.new_json_file_path, tomo_viewer.tomo_path_and_stage.json_file_path))
-        with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'r') as file:
-            data = json.load(file)
-        # 将JSON数据格式化为多行结构并保存
-        with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'w') as file:
-            json.dump(data, file, indent=4)
+        if os.path.exists(tomo_viewer.tomo_path_and_stage.new_label_file_path):
+            print(f"Moving {tomo_viewer.tomo_path_and_stage.new_label_file_path} to {tomo_viewer.tomo_path_and_stage.label_path}, please wait...")
+            os.system('mv {} {}'.format(tomo_viewer.tomo_path_and_stage.new_label_file_path, tomo_viewer.tomo_path_and_stage.label_path))
+        if os.path.exists(tomo_viewer.tomo_path_and_stage.new_json_file_path):
+            os.system('mv {} {}'.format(tomo_viewer.tomo_path_and_stage.new_json_file_path, tomo_viewer.tomo_path_and_stage.json_file_path))
+            with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'r') as file:
+                data = json.load(file)
+            # 将JSON数据格式化为多行结构并保存
+            with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'w') as file:
+                json.dump(data, file, indent=4)
         os.system('rm -r {}'.format(tomo_viewer.tomo_path_and_stage.root_dir))
+        print(f"Processed successfully.")
 
 if __name__ == '__main__':
 
