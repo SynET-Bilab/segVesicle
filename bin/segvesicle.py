@@ -20,6 +20,52 @@ import center_cross
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+def print_segvesicle_ascii_art():
+    ascii_art = r"""
+>>=============================================================================<<
+||███████╗███████╗ ██████╗ ██╗   ██╗███████╗███████╗██╗ ██████╗██╗     ███████╗||
+||██╔════╝██╔════╝██╔════╝ ██║   ██║██╔════╝██╔════╝██║██╔════╝██║     ██╔════╝||
+||███████╗█████╗  ██║  ███╗██║   ██║█████╗  ███████╗██║██║     ██║     █████╗  ||
+||╚════██║██╔══╝  ██║   ██║╚██╗ ██╔╝██╔══╝  ╚════██║██║██║     ██║     ██╔══╝  ||
+||███████║███████╗╚██████╔╝ ╚████╔╝ ███████╗███████║██║╚██████╗███████╗███████╗||
+||╚══════╝╚══════╝ ╚═════╝   ╚═══╝  ╚══════╝╚══════╝╚═╝ ╚═════╝╚══════╝╚══════╝||
+>>=============================================================================<<                                          
+    """
+    print(ascii_art)
+
+def print_pleasewait_ascii_art():
+    ascii_art = r"""
+>>================================================<<
+||██████╗ ██╗     ███████╗ █████╗ ███████╗███████╗||
+||██╔══██╗██║     ██╔════╝██╔══██╗██╔════╝██╔════╝||
+||██████╔╝██║     █████╗  ███████║███████╗█████╗  ||
+||██╔═══╝ ██║     ██╔══╝  ██╔══██║╚════██║██╔══╝  ||
+||██║     ███████╗███████╗██║  ██║███████║███████╗||
+||╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝||
+||                                                ||
+||██╗    ██╗ █████╗ ██╗████████╗                  ||
+||██║    ██║██╔══██╗██║╚══██╔══╝                  ||
+||██║ █╗ ██║███████║██║   ██║                     ||
+||██║███╗██║██╔══██║██║   ██║                     ||
+||╚███╔███╔╝██║  ██║██║   ██║██╗██╗██╗            ||
+|| ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝   ╚═╝╚═╝╚═╝╚═╝            ||
+>>================================================<<                                      
+    """
+    print(ascii_art)
+
+def print_byebye_ascii_art():
+    ascii_art = r"""
+>>======================================================<<
+||██████╗ ██╗   ██╗███████╗    ██████╗ ██╗   ██╗███████╗||
+||██╔══██╗╚██╗ ██╔╝██╔════╝    ██╔══██╗╚██╗ ██╔╝██╔════╝||
+||██████╔╝ ╚████╔╝ █████╗      ██████╔╝ ╚████╔╝ █████╗  ||
+||██╔══██╗  ╚██╔╝  ██╔══╝      ██╔══██╗  ╚██╔╝  ██╔══╝  ||
+||██████╔╝   ██║   ███████╗    ██████╔╝   ██║   ███████╗||
+||╚═════╝    ╚═╝   ╚══════╝    ╚═════╝    ╚═╝   ╚══════╝||
+>>======================================================<<                                         
+    """
+    print(ascii_art)
+
 def add_folder_list_widget(tomo_viewer: TomoViewer):
     folder_list_widget = FolderListWidget(tomo_viewer)
     tomo_viewer.viewer.window.add_dock_widget(folder_list_widget, area='right')
@@ -44,10 +90,13 @@ def main():
     key_binder = KeyBinder(timer, tomo_viewer.viewer)
     key_binder.bind_keys()
     
+    print_segvesicle_ascii_art()
+    
     napari.run()
     
     if tomo_viewer.tomo_path_and_stage.tomo_name != None:
         if os.path.exists(tomo_viewer.tomo_path_and_stage.new_label_file_path):
+            print_pleasewait_ascii_art()
             print(f"Moving {tomo_viewer.tomo_path_and_stage.new_label_file_path} to {tomo_viewer.tomo_path_and_stage.label_path}, please wait...")
             os.system('mv {} {}'.format(tomo_viewer.tomo_path_and_stage.new_label_file_path, tomo_viewer.tomo_path_and_stage.label_path))
         if os.path.exists(tomo_viewer.tomo_path_and_stage.new_json_file_path):
@@ -58,7 +107,10 @@ def main():
             with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'w') as file:
                 json.dump(data, file, indent=4)
         os.system('rm -r {}'.format(tomo_viewer.tomo_path_and_stage.root_dir))
-        print(f"Processed successfully.")
+        print('! '*20)
+        print(f"Processed Finished.")
+        print('! '*20)
+    print_byebye_ascii_art()
 
 if __name__ == '__main__':
 
