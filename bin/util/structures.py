@@ -256,11 +256,8 @@ class Vesicle:
         x = a * np.cos(np.linspace(0, 2 * np.pi, precision)) * np.cos(phi) - b * np.sin(np.linspace(0, 2 * np.pi, precision)) * np.sin(phi)
         y = a * np.cos(np.linspace(0, 2 * np.pi, precision)) * np.sin(phi) + b * np.sin(np.linspace(0, 2 * np.pi, precision)) * np.cos(phi)
         z = np.ones(precision)
-        
-        # ls TODO: in xml file, center, radii, evecs should to xyz format (at least center should)
         points = np.vstack((x, y, z)).T + self._center2D
-        # points = points[:, [2, 1, 0]]  # ls: dont need to change zyx to xyz 
-
+        
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
         return points
     
@@ -703,17 +700,6 @@ class Triangle:
         self.points = points
         return points
 
-
-    # def area(self):
-    #     """
-    #     Calculate area of a given triangle
-    #     """
-    #     import numpy as np
-    #     a = np.linalg.norm(self.p3 - self.p2)
-    #     b = np.linalg.norm(self.p1 - self.p3)
-    #     c = np.linalg.norm(self.p2 - self.p1)
-    #     p = (a + b + c) / 2
-    #     return (abs(p*(p - a)*(p - b)*(p - c)))**0.5
     
     def area(self):
         '''
@@ -814,33 +800,6 @@ class Surface:
             '''
             return np.round(x / base) * base
         
-        # def filter_equ_x(points, idx):
-        #     '''
-        #     get average y of points with equal x
-        #     '''
-        #     obj, _, x, _, z = points[0]
-        #     y = custom_round(points[:, 3].mean()).astype(np.float64)
-        #     return np.array([obj, idx, x, y, z])
-        
-        # def max_filter(unfiltered):
-        #     '''
-        #     to fix conflicts that in the same contour, points with the same x have different y (here just do a adjusted NMS by mean y)
-        #     '''
-        #     filtered = []
-        #     contours = []
-            
-        #     for z in sorted(list(set(unfiltered[:, -1].tolist()))):
-        #         contours.append(unfiltered[unfiltered[:, -1] == z])
-            
-        #     for i, contour in enumerate(contours):
-        #         idx = i + 1
-        #         point_x_set = sorted(list(set(contour[:, 2].tolist())))
-        #         for x in point_x_set:
-        #             point_equ_x = contour[contour[:, 2] == x]
-        #             filtered.append(filter_equ_x(point_equ_x, idx))
-        #     filtered = np.array(filtered)
-            
-        #     return filtered
 
         def avg_for_1d(idxs, length):
             '''
@@ -875,7 +834,7 @@ class Surface:
                 point_y_set = sorted(list(set(contour[:, 3].tolist())))
                 x_diff = max(point_x_set) - min(point_x_set)
                 y_diff = max(point_y_set) - min(point_y_set)
-                if x_diff < y_diff: # membrane is vertical, so average along the x axis
+                if x_diff < y_diff:  # membrane is vertical, so average along the x axis
                     length = int(x_diff + 5)
                     for y in point_y_set:
                         point_equ_y = contour[contour[:, 3] == y]
@@ -885,7 +844,7 @@ class Surface:
                         for x in idxs_mean:
                             filtered.append([obj, idx, x, y, z])
                             
-                else: # membrane is horizontal, so average along the y axis
+                else:  # membrane is horizontal, so average along the y axis
                     length = int(y_diff + 5)
                     for x in point_x_set:
                         point_equ_x = contour[contour[:, 2] == x]
@@ -1031,6 +990,7 @@ class Membrane:
         self.__max_distance_to_boundary = None
         self.__membrane_vector = None
 
+
     @property
     def membrane_points(self):
         '''
@@ -1049,6 +1009,7 @@ class Membrane:
             call(s,shell = True)
         return self.__membrane_points * self.pixel_size
 
+
     @property
     def membrane_area(self):
         '''
@@ -1065,6 +1026,7 @@ class Membrane:
             self.__membrane_area = float(area) * self.pixel_size * self.pixel_size / 10000.0
         return self.__membrane_area
 
+
     @property
     def area_pixel_ratio(self):
 
@@ -1072,6 +1034,7 @@ class Membrane:
             self.__area_pixel_ratio = self.membrane_area / len(self.membrane_points)
 
         return self.__area_pixel_ratio
+
 
     def random_membrane_points(self, num_points = 100, remove_overlap = False, overlap_threshold = 7.0):
         #print(remove_overlap)
@@ -1105,11 +1068,13 @@ class Membrane:
             res.append(self.membrane_points[np.argmin(a)])
         return np.array(res)
 
+
     @property
     def membrane_mean(self):
         if self.__membrane_mean is None:
             self.__membrane_mean = np.average(self.membrane_points, axis = 0)
         return self.__membrane_mean
+
 
     def ppp(self, membraneName):
         import numpy as np
@@ -1126,7 +1091,6 @@ class Membrane:
             transVector = V[:, [0, 2]]
         else:
             transVector = V[:, :2]
-        # reduced_m = np.dot(data_m, transVector)
 
         out = transVector
         np.savetxt(membraneName, out)
@@ -1138,22 +1102,17 @@ class Membrane:
             import os
             pid = os.getpid()
             np.savetxt('{}_membrane.point'.format(pid), self.membrane_points)
+            
             from subprocess import call
-            # s="/Applications/MATLAB_R2021a.app/bin/matlab -nodisplay -nodesktop -nosplash -nojvm -r \"addpath(\'/storage/home-backup/home/lytao/software/synTomo/GABAAR\');ppp(\'{}_membrane.point\');exit;\" > /dev/null".format(pid)
-            # call(s,shell=True)
             self.ppp('{}_membrane.point'.format(pid))
-
             membrane2D=np.loadtxt('{}_membrane.point'.format(pid))
             self.__membrane_trans=membrane2D[:3]
 
             s = "rm {}_membrane.point".format(pid)
             call(s,shell = True)
 
-
-            # from shapely.geometry import Polygon
-            # self.__boundary = Polygon(membrane2D[3:])
-
         return self.__membrane_trans
+
 
     def membrane_vector(self):
         '''
@@ -1184,6 +1143,7 @@ class Membrane:
             tmp = self.membrane_trans
         return self.__boundary
 
+
     @property
     def convex_boundary(self):
         if self.__convex_boundary is None:
@@ -1198,6 +1158,7 @@ class Membrane:
 
     def transform2D(self, point3D):
         return np.matmul(point3D - self.membrane_mean, self.membrane_trans)
+
 
     def distance_to_boundary(self, points, boundary = None):
         if boundary is None:
@@ -1215,6 +1176,7 @@ class Membrane:
             else:
                 return -boundary.exterior.distance(pt_point)
         return np.array(list(map(d, points)))
+
 
     def max_membrane_distance_to_boundary(self, boundary = None):
         old = False
@@ -1242,6 +1204,7 @@ class Membrane:
                 else:
                     continue
             return distance
+
 
     @property
     def max_distance_to_boundary(self):
