@@ -128,7 +128,7 @@ def save_label_layer(tomo_viewer, layer_idx):
         # data = np.flip(data, axis=1)
         with mrcfile.new(save_path, overwrite=True) as mrc:
             mrc.set_data(data)
-    show_info('Saved at {}'.format(os.path.abspath(save_path)))
+    # show_info('Saved at {}'.format(os.path.abspath(save_path)))
 
 def get_info_from_json(json_file):
     with open(json_file, "r") as f:
