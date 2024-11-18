@@ -193,7 +193,8 @@ def add_picked_vesicle(tomo_viewer, data_to_add):
         tomo_viewer.print('Please reselect two points')
         show_info('Please reselect two points')
     else:
-        viewer.layers[LABEL_LAYER_IDX].data = viewer.layers[LABEL_LAYER_IDX].data + data_to_add  # update label layer
+        mask_n = np.sign(data_to_add) * np.sign(viewer.layers[LABEL_LAYER_IDX].data)
+        viewer.layers[LABEL_LAYER_IDX].data = viewer.layers[LABEL_LAYER_IDX].data + (1-mask_n) * data_to_add  # update label layer
         viewer.layers[LABEL_LAYER_IDX].refresh()
 
 def save_and_update_delete(tomo_viewer):
