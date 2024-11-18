@@ -144,11 +144,11 @@ class Vesicle:
                                                 phi = str(self._rotation2D)))
         
         if hasattr(self,"_evecs"):
-            for i, evec in enumerate(self._evecs):
+            for i, evec in enumerate(self._evecs.T):
                 vesicleElement.append(etree.Element("Evecs",\
-                                                    X = str(evec[0]),\
+                                                    X = str(evec[2]),\
                                                     Y = str(evec[1]),\
-                                                    Z = str(evec[2]),\
+                                                    Z = str(evec[0]),\
                                                     idx = str(i)))
 
         if hasattr(self,"_distance"):
@@ -284,7 +284,7 @@ class Vesicle:
         points = np.stack([x, y, z], axis=-1)  # (precision, 3), points is an isotropic sphere
         
         points *= self._radius3D
-        points = points @ self._evecs.T + self._center3D
+        points = points @ self._evecs + self._center3D
 
         # points = points[:, [2, 1, 0]]  # ls: dont need to change zyx to xyz 
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"        
@@ -307,7 +307,7 @@ class Vesicle:
         random_points /= np.linalg.norm(random_points, axis=-1, keepdims=True)
         
         points = random_points * self._radius3D
-        points = points @ self._evecs.T + self._center3D
+        points = points @ self._evecs + self._center3D
         points = points[:, [2, 1, 0]]  # zyx to xyz
 
         # assert points.shape == (precision, 3), f"Unexpected shape: {points.shape}"
