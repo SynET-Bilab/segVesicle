@@ -81,8 +81,9 @@ def main():
     timer = QTimer()
     timer.setInterval(100)  # 设置定时器间隔，单位为毫秒
     
-    viewer = napari.Viewer()
+    viewer = napari.Viewer(title='VesicleSeg')
     # 使用封装类
+    
     tomo_viewer = TomoViewer(viewer, current_path, pid)
     
     add_folder_list_widget(tomo_viewer)
