@@ -1,4 +1,7 @@
-from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QLabel, QLineEdit, QPushButton, QWidget, QFormLayout, QProgressDialog, QDesktopWidget
+from qtpy.QtWidgets import (
+    QMainWindow, QVBoxLayout, QLabel, QLineEdit, QPushButton, QWidget,
+    QFormLayout, QProgressDialog, QDesktopWidget, QComboBox
+)
 from qtpy.QtCore import Qt
 import subprocess
 
@@ -13,14 +16,14 @@ class MembSegmentationWindow(QMainWindow):
         self.setWindowTitle("Membrane Segmentation Parameters")
 
         # 调整窗口大小，增加宽度
-        self.resize(500, 100)
+        self.resize(500, 150)  # 增加高度以容纳新控件
 
         # 主部件和布局
         self.main_widget = QWidget(self)
         self.setCentralWidget(self.main_widget)
         self.layout = QVBoxLayout(self.main_widget)
 
-        # 表单布局，用于输入 pixel_size 和 extend
+        # 表单布局，用于输入 pixel_size、extend 和选择选项
         self.form_layout = QFormLayout()
 
         # Pixel size 输入
@@ -33,6 +36,11 @@ class MembSegmentationWindow(QMainWindow):
         self.extend_input.setPlaceholderText("Enter extend value (default: 30)")
         self.extend_input.setText("30")
         self.form_layout.addRow(QLabel("Extend:"), self.extend_input)
+
+        # 选项框：segprepost 或 segonemem
+        self.method_selection = QComboBox(self)
+        self.method_selection.addItems(["segprepost", "segonemem"])  # 添加选项
+        self.form_layout.addRow(QLabel("Segmentation Method:"), self.method_selection)
 
         # 将表单布局添加到主布局
         self.layout.addLayout(self.form_layout)
@@ -53,10 +61,13 @@ class MembSegmentationWindow(QMainWindow):
         extend = self.extend_input.text()
         extend = int(extend) if extend else 30  # 默认值为 30
 
-        # 执行膜分割
-        self.register_seg_memb(pixel_size=pixel_size, extend=extend)
+        # 获取用户选择的分割方法
+        selected_method = self.method_selection.currentText()
 
-    def register_seg_memb(self, pixel_size=None, extend=30):
+        # 执行膜分割
+        self.register_seg_memb(method=selected_method, pixel_size=pixel_size, extend=extend)
+
+    def register_seg_memb(self, method="segprepost", pixel_size=None, extend=30):
         # 显示进度对话框
         progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self)
         progress_dialog.setWindowTitle('Segmenting')
@@ -65,8 +76,10 @@ class MembSegmentationWindow(QMainWindow):
         progress_dialog.show()
 
         # 设置输出路径
-        output_path = self.tomo_viewer.tomo_path_and_stage.memb_folder_path + '/' + self.tomo_viewer.tomo_path_and_stage.base_tomo_name
-        cmd = f'segprepost.py run {self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path} {self.tomo_viewer.tomo_path_and_stage.memb_prompt_path} -o {output_path}'
+        output_path = f"{self.tomo_viewer.tomo_path_and_stage.memb_folder_path}/{self.tomo_viewer.tomo_path_and_stage.base_tomo_name}"
+        
+        # 根据选择的方法构建命令
+        cmd = f'{method}.py run {self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path} {self.tomo_viewer.tomo_path_and_stage.memb_prompt_path} -o {output_path}'
 
         # 如果 Pixel size 不为 None，则添加 --pixel 参数
         if pixel_size is not None:
@@ -96,8 +109,6 @@ class MembSegmentationWindow(QMainWindow):
             # 进度完成
             progress_dialog.setValue(100)
 
-        
-        
     def center_on_screen(self):
         ''' 使窗口居中显示 '''
         qr = self.frameGeometry()  # 获取窗口的矩形几何尺寸

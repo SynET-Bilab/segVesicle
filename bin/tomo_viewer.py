@@ -465,35 +465,6 @@ class TomoViewer:
         self.segmentation_window = MembSegmentationWindow(self)
         self.segmentation_window.show()
     
-    def register_seg_memb(self):
-        # 显示进度对话框
-        from qtpy.QtWidgets import QProgressDialog
-        from qtpy.QtCore import Qt
-        self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
-        self.progress_dialog.setWindowTitle('Opening')
-        self.progress_dialog.setWindowModality(Qt.WindowModal)
-        self.progress_dialog.setValue(0)
-        self.progress_dialog.show()
-
-        # 设置输出路径
-        output_path = self.tomo_path_and_stage.memb_folder_path + '/' + self.tomo_path_and_stage.base_tomo_name
-        cmd = f'segprepost.py run {self.tomo_path_and_stage.isonet_tomo_path} {self.tomo_path_and_stage.memb_prompt_path} -o {output_path}'
-
-        try:
-            # 运行命令并捕获错误
-            subprocess.run(cmd, shell=True, check=True)
-
-            # 成功时的提示信息
-            result = f'Membrane segmentation successful. The result is saved at {self.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
-            self.print(result)
-
-        except subprocess.CalledProcessError as e:
-            # 捕获错误并输出错误信息
-            error_message = f"An error occurred during membrane segmentation: {str(e)}"
-            self.print(error_message)
-
-        # 进度完成
-        self.progress_dialog.setValue(100)
     
     def register_vis_memb(self):
         def read_point(point_file, dtype_z=int):
