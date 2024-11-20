@@ -113,6 +113,9 @@ class MembSegmentationWindow(QMainWindow):
         result = f'Membrane segmentation successful. The result is saved at {self.tomo_viewer.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
         self.tomo_viewer.print(result)
         self.apply_button.setEnabled(True)
+        
+        # Automatically close the window upon successful completion
+        self.close()
 
     def on_segmentation_error(self, error_message):
         self.tomo_viewer.print(f"An error occurred during membrane segmentation: {error_message}")
