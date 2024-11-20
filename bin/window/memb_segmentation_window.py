@@ -85,6 +85,7 @@ class MembSegmentationWindow(QMainWindow):
         selected_method = self.method_selection.currentText()
         output_path = f"{self.tomo_viewer.tomo_path_and_stage.memb_folder_path}/{self.tomo_viewer.tomo_path_and_stage.base_tomo_name}"
         
+        self.result = f'Membrane segmentation successful. The result is saved at {self.tomo_viewer.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
         cmd = f'{selected_method}.py run {self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path} {self.tomo_viewer.tomo_path_and_stage.memb_prompt_path} -o {output_path}'
         
         if pixel_size is not None:
@@ -110,8 +111,8 @@ class MembSegmentationWindow(QMainWindow):
         self.apply_button.setEnabled(False)
 
     def on_segmentation_finished(self):
-        result = f'Membrane segmentation successful. The result is saved at {self.tomo_viewer.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
-        self.tomo_viewer.print(result)
+        # result = f'Membrane segmentation successful. The result is saved at {self.tomo_viewer.tomo_path_and_stage.memb_folder_path}. You can click Visualize to view the result.'
+        self.tomo_viewer.print(self.result)
         self.apply_button.setEnabled(True)
         
         # Automatically close the window upon successful completion
