@@ -53,6 +53,7 @@ class TomoPathAndStage:
         self.tether_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_tether.xml')
         self.contact_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_contact.xml')
         self.omega_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_omega.xml')
+        self.weidong_excel_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_wd.xlsx')
         self.segment_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_segment.mrc')
         self.label_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_label_vesicle.mrc')
         self.json_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle.json')

@@ -31,6 +31,7 @@ from window.distance_filter_window import DistanceFilterWindow
 from window.annotate_vesicle_class import VesicleAnnotationWindow
 from window.fix_false_negative_vesicle import FixFNWindow
 from window.xml_exporter_dialog import export_final_xml
+from util.wd_excel_export import export_wd_excel
 from window.finetune_model_window import FinetuneModelWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
@@ -83,7 +84,7 @@ class TomoViewer:
         # self.register_analyze_by_volume()
         # self.register_show_single_vesicle()
         self.register_fix_fn_vesicle()
-        
+        self.register_xport_wd_excel()
         try:
             self.toolbar_widget.finish_isonet_button.clicked.disconnect()
         except TypeError:
@@ -1064,4 +1065,13 @@ class TomoViewer:
             pass
         self.toolbar_widget.export_final_xml_button.clicked.connect(
             lambda: export_final_xml(self.main_viewer, self.tomo_path_and_stage, self.print)
+        )
+        
+    def register_xport_wd_excel(self):
+        try:
+            self.toolbar_widget.export_wd_excel_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.export_wd_excel_button.clicked.connect(
+            lambda: export_wd_excel(self.tomo_path_and_stage, self.print)
         )

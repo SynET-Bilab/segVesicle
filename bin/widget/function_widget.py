@@ -67,6 +67,7 @@ class ToolbarWidget(QWidget):
         self.fix_fn_button = self.add_button(self.vesicle_analysis_layout, "Fix Flase Negative Vesicles")
         self.multi_class_visualize_button = self.add_button(self.vesicle_analysis_layout, "Multi-class Visualization")
         self.export_final_xml_button = self.add_button(self.vesicle_analysis_layout, "Export Final Vesicle Data")
+        self.export_wd_excel_button = self.add_button(self.vesicle_analysis_layout, "Export Excel for Weidong")
 
         # Set the main layout for the widget
         self.main_layout = QVBoxLayout()
