@@ -787,7 +787,7 @@ class Surface:
         return 0
     
     
-    def from_model_auto_segment(self, model, objNum=2):
+    def from_model_auto_segment(self, model, objNum, amp=1):
         '''
         load membrane from model file produced by auto-segmentation
         premembrane: object num: 2
@@ -865,6 +865,7 @@ class Surface:
         untreated = untreated[untreated[:, 0] == objNum]
         
         membrane = max_filter(untreated)
+        membrane = membrane * amp  # amplify the membrane to the original size
         np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
         
         self._densePoints = membrane[:, 2:]
