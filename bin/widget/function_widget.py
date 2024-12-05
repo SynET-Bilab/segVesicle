@@ -49,6 +49,9 @@ class ToolbarWidget(QWidget):
         self.stsyseg_button = self.add_button(self.memb_layout, "Stsyseg")
         self.visualize_button = self.add_button(self.memb_layout, "Visualize")
         self.manualy_draw_button = self.add_button(self.memb_layout, "Manually Draw")
+        # self.extract_memb_button = self.add_button(self.memb_layout, "Extract Memb")
+        self.interpolate_memb_button = self.add_button(self.memb_layout, "Interpolate Memb")
+        self.save_memb_button = self.add_button(self.memb_layout, "Save Memb")
 
         # Create layout for the Analysis tab and add buttons
         # self.analysis_layout = QVBoxLayout()

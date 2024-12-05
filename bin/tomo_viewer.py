@@ -31,6 +31,7 @@ from window.distance_filter_window import DistanceFilterWindow
 from window.annotate_vesicle_class import VesicleAnnotationWindow
 from window.fix_false_negative_vesicle import FixFNWindow
 from window.xml_exporter_dialog import export_final_xml
+from window.interpolate_memb_dialog import InterpolateMembDialog
 from util.wd_excel_export import export_wd_excel
 from window.finetune_model_window import FinetuneModelWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
@@ -70,17 +71,24 @@ class TomoViewer:
         self.register_correction_tomo()
         self.register_deconv_tomo()
         self.register_open_ori_tomo()
+        
         self.register_draw_area_mod()
         self.register_export_xlsx()
         self.register_finetune_model()
         self.register_manualy_correction()
+        
         self.register_distance_calc()
         self.register_filter_vesicle()
         self.register_annotate_pit()
         self.register_annotate_vesicle()
         self.register_multi_class_visualize()
         self.register_export_final_xml()
+        
         self.register_manualy_draw_memb()
+        # self.register_extract_memb()
+        self.register_interpolate_memb()
+        self.register_save_mamually_memb()
+        
         # self.register_analyze_by_volume()
         # self.register_show_single_vesicle()
         self.register_fix_fn_vesicle()
@@ -521,6 +529,7 @@ class TomoViewer:
             return
         
         model_df = read_model(model_file)
+        self.memb_df = model_df
 
         shape = self.viewer.layers[0].data.shape  # 请根据你的实际情况调整
         data = mod_to_3d_data(model_df, shape)
@@ -588,100 +597,349 @@ class TomoViewer:
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
         
     def register_manualy_draw_memb(self):
+        # def manualy_draw_memb():
+        #     """
+        #     手动绘制膜并保存为 .mod 文件。
+            
+        #     要求：
+        #     1. 每个 z 值有一个或多个点。
+        #     2. 在连续的 z 轴上进行标注。
+        #     3. 同一个 z 的点保存在同一个 contour 中，每个 z 创建一个 contour。
+        #     4. 保存为 .mod 文件到 self.tomo_path_and_stage.manualy_memb_path。
+        #     """
+            
+        #     def write_model(model_file, model_df):
+        #         """ 将点文件转换为 .mod 文件 """
+        #         model = np.asarray(model_df)
+            
+        #         # 提取model_file的文件夹路径
+        #         model_dir = os.path.dirname(model_file)
+            
+        #         # 如果文件夹不存在，则创建文件夹
+        #         if not os.path.exists(model_dir):
+        #             os.makedirs(model_dir)
+            
+        #         with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+        #             # 保存点文件
+        #             point_file = temp_file.name
+        #             np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
+            
+        #             # 使用 point2model 命令将点文件转换为 .mod 文件
+        #             cmd = f"point2model -op {point_file} {model_file} >/dev/null"
+        #             subprocess.run(cmd, shell=True, check=True)
+            
+        #     def validate_and_group_points(points):
+        #         """ 验证点并按连续的 z 值分组 """
+        #         if len(points) == 0:
+        #             self.print("Error: No input points provided.")
+        #             return None
+                
+        #         # 按 z 值分组
+        #         z_groups = {}
+        #         for point in points:
+        #             z = point[0]
+        #             if z not in z_groups:
+        #                 z_groups[z] = []
+        #             z_groups[z].append(point)
+                
+        #         # 检查 z 值是否连续
+        #         sorted_z = sorted(z_groups.keys())
+        #         for i in range(1, len(sorted_z)):
+        #             if sorted_z[i] - sorted_z[i-1] != 1:
+        #                 self.print(f"Error: Z values are not continuous. Gap found between z={sorted_z[i-1]} and z={sorted_z[i]}.")
+        #                 return None
+                
+        #         return z_groups
+            
+        #     # 获取点数据
+        #     points = self.viewer.layers['edit vesicles'].data
+            
+        #     # 验证并分组点数据
+        #     z_groups = validate_and_group_points(points)
+            
+        #     # 如果验证不通过，直接退出并清空点数据
+        #     if z_groups is None:
+        #         self.viewer.layers['edit vesicles'].data = None
+        #         return
+            
+        #     # 准备保存的点数据
+        #     data = []
+        #     object_id = 1  # 只有一个 object
+        #     contour_id = 1  # contour 从1开始
+        #     sorted_z = sorted(z_groups.keys())
+            
+        #     for z in sorted_z:
+        #         group = z_groups[z]
+        #         for point in group:
+        #             # 假设点的格式为 [z, y, x]
+        #             # object_id, contour_id, x, y, z (1-based for object and contour)
+        #             data.append([object_id, contour_id, point[2], point[1], point[0]])
+        #         contour_id += 1  # 每个 z 创建一个新的 contour
+            
+        #     # 转换为 DataFrame
+        #     df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
+            
+        #     # 保存为 .mod 文件
+        #     write_model(self.tomo_path_and_stage.manualy_memb_path, df)
+        #     self.print("Points validated and saved successfully.")
+            
+        #     # 最后清空点数据
+        #     self.viewer.layers['edit vesicles'].data = None
         def manualy_draw_memb():
-            """
-            手动绘制膜并保存为 .mod 文件。
+            # Step 1: Get the shape of the first layer
+            label_shape = self.viewer.layers[0].data.shape
             
-            要求：
-            1. 每个 z 值有一个或多个点。
-            2. 在连续的 z 轴上进行标注。
-            3. 同一个 z 的点保存在同一个 contour 中，每个 z 创建一个 contour。
-            4. 保存为 .mod 文件到 self.tomo_path_and_stage.manualy_memb_path。
-            """
+            # Step 2: Create an array of zeros with the same shape
+            zero_array = np.zeros(label_shape, dtype=np.uint8)
             
-            def write_model(model_file, model_df):
-                """ 将点文件转换为 .mod 文件 """
-                model = np.asarray(model_df)
+            # Step 3: Add the array as a new layer with the name 'Draw Membrane'
+            membrane_layer = self.viewer.add_labels(zero_array, name='Draw Membrane')
             
-                # 提取model_file的文件夹路径
-                model_dir = os.path.dirname(model_file)
-            
-                # 如果文件夹不存在，则创建文件夹
-                if not os.path.exists(model_dir):
-                    os.makedirs(model_dir)
-            
-                with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
-                    # 保存点文件
-                    point_file = temp_file.name
-                    np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
-            
-                    # 使用 point2model 命令将点文件转换为 .mod 文件
-                    cmd = f"point2model -op {point_file} {model_file} >/dev/null"
-                    subprocess.run(cmd, shell=True, check=True)
-            
-            def validate_and_group_points(points):
-                """ 验证点并按连续的 z 值分组 """
-                if len(points) == 0:
-                    self.print("Error: No input points provided.")
-                    return None
-                
-                # 按 z 值分组
-                z_groups = {}
-                for point in points:
-                    z = point[0]
-                    if z not in z_groups:
-                        z_groups[z] = []
-                    z_groups[z].append(point)
-                
-                # 检查 z 值是否连续
-                sorted_z = sorted(z_groups.keys())
-                for i in range(1, len(sorted_z)):
-                    if sorted_z[i] - sorted_z[i-1] != 1:
-                        self.print(f"Error: Z values are not continuous. Gap found between z={sorted_z[i-1]} and z={sorted_z[i]}.")
-                        return None
-                
-                return z_groups
-            
-            # 获取点数据
-            points = self.viewer.layers['edit vesicles'].data
-            
-            # 验证并分组点数据
-            z_groups = validate_and_group_points(points)
-            
-            # 如果验证不通过，直接退出并清空点数据
-            if z_groups is None:
-                self.viewer.layers['edit vesicles'].data = None
-                return
-            
-            # 准备保存的点数据
-            data = []
-            object_id = 1  # 只有一个 object
-            contour_id = 1  # contour 从1开始
-            sorted_z = sorted(z_groups.keys())
-            
-            for z in sorted_z:
-                group = z_groups[z]
-                for point in group:
-                    # 假设点的格式为 [z, y, x]
-                    # object_id, contour_id, x, y, z (1-based for object and contour)
-                    data.append([object_id, contour_id, point[2], point[1], point[0]])
-                contour_id += 1  # 每个 z 创建一个新的 contour
-            
-            # 转换为 DataFrame
-            df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
-            
-            # 保存为 .mod 文件
-            write_model(self.tomo_path_and_stage.manualy_memb_path, df)
-            self.print("Points validated and saved successfully.")
-            
-            # 最后清空点数据
-            self.viewer.layers['edit vesicles'].data = None
+            # Step 4: Set the layer to paint mode with brush size of 1
+            membrane_layer.mode = 'paint'
+            membrane_layer.brush_size = 1
     
         try:
             self.toolbar_widget.manualy_draw_button.clicked.disconnect()
         except TypeError:
             pass
         self.toolbar_widget.manualy_draw_button.clicked.connect(manualy_draw_memb)
+        
+    def register_extract_memb(self):
+        def extract_memb():
+            """
+            提取并处理膜层（Membrane）的mask数据。
+
+            参数：
+            - self: 类的实例，包含viewer和layers属性。
+            - extract_stride (int): 切片步长，每隔多少个z切片保留一次mask。
+            """
+            extract_stride = 10
+            
+            # 获取原始的三维mask数据 (z, y, x)
+            original_data = self.viewer.layers['Membrane'].data
+
+            # 步骤 2: 只保留mask值为2的部分，其余设置为0
+            # 生成一个与original_data形状相同的布尔数组，值为True的位置对应mask值为2
+            mask_value_2 = (original_data == 2)
+            
+            # 创建一个新的数据数组，初始为全0
+            new_data = np.zeros_like(original_data, dtype=original_data.dtype)
+            
+            # 将mask值为2的位置设置为2，其他位置保持为0
+            new_data[mask_value_2] = 1
+
+            # 步骤 3: 设置切片步长extract_stride
+            # 找到第一个z切片中mask不是全0的位置
+            # 通过对每个z切片求和，判断是否有非零值
+            z_sums = new_data.sum(axis=(1, 2))
+            non_zero_z_indices = np.where(z_sums > 0)[0]
+            
+            if non_zero_z_indices.size == 0:
+                print("没有找到任何mask值为2的z切片。")
+                # 如果没有找到非零的z切片，直接覆盖原数据
+                self.viewer.layers['Membrane'].data = new_data
+                return
+            
+            # 第一个非零的z切片索引
+            start_z = non_zero_z_indices[0]
+            
+            # 生成一个布尔数组，标记需要保留的z切片
+            # 从start_z开始，每隔extract_stride个切片保留一次
+            mask_z = np.zeros(new_data.shape[0], dtype=bool)
+            mask_z[start_z::extract_stride] = True
+            
+            # 应用z切片的mask，只保留标记为True的切片，其他切片置0
+            # 使用广播机制，将mask_z应用到所有y和x维度
+            new_data = np.where(mask_z[:, None, None], new_data, 0)
+            
+            # 步骤 4: 覆盖原始的mask数据
+            self.viewer.layers['Membrane'].data = new_data
+
+            print("膜层mask数据已成功提取并更新。")
+    
+        try:
+            self.toolbar_widget.extract_memb_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.extract_memb_button.clicked.connect(extract_memb)
+        
+    def register_interpolate_memb(self):
+        def on_interpolate_memb_button_clicked():
+            dialog = InterpolateMembDialog(parent=self.viewer.window._qt_window)
+            if dialog.exec_():
+                operation, membrane_type, threshold = dialog.get_values()
+                try:
+                    interpolate_memb(operation, membrane_type, threshold)
+                except Exception as e:
+                    QMessageBox.critical(self.viewer.window._qt_window, "Error", str(e))
+                    
+        def interpolate_memb(operation='dilation_erosion', membrane_type='front', threshold=0.2):
+            from scipy.ndimage import binary_dilation, binary_erosion
+            """
+            Interpolates membrane lines across multiple z-layers and creates a new label layer in Napari.
+            """
+            # Retrieve existing membrane mask data, assuming shape is (z, y, x)
+            if 'Draw Membrane' not in self.viewer.layers:
+                raise ValueError("Layer 'Draw Membrane' not found.")
+
+            membrane_mask = self.viewer.layers['Draw Membrane'].data
+
+            if membrane_mask.ndim != 3:
+                raise ValueError("Data in 'Draw Membrane' layer should be a 3D array (z, y, x).")
+
+            # Determine which z-layers contain membrane annotations
+            labeled_z = np.where(membrane_mask.any(axis=(1, 2)))[0]
+            labeled_z = np.sort(labeled_z)
+
+            if len(labeled_z) < 2:
+                raise ValueError("At least two z-layers with membrane annotations are required for interpolation.")
+
+            # Initialize interpolated membrane mask with all zeros
+            interpolated_mask = np.zeros_like(membrane_mask, dtype=np.uint8)
+
+            structuring_element = np.ones((3, 3), dtype=bool)  # 3x3 structuring element
+
+            # Perform morphological operations based on selected operation type
+            if operation == 'dilation_erosion':
+                # Apply dilation before interpolation
+                for z in labeled_z:
+                    membrane_mask[z] = binary_dilation(membrane_mask[z], structure=structuring_element)
+            elif operation == 'none':
+                pass  # No morphological operations
+            else:
+                raise ValueError("Unknown operation type")
+
+            # Copy existing membrane annotations to the interpolated mask
+            interpolated_mask[labeled_z] = membrane_mask[labeled_z]
+
+            # Iterate through adjacent labeled z-layers and perform linear interpolation
+            for i in range(len(labeled_z) - 1):
+                z_start = labeled_z[i]
+                z_end = labeled_z[i + 1]
+                mask_start = membrane_mask[z_start].astype(float)
+                mask_end = membrane_mask[z_end].astype(float)
+                num_interp = z_end - z_start - 1
+
+                if num_interp <= 0:
+                    continue  # Adjacent z-layers, no interpolation needed
+
+                for dz in range(1, num_interp + 1):
+                    z_interp = z_start + dz
+                    alpha = dz / (z_end - z_start)  # Interpolation weight
+
+                    # Perform linear interpolation
+                    mask_interp = (1 - alpha) * mask_start + alpha * mask_end
+
+                    # Binarize the interpolation result
+                    mask_interp_binary = (mask_interp > threshold).astype(np.uint8)
+
+                    # Update the interpolated mask with binary values
+                    interpolated_mask[z_interp] = mask_interp_binary
+
+            # Perform morphological operations after interpolation
+            if operation == 'dilation_erosion':
+                # Apply erosion after interpolation
+                for z in range(interpolated_mask.shape[0]):
+                    if interpolated_mask[z].any():  # If the current layer has annotations
+                        interpolated_mask[z] = binary_erosion(interpolated_mask[z], structure=structuring_element) * interpolated_mask[z]
+            elif operation == 'none':
+                pass  # No morphological operations
+            else:
+                raise ValueError("Unknown operation type")
+
+            # Update the interpolated mask with appropriate values based on membrane type
+            if membrane_type == 'front':
+                interpolated_mask[interpolated_mask > 0] = 2
+            elif membrane_type == 'rear':
+                interpolated_mask[interpolated_mask > 0] = 22
+            else:
+                raise ValueError("Unknown membrane type")
+
+            # Add the new label layer to Napari
+            if 'Membrane Labels' in self.viewer.layers:
+                self.viewer.layers.remove('Membrane Labels')  # Remove old layer if it exists
+
+            self.viewer.add_labels(interpolated_mask, name='Membrane Labels')
+            self.viewer.layers.remove('Draw Membrane')
+                
+        try:
+            self.toolbar_widget.interpolate_memb_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.interpolate_memb_button.clicked.connect(on_interpolate_memb_button_clicked)
+    
+    def register_save_mamually_memb(self):
+        def save_mamually_memb():
+            original_data = self.viewer.layers['Membrane'].data
+            new_data = self.viewer.layers['Membrane Labels'].data
+            # 进行按位或运算
+            combined_data = original_data | new_data
+
+            # 将结果覆盖回原来的层
+            self.viewer.layers['Membrane'].data = combined_data
+
+            # 可选：更新显示
+            self.viewer.layers['Membrane'].refresh()
+            
+            self.viewer.layers.remove('Membrane Labels')
+            
+            # 1. 获取修改后的数据
+            data = self.viewer.layers['Membrane'].data
+            
+            # 2. 定义反向映射关系，从数据值映射回object编号
+            # 原始的obj_mapping是 {1: 0, 2: 2, 3: 22}
+            # 因此反向映射为 {2: 2, 22: 3}
+            obj_mapping_reverse = {2: 2, 22: 3}
+            
+            # 3. 提取非零值的坐标和对应的object编号
+            z_idx, y_idx, x_idx = np.nonzero(data)
+            values = data[z_idx, y_idx, x_idx]
+            
+            # 仅保留在反向映射中的值（即排除值为0或不在映射中的值）
+            valid_indices = [i for i, val in enumerate(values) if val in obj_mapping_reverse]
+            z_idx = z_idx[valid_indices]
+            y_idx = y_idx[valid_indices]
+            x_idx = x_idx[valid_indices]
+            values = values[valid_indices]
+            
+            # 获取对应的object编号
+            objects = [obj_mapping_reverse[val] for val in values]
+            
+            # 4. 调整contour和z的值
+            # contour代表点所在的不同z轴，从1开始
+            contours = z_idx + 1  # 将z_idx从0开始调整为从1开始
+            z_values = z_idx.astype(int)  # z值为索引即可，无需调整
+            
+            # 5. 构建DataFrame
+            df = pd.DataFrame({
+                'object': objects,
+                'contour': contours,
+                'x': x_idx.astype(float),
+                'y': y_idx.astype(float),
+                'z': z_values
+            })
+            
+            # 6. 保存DataFrame为点文件，并转换回.mod文件
+            with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
+                point_file = temp_file.name
+                # 保存点文件
+                df.to_csv(point_file, sep=' ', index=False, header=False)
+                
+                # 使用point2model将点文件转换为.mod文件
+                output_mod_file = self.tomo_path_and_stage.new_memb_result_path
+                cmd = f"point2model {point_file} {output_mod_file} >/dev/null"
+                subprocess.run(cmd, shell=True, check=True)
+            
+            # 7. 操作成功后输出提示
+            self.print(f"Membrane layer saved back to {output_mod_file} successfully.")
+            
+        
+        try:
+            self.toolbar_widget.save_memb_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.save_memb_button.clicked.connect(save_mamually_memb)
         
     def register_finetune_model(self):
         def open_finetune_window():

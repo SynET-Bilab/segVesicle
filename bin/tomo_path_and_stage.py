@@ -42,7 +42,9 @@ class TomoPathAndStage:
         self.memb_prompt_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', 'prompt.mod')
         self.memb_folder_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane')
         self.memb_result_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', self.base_tomo_name + '.mod')
+        self.new_memb_result_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', self.base_tomo_name + '_new.mod')
         self.manualy_memb_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', self.base_tomo_name + '_manual.mod')
+        
         self.isonet_tomo_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_wbp_corrected.mrc')
         self.ori_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_ori.xml')
         self.ori_filter_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_filter_bak.xml')
