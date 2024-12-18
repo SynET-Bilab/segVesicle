@@ -39,6 +39,7 @@ class TomoPathAndStage:
         self.deconv_para = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomo_deconv', self.base_tomo_name + '.json')
         self.correction_output_path = os.path.join(self.current_path, tomo_name, 'ves_seg')
         self.area_path = os.path.join(self.current_path, tomo_name, 'area.mod')
+        self.area_by_sam_path = os.path.join(self.current_path, tomo_name, 'sam_area.mrc')
         self.memb_prompt_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', 'prompt.mod')
         self.memb_folder_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane')
         self.memb_result_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', self.base_tomo_name + '.mod')

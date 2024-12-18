@@ -349,6 +349,8 @@ class TomoViewer:
             self.label = predict_label(self.deconv_data, self.corrected_data)
             # self.label = self.viewer.layers['label'].data
             self.progress_dialog.setValue(40)
+            if os.path.exists(self.tomo_path_and_stage.area_by_sam_path):
+                self.area_path = self.tomo_path_and_stage.area_by_sam_path
             if os.path.exists(self.tomo_path_and_stage.area_path):
                 self.area_path = self.tomo_path_and_stage.area_path
             else:

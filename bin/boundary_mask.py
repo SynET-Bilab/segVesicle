@@ -1,8 +1,24 @@
 '''This function is copied from `https://github.com/IsoNet-cryoET/IsoNet/blob/master/util/filter.py`
 '''
+import mrcfile
 import numpy as np
 from skimage.morphology import dilation, cube
 
+def get_tomo(path):
+    """
+    Load a 3D MRC file as a numpy array.
+
+    Parameters:
+    - path: str
+        Path to the MRC file.
+
+    Returns:
+    - data: ndarray
+        The 3D data loaded from the MRC file.
+    """
+    with mrcfile.open(path) as mrc:
+        data = mrc.data
+    return data
 
 def boundary_mask(tomo, mask_boundary, pixelsize = 17.14):
 
@@ -19,6 +35,9 @@ def boundary_mask(tomo, mask_boundary, pixelsize = 17.14):
         points = np.loadtxt(mask_boundary[:-4]+'.point', dtype = np.float32)/binning
     elif mask_boundary[-6:] == '.point':
         points = np.loadtxt(mask_boundary[:-6]+'.point', dtype = np.float32)/binning
+    elif mask_boundary[-4:] == '.mrc':
+        out = get_tomo(mask_boundary)
+        return out
     else:
         logging.error("mask boundary file should end with .mod or .point but got {} !\n".format(mask_boundary))
         sys.exit()
