@@ -351,7 +351,7 @@ class TomoViewer:
             self.progress_dialog.setValue(40)
             if os.path.exists(self.tomo_path_and_stage.area_by_sam_path):
                 self.area_path = self.tomo_path_and_stage.area_by_sam_path
-            if os.path.exists(self.tomo_path_and_stage.area_path):
+            elif os.path.exists(self.tomo_path_and_stage.area_path):
                 self.area_path = self.tomo_path_and_stage.area_path
             else:
                 self.area_path = None
