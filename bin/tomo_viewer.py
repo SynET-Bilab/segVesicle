@@ -308,13 +308,13 @@ class TomoViewer:
             msg_box.exec_()
             return
             
-        if not os.path.exists(self.tomo_path_and_stage.area_path):
-            self.print("Please draw tomo area first.")
-        elif not os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
-            self.print("Predict need deconv data.")
-        elif not os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
-            self.print("Predict need correction data.")
-        else:
+        # if not os.path.exists(self.tomo_path_and_stage.area_path):
+        #     self.print("Please draw tomo area first.")
+        # elif not os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
+        #     self.print("Predict need deconv data.")
+        # elif not os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
+        #     self.print("Predict need correction data.")
+        if self.viewer.layers != None:
             
             from qtpy.QtWidgets import QProgressDialog
             from qtpy.QtCore import Qt
@@ -332,19 +332,28 @@ class TomoViewer:
             # 检查并获取 deconv_data
             if 'deconv_tomo' in self.viewer.layers:
                 self.deconv_data = self.viewer.layers['deconv_tomo'].data
-            else:
+            elif os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
                 self.deconv_data = get_tomo(self.tomo_path_and_stage.deconv_tomo_path)
+            else:
+                self.deconv_data = self.viewer.layers[0].data
 
             # 检查并获取 corrected_data
             if 'corrected_tomo' in self.viewer.layers:
                 self.corrected_data = self.viewer.layers['corrected_tomo'].data
-            else:
+            elif os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
                 self.corrected_data = get_tomo(self.tomo_path_and_stage.isonet_tomo_path)
+            else:
+                self.corrected_data = self.viewer.layers[0].data
+            
             self.progress_dialog.setValue(20)
             self.label = predict_label(self.deconv_data, self.corrected_data)
             # self.label = self.viewer.layers['label'].data
             self.progress_dialog.setValue(40)
-            self.area_path = self.tomo_path_and_stage.area_path
+            if os.path.exists(self.tomo_path_and_stage.area_path):
+                self.area_path = self.tomo_path_and_stage.area_path
+            else:
+                self.area_path = None
+            
             self.processed_vesicles, self.shape = morph_process(self.label, self.area_path)
             self.progress_dialog.setValue(60)
 
@@ -359,6 +368,57 @@ class TomoViewer:
             self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
             self.progress_dialog.setValue(100)
             self.show_current_state()
+        # if not os.path.exists(self.tomo_path_and_stage.area_path):
+        #     self.print("Please draw tomo area first.")
+        # elif not os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
+        #     self.print("Predict need deconv data.")
+        # elif not os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
+        #     self.print("Predict need correction data.")
+        # else:
+            
+        #     from qtpy.QtWidgets import QProgressDialog
+        #     from qtpy.QtCore import Qt
+        #     self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
+        #     self.progress_dialog.setWindowTitle('Predicting')
+        #     self.progress_dialog.setWindowModality(Qt.WindowModal)
+        #     self.progress_dialog.setValue(0)
+        #     self.progress_dialog.show()
+        #     # self.deconv_data = self.viewer.layers['deconv_tomo'].data
+        #     # self.corrected_data = self.viewer.layers['corrected_tomo'].data
+        #     def get_tomo(path):
+        #         with mrcfile.open(path) as mrc:
+        #             data = mrc.data
+        #         return data
+        #     # 检查并获取 deconv_data
+        #     if 'deconv_tomo' in self.viewer.layers:
+        #         self.deconv_data = self.viewer.layers['deconv_tomo'].data
+        #     else:
+        #         self.deconv_data = get_tomo(self.tomo_path_and_stage.deconv_tomo_path)
+
+        #     # 检查并获取 corrected_data
+        #     if 'corrected_tomo' in self.viewer.layers:
+        #         self.corrected_data = self.viewer.layers['corrected_tomo'].data
+        #     else:
+        #         self.corrected_data = get_tomo(self.tomo_path_and_stage.isonet_tomo_path)
+        #     self.progress_dialog.setValue(20)
+        #     self.label = predict_label(self.deconv_data, self.corrected_data)
+        #     # self.label = self.viewer.layers['label'].data
+        #     self.progress_dialog.setValue(40)
+        #     self.area_path = self.tomo_path_and_stage.area_path
+        #     self.processed_vesicles, self.shape = morph_process(self.label, self.area_path)
+        #     self.progress_dialog.setValue(60)
+
+        #     self.vesicle_info = vesicle_measure(self.corrected_data, self.processed_vesicles, self.shape, min_radius=8)
+        #     with open(self.tomo_path_and_stage.new_json_file_path,"w") as out:
+        #         json.dump(self.vesicle_info,out)
+        #     self.ves_tomo = vesicle_rendering(self.vesicle_info, self.shape)
+        #     with mrcfile.new(self.tomo_path_and_stage.new_label_file_path, overwrite=True) as mrc:
+        #         mrc.set_data(self.ves_tomo)
+        #     self.viewer.add_labels(self.ves_tomo, name='label')
+        #     self.viewer.layers['label'].opacity = 0.5 
+        #     self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+        #     self.progress_dialog.setValue(100)
+        #     self.show_current_state()
         
     def register_export_xlsx(self):
         def export_xlsx():
