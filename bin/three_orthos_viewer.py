@@ -24,7 +24,7 @@ from global_vars import TOMO_NAME
 from help_viewer import HelpViewer
 
 # 判断当前 napari 版本是否大于 0.4.16
-NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16") and parse_version(napari.__version__) < parse_version("0.5.1")
+NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16") and parse_version(napari.__version__) < parse_version("0.5.0")
 # NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
 
 import concurrent.futures

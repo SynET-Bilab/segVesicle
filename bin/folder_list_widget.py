@@ -16,6 +16,7 @@ from tomo_viewer import TomoViewer
 from global_vars import TOMO_NAME
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.resample import resample_image
+from util.io import get_tomo
 
 LABEL_START = 10000  # large enough to avoid overlap with original labe
 LABEL_LAYER_IDX = 'label'
@@ -26,11 +27,6 @@ global added_vesicle_num
 added_vesicle_num = 0
 label_history = None
 tomo_path = None
-
-def get_tomo(path):
-    with mrcfile.open(path) as mrc:
-        data = mrc.data
-    return data
 
         
 class FolderListWidget(QWidget):

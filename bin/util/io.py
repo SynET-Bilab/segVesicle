@@ -3,9 +3,25 @@
 import os
 import tempfile
 import subprocess
+import mrcfile
 import pandas as pd
 import numpy as np
 
+def get_tomo(path):
+    """
+    Load a 3D MRC file as a numpy array.
+
+    Parameters:
+    - path: str
+        Path to the MRC file.
+
+    Returns:
+    - data: ndarray
+        The 3D data loaded from the MRC file.
+    """
+    with mrcfile.open(path) as mrc:
+        data = mrc.data
+    return data
 #save_points_as_mod(points, object_id=1, model_file="/share/data/CryoET_Data/lvzy/segVesicle_test/p545/ves_seg/sampled_points.mod")
 
 def save_points_as_mod(points: np.ndarray, object_id: int, model_file: str):

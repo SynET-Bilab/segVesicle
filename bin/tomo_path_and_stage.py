@@ -31,7 +31,8 @@ class TomoPathAndStage:
         self.base_tomo_name = tomo_name.split('-1')[0] if '-1' in tomo_name else tomo_name
 
         # 初始化路径
-        self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-wbp.rec')
+        self.ori_tomo_path = None
+        # self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-wbp.rec')
         # self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-5i.rec')
         self.rec_tomo_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomoset', self.base_tomo_name + '_wbp_resample.mrc')
         self.tomograms_star_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomograms.star')

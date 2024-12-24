@@ -13,6 +13,7 @@ from napari.utils.notifications import show_info
 from napari.resources import ICONS
 # from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
 
+from util.io import get_tomo
 from segVesicle.utils import make_ellipsoid as mk
 from morph import density_fit, density_fit_2d, fit_6pts, dis
 from tomo_viewer import TomoViewer
@@ -58,10 +59,6 @@ def save_and_update_add_6pts_with_queue(tomo_viewer):
 def save_and_update_delete_with_queue(tomo_viewer):
     task_queue.put((save_and_update_delete, (tomo_viewer,)))
 
-def get_tomo(path):
-    with mrcfile.open(path) as mrc:
-        data = mrc.data
-    return data
 
 def vesicle_rendering(vesicle_info, tomo_dims, idx):
     vesicle_tomo = np.zeros(np.array(tomo_dims) + np.array([30,30,30]), dtype=np.int16)

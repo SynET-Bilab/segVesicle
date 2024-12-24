@@ -1,10 +1,6 @@
 import mrcfile
 from scipy.ndimage import zoom
-
-def get_tomo(input_data):
-    with mrcfile.open(input_data) as m:
-        data = m.data
-    return data
+from util.io import get_tomo
 
 
 def resample_image(tomo, pixel_size, out_name=None, outspacing=17.142):

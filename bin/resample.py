@@ -3,6 +3,7 @@ import numpy as np
 import mrcfile
 import fire
 from scipy.ndimage import zoom
+from util.io import get_tomo
 
 
 
@@ -10,12 +11,6 @@ def generate_new_tomo(out_data, out_name, outspacing):
     with mrcfile.new(out_name, overwrite=True) as m:
         m.set_data(out_data)
         m.voxel_size = [outspacing, outspacing, outspacing]
-
-
-def get_tomo(input_data):
-    with mrcfile.open(input_data) as m:
-        data = m.data
-    return data
 
 
 def resample_image(tomo, pixel_size, out_name=None, outspacing=17.142):

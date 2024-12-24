@@ -38,6 +38,7 @@ from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample import resample_image
 from util.json2xlsx import json_to_excel
+from util.io import get_tomo
 from widget.function_widget import ToolbarWidget
 
 
@@ -325,10 +326,6 @@ class TomoViewer:
             self.progress_dialog.show()
             # self.deconv_data = self.viewer.layers['deconv_tomo'].data
             # self.corrected_data = self.viewer.layers['corrected_tomo'].data
-            def get_tomo(path):
-                with mrcfile.open(path) as mrc:
-                    data = mrc.data
-                return data
             # 检查并获取 deconv_data
             if 'deconv_tomo' in self.viewer.layers:
                 self.deconv_data = self.viewer.layers['deconv_tomo'].data
@@ -387,10 +384,6 @@ class TomoViewer:
         #     self.progress_dialog.show()
         #     # self.deconv_data = self.viewer.layers['deconv_tomo'].data
         #     # self.corrected_data = self.viewer.layers['corrected_tomo'].data
-        #     def get_tomo(path):
-        #         with mrcfile.open(path) as mrc:
-        #             data = mrc.data
-        #         return data
         #     # 检查并获取 deconv_data
         #     if 'deconv_tomo' in self.viewer.layers:
         #         self.deconv_data = self.viewer.layers['deconv_tomo'].data

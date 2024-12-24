@@ -3,22 +3,8 @@
 import mrcfile
 import numpy as np
 from skimage.morphology import dilation, cube
+from util.io import get_tomo
 
-def get_tomo(path):
-    """
-    Load a 3D MRC file as a numpy array.
-
-    Parameters:
-    - path: str
-        Path to the MRC file.
-
-    Returns:
-    - data: ndarray
-        The 3D data loaded from the MRC file.
-    """
-    with mrcfile.open(path) as mrc:
-        data = mrc.data
-    return data
 
 def boundary_mask(tomo, mask_boundary, pixelsize = 17.14):
 
