@@ -22,6 +22,7 @@ from napari.utils.action_manager import action_manager
 from resource.Ui_utils_widge import Ui_Form
 from global_vars import TOMO_NAME
 from help_viewer import HelpViewer
+import threading
 
 # 判断当前 napari 版本是否大于 0.4.16
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16") and parse_version(napari.__version__) < parse_version("0.5.0")
@@ -321,6 +322,7 @@ class MultipleViewerWidget(QWidget):
         self.message_signal.connect(self.utils_widget.print_in_widget)
     
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.refresh_timer = None
 
     
     def print_in_widget(self, text):
@@ -440,15 +442,34 @@ class MultipleViewerWidget(QWidget):
         '''
         if self._block:
             return
+        
+        if self.refresh_timer is not None:
+            self.refresh_timer.cancel()
+        
+        # 设置一个延迟刷新
+        self.refresh_timer = threading.Timer(0.5, lambda: self._perform_refresh(event))
+        self.refresh_timer.start()
+
+    def _perform_refresh(self, event):
+        layers_to_refresh = []
+        
         for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
-            layer = model.layers[event.source.name]
-            if layer is event.source:
+            if event.source == None:
                 continue
-            try:
-                self._block = True
+            else:
+                layer = model.layers[event.source.name]
+                if layer is event.source:
+                    continue
+                
+                if self._data_needs_refresh(layer):
+                    layers_to_refresh.append(layer)
+        
+        try:
+            self._block = True
+            for layer in layers_to_refresh:
                 layer.refresh()
-            finally:
-                self._block = False
+        finally:
+            self._block = False
 
     def _layer_removed(self, event):
         self.viewer_model1.layers.pop(event.index)
