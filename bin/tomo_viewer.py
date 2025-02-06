@@ -309,12 +309,6 @@ class TomoViewer:
             msg_box.exec_()
             return
             
-        # if not os.path.exists(self.tomo_path_and_stage.area_path):
-        #     self.print("Please draw tomo area first.")
-        # elif not os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
-        #     self.print("Predict need deconv data.")
-        # elif not os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
-        #     self.print("Predict need correction data.")
         if self.viewer.layers != None:
             
             from qtpy.QtWidgets import QProgressDialog
@@ -324,8 +318,7 @@ class TomoViewer:
             self.progress_dialog.setWindowModality(Qt.WindowModal)
             self.progress_dialog.setValue(0)
             self.progress_dialog.show()
-            # self.deconv_data = self.viewer.layers['deconv_tomo'].data
-            # self.corrected_data = self.viewer.layers['corrected_tomo'].data
+            
             # 检查并获取 deconv_data
             if 'deconv_tomo' in self.viewer.layers:
                 self.deconv_data = self.viewer.layers['deconv_tomo'].data
@@ -367,53 +360,7 @@ class TomoViewer:
             self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
             self.progress_dialog.setValue(100)
             self.show_current_state()
-        # if not os.path.exists(self.tomo_path_and_stage.area_path):
-        #     self.print("Please draw tomo area first.")
-        # elif not os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
-        #     self.print("Predict need deconv data.")
-        # elif not os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
-        #     self.print("Predict need correction data.")
-        # else:
-            
-        #     from qtpy.QtWidgets import QProgressDialog
-        #     from qtpy.QtCore import Qt
-        #     self.progress_dialog = QProgressDialog("Processing...", 'Cancel', 0, 100, self.main_viewer)
-        #     self.progress_dialog.setWindowTitle('Predicting')
-        #     self.progress_dialog.setWindowModality(Qt.WindowModal)
-        #     self.progress_dialog.setValue(0)
-        #     self.progress_dialog.show()
-        #     # self.deconv_data = self.viewer.layers['deconv_tomo'].data
-        #     # self.corrected_data = self.viewer.layers['corrected_tomo'].data
-        #     # 检查并获取 deconv_data
-        #     if 'deconv_tomo' in self.viewer.layers:
-        #         self.deconv_data = self.viewer.layers['deconv_tomo'].data
-        #     else:
-        #         self.deconv_data = get_tomo(self.tomo_path_and_stage.deconv_tomo_path)
-
-        #     # 检查并获取 corrected_data
-        #     if 'corrected_tomo' in self.viewer.layers:
-        #         self.corrected_data = self.viewer.layers['corrected_tomo'].data
-        #     else:
-        #         self.corrected_data = get_tomo(self.tomo_path_and_stage.isonet_tomo_path)
-        #     self.progress_dialog.setValue(20)
-        #     self.label = predict_label(self.deconv_data, self.corrected_data)
-        #     # self.label = self.viewer.layers['label'].data
-        #     self.progress_dialog.setValue(40)
-        #     self.area_path = self.tomo_path_and_stage.area_path
-        #     self.processed_vesicles, self.shape = morph_process(self.label, self.area_path)
-        #     self.progress_dialog.setValue(60)
-
-        #     self.vesicle_info = vesicle_measure(self.corrected_data, self.processed_vesicles, self.shape, min_radius=8)
-        #     with open(self.tomo_path_and_stage.new_json_file_path,"w") as out:
-        #         json.dump(self.vesicle_info,out)
-        #     self.ves_tomo = vesicle_rendering(self.vesicle_info, self.shape)
-        #     with mrcfile.new(self.tomo_path_and_stage.new_label_file_path, overwrite=True) as mrc:
-        #         mrc.set_data(self.ves_tomo)
-        #     self.viewer.add_labels(self.ves_tomo, name='label')
-        #     self.viewer.layers['label'].opacity = 0.5 
-        #     self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
-        #     self.progress_dialog.setValue(100)
-        #     self.show_current_state()
+        
         
     def register_export_xlsx(self):
         def export_xlsx():
@@ -652,94 +599,6 @@ class TomoViewer:
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
         
     def register_manualy_draw_memb(self):
-        # def manualy_draw_memb():
-        #     """
-        #     手动绘制膜并保存为 .mod 文件。
-            
-        #     要求：
-        #     1. 每个 z 值有一个或多个点。
-        #     2. 在连续的 z 轴上进行标注。
-        #     3. 同一个 z 的点保存在同一个 contour 中，每个 z 创建一个 contour。
-        #     4. 保存为 .mod 文件到 self.tomo_path_and_stage.manualy_memb_path。
-        #     """
-            
-        #     def write_model(model_file, model_df):
-        #         """ 将点文件转换为 .mod 文件 """
-        #         model = np.asarray(model_df)
-            
-        #         # 提取model_file的文件夹路径
-        #         model_dir = os.path.dirname(model_file)
-            
-        #         # 如果文件夹不存在，则创建文件夹
-        #         if not os.path.exists(model_dir):
-        #             os.makedirs(model_dir)
-            
-        #         with tempfile.NamedTemporaryFile(suffix=".pt", dir=".") as temp_file:
-        #             # 保存点文件
-        #             point_file = temp_file.name
-        #             np.savetxt(point_file, model, fmt=(['%d']*2 + ['%.2f']*3))
-            
-        #             # 使用 point2model 命令将点文件转换为 .mod 文件
-        #             cmd = f"point2model -op {point_file} {model_file} >/dev/null"
-        #             subprocess.run(cmd, shell=True, check=True)
-            
-        #     def validate_and_group_points(points):
-        #         """ 验证点并按连续的 z 值分组 """
-        #         if len(points) == 0:
-        #             self.print("Error: No input points provided.")
-        #             return None
-                
-        #         # 按 z 值分组
-        #         z_groups = {}
-        #         for point in points:
-        #             z = point[0]
-        #             if z not in z_groups:
-        #                 z_groups[z] = []
-        #             z_groups[z].append(point)
-                
-        #         # 检查 z 值是否连续
-        #         sorted_z = sorted(z_groups.keys())
-        #         for i in range(1, len(sorted_z)):
-        #             if sorted_z[i] - sorted_z[i-1] != 1:
-        #                 self.print(f"Error: Z values are not continuous. Gap found between z={sorted_z[i-1]} and z={sorted_z[i]}.")
-        #                 return None
-                
-        #         return z_groups
-            
-        #     # 获取点数据
-        #     points = self.viewer.layers['edit vesicles'].data
-            
-        #     # 验证并分组点数据
-        #     z_groups = validate_and_group_points(points)
-            
-        #     # 如果验证不通过，直接退出并清空点数据
-        #     if z_groups is None:
-        #         self.viewer.layers['edit vesicles'].data = None
-        #         return
-            
-        #     # 准备保存的点数据
-        #     data = []
-        #     object_id = 1  # 只有一个 object
-        #     contour_id = 1  # contour 从1开始
-        #     sorted_z = sorted(z_groups.keys())
-            
-        #     for z in sorted_z:
-        #         group = z_groups[z]
-        #         for point in group:
-        #             # 假设点的格式为 [z, y, x]
-        #             # object_id, contour_id, x, y, z (1-based for object and contour)
-        #             data.append([object_id, contour_id, point[2], point[1], point[0]])
-        #         contour_id += 1  # 每个 z 创建一个新的 contour
-            
-        #     # 转换为 DataFrame
-        #     df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
-            
-        #     # 保存为 .mod 文件
-        #     write_model(self.tomo_path_and_stage.manualy_memb_path, df)
-        #     self.print("Points validated and saved successfully.")
-            
-        #     # 最后清空点数据
-        #     self.viewer.layers['edit vesicles'].data = None
         def manualy_draw_memb():
             # Step 1: Get the shape of the first layer
             label_shape = self.viewer.layers[0].data.shape

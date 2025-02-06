@@ -158,11 +158,16 @@ class DeconvWindow(QMainWindow):
         if not save_path.endswith('.json'):
             save_path += '.json'
 
+        # 获取目录路径并判断是否存在，不存在则创建
+        folder = os.path.dirname(save_path)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
         with open(save_path, 'w') as json_file:
             json.dump(parameters, json_file, indent=4)
         
         message = f"Parameters saved to {save_path}"
-        print(f"Parameters saved to {save_path}")
+        print(message)
         self.tomo_viewer.print(message)
     
     def preview_deconv(self):

@@ -32,7 +32,8 @@ class TomoPathAndStage:
 
         # 初始化路径
         self.ori_tomo_path = None
-        self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-wbp.rec')
+        # self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-wbp.rec')
+        self.ori_tomo_path = None
         # self.ori_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '-bin4-5i.rec')
         self.rec_tomo_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomoset', self.base_tomo_name + '_wbp_resample.mrc')
         self.tomograms_star_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'tomograms.star')
@@ -47,7 +48,10 @@ class TomoPathAndStage:
         self.new_memb_result_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', self.base_tomo_name + '_new.mod')
         self.manualy_memb_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'membrane', self.base_tomo_name + '_manual.mod')
         
+        
         self.isonet_tomo_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_wbp_corrected.mrc')
+        # temp
+        # self.isonet_tomo_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '_wbp_corrected.mrc')
         self.ori_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_ori.xml')
         self.ori_filter_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_filter_bak.xml')
         self.filter_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_filter.xml')
@@ -59,8 +63,12 @@ class TomoPathAndStage:
         self.omega_xml_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_omega.xml')
         self.weidong_excel_path = os.path.join(self.current_path, tomo_name, 'ves_seg', 'vesicle_analysis', self.base_tomo_name + '_wd.xlsx')
         self.segment_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_segment.mrc')
+        
         self.label_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_label_vesicle.mrc')
         self.json_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle.json')
+        # temp
+        # self.label_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '_label_vesicle.mrc')
+        # self.json_file_path = os.path.join(self.current_path, tomo_name, self.base_tomo_name + '_vesicle.json')
         self.xlsx_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle.xlsx')
         self.new_json_file_path = os.path.join(self.root_dir, 'vesicle_new_{}.json'.format(self.pid))
         self.new_label_file_path = os.path.join(self.root_dir, 'label_{}.mrc'.format(self.pid))
@@ -80,8 +88,8 @@ class TomoPathAndStage:
             return self.ProgressStage.MAKE_PREDICT
         elif os.path.exists(self.deconv_tomo_path):
             return self.ProgressStage.MAKE_CORRECTION
-        elif os.path.exists(self.ori_tomo_path):
-            return self.ProgressStage.MAKE_DECONVOLUTION
+        # elif os.path.exists(self.ori_tomo_path):
+        #     return self.ProgressStage.MAKE_DECONVOLUTION
         else:
             return self.ProgressStage.OPEN_TOMO
         

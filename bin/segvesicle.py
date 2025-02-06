@@ -16,6 +16,7 @@ import center_cross
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 def add_folder_list_widget(tomo_viewer: TomoViewer):
     folder_list_widget = FolderListWidget(tomo_viewer)

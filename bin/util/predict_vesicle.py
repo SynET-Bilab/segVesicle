@@ -5,6 +5,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 from scipy import ndimage
+import multiprocessing
 
 from skimage.morphology import opening, closing, erosion, dilation, remove_small_objects
 from skimage.morphology import cube, ball
@@ -36,22 +37,23 @@ def predict_label(deconv_data, corrected_data):
     
     return labelmap
     
-def segment(path_weights, data, patch_size=192):
-    pcrop = 48  # how many pixels to crop from border
+def segment(path_weights, dataArray, patch_size=192):
+    pcrop = max((patch_size - dataArray.shape[0])//2 + 2 ,48)
+    # pcrop = 48  # how many pixels to crop from border
 
     P = patch_size
-    Ncl = 2
-    # build network
-    net = models.my_model(patch_size, Ncl)
+    Ncl=2
+    #build network
+    net=models.my_model(patch_size,Ncl)
     net.load_weights(path_weights)
+    
+    percentile_99_5 = np.percentile(dataArray, 99.5)
+    percentile_00_5 = np.percentile(dataArray, 00.5)
+    dataArray=np.clip(dataArray, percentile_00_5, percentile_99_5)
 
-    percentile_99_5 = np.percentile(data, 99.5)
-    percentile_00_5 = np.percentile(data, 00.5)
-    data = np.clip(data, percentile_00_5, percentile_99_5)
-
-    data = (data - np.mean(data)) / np.std(data)  # normalize
-    data = np.pad(data, pcrop, mode='constant', constant_values=0)  # 0pad
-    dim = data.shape
+    dataArray = (dataArray[:] - np.mean(dataArray[:])) / np.std(dataArray[:])  # normalize
+    dataArray = np.pad(dataArray, pcrop, mode='constant', constant_values=0)  # 0pad
+    dim = dataArray.shape
     l = int(P / 2)
     lcrop = int(l - pcrop)
     step = int(2 * l - 2 * pcrop)
@@ -78,23 +80,23 @@ def segment(path_weights, data, patch_size=192):
     for x in pcenterX:
         for y in pcenterY:
             for z in pcenterZ:
-                print(f'Segmenting patch {patchCount} / {Npatch} ...')
-                patch = data[z - l:z + l, y - l:y + l, x - l:x + l]
+                print('Segmenting patch ' + str(patchCount) + ' / ' + str(Npatch) + ' ...')
+                patch = dataArray[z - l:z + l, y - l:y + l, x - l:x + l]
                 patch = np.reshape(patch, (1, P, P, P, 1))  # reshape for keras [batch,x,y,z,channel]
                 pred = net.predict(patch, batch_size=10)
-                predArray[z-lcrop:z+lcrop, y-lcrop:y+lcrop, x-lcrop:x+lcrop, :] += np.float16(pred[0, l - lcrop:l + lcrop, l - lcrop:l + lcrop, l - lcrop:l + lcrop, :])
-                normArray[z-lcrop:z+lcrop, y-lcrop:y+lcrop, x-lcrop:x+lcrop] += np.ones((P-2*pcrop, P-2*pcrop, P-2*pcrop), dtype=np.int8)
+                predArray[z-lcrop:z+lcrop, y-lcrop:y+lcrop, x-lcrop:x+lcrop, :] += np.float16(pred[0,l - lcrop:l + lcrop,l - lcrop:l + lcrop,l - lcrop:l + lcrop,:])
+                normArray[z-lcrop:z+lcrop, y-lcrop:y+lcrop, x-lcrop:x+lcrop]+=np.ones((P-2*pcrop, P-2*pcrop, P-2*pcrop), dtype=np.int8)
                 patchCount += 1
-    normArray[normArray == 0] = 1
+    normArray[normArray==0]=1
 
-    # Normalize overlapping regions:
+    # Normalize overlaping regions:
     for C in range(0, Ncl):
         predArray[:, :, :, C] = predArray[:, :, :, C] / normArray
     end = time.time()
-    print(f"Model took {int(end - start)} seconds to predict")
+    print("Model took {} seconds to predict".format(int(end - start)))
     predArray = predArray[pcrop:-pcrop, pcrop:-pcrop, pcrop:-pcrop, :]  # unpad
 
-    labelmap = np.int8(np.argmax(predArray, 3))
+    labelmap = np.int8( np.argmax(predArray,3) )
     return labelmap
     
 def morph_process(labelmap, area_file, pixelsize=17.14, radius=10):
@@ -128,7 +130,7 @@ def morph_process(labelmap, area_file, pixelsize=17.14, radius=10):
 
     kernel_pre = cube(11)
     pre_pro = opening(pre_pro, kernel_pre)
-    pre_pro = erosion(pre_pro, cube(2))
+    pre_pro = erosion(pre_pro, cube(3))
     labeled_pre_pro = label(pre_pro) #process linked vesicles just after prediction, Part 1
 
     print('\nFix the broken vesicles\n')
@@ -187,43 +189,51 @@ def vesicle_measure(data, vesicle_list, shape, min_radius):
     global sup_in_count
     in_count = 0
     sup_in_count = 0
-
-    def if_normal(radii, threshold=0.22):
-        if np.std(radii) / np.mean(radii) > threshold:
-            return False
-        elif np.mean(radii) < 0.6 * min_radius or np.mean(radii) > min_radius * 4:
-            return False
-        else:
-            return True
-
+    
     logging.info('\nStart vesicle measurement\n')
+    
+    idxs = range(len(vesicle_list))
     for i in tqdm(range(len(vesicle_list)), file=sys.stdout):
-        [center0, evecs, radii] = ef.ellipsoid_fit(vesicle_list[i])
-        if min(center0 - max(radii)) <= 0 or min(np.array(data.shape) - 1 - center0 - max(radii)) <= 0:
-            continue
-
-        [center, evecs, radii, ccf] = density_fit(data, center0, np.max(radii))
-        if ccf < 0.3:
-            continue
-
-        if if_normal(radii):
-            info = {
-                'name': 'vesicle_' + str(i),
-                'center': center.tolist(),
-                'radii': radii.tolist(),
-                'evecs': evecs.tolist(),
-                'CCF': str(ccf)
-            }
-            results.append(info)
+        continue
+    #pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    poolnum = min(multiprocessing.cpu_count(), 4)
+    pool = multiprocessing.Pool(poolnum)
+    results = pool.starmap(measure_one, [(i,data,vesicle_list,min_radius) for i in idxs])
+    results = list(filter(None, results))
 
     vesicle_info = {'vesicles': results}
     return vesicle_info
+
+def measure_one(idx,data,vesicle_list,min_radius):
+    
+    [center0, evecs, radii]=ef.ellipsoid_fit(vesicle_list[idx])
+    if min(center0-max(radii))<=0 or min(np.array(data.shape)-1-center0-max(radii))<=0:
+        return
+    def if_normal(radii, threshold=0.22):
+        if np.std(radii)/np.mean(radii) >threshold:
+            a = False
+        elif np.mean(radii) < 0.6*min_radius or np.mean(radii) > min_radius*4:
+            a = False
+        else:
+            a = True
+        return a
+
+    [center, evecs, radii, ccf]=density_fit(data,center0,np.max(radii))
+    #[center, evecs, radii]=density_fit(data,center0,np.max(radii))
+    if ccf < 0.3: #delete wrong segments
+        return
+
+    if if_normal(radii):
+        info={'name':'vesicle_'+str(idx),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
+        #info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
+        return info
 
 def density_fit(data_iso,center,radius):
     '''input center(z,y,x), output center(z,y.x), both in array
     '''
     shape = data_iso.shape
-    padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
+    # padwidth = int(max(-min(center-radius), -min(np.array(shape)-1-center-radius),0))+5
+    padwidth = 10
     maxvalue=np.max(data_iso)
     data_pad = np.pad(data_iso,padwidth,'constant',constant_values= maxvalue)
 
@@ -231,7 +241,7 @@ def density_fit(data_iso,center,radius):
     center = np.round(center+padwidth).astype(np.int16)
     cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
     cube_ = ndimage.gaussian_filter(cube_,sigma=1)
-    cube_reverse = -cube_
+    cube_reverse = -cube_.astype(np.float32)
     cube_normalize = (cube_reverse - np.min(cube_reverse))/(np.max(cube_reverse)-np.min(cube_reverse))
 
     mask=ball(cube_.shape[0]//2)
@@ -244,6 +254,12 @@ def density_fit(data_iso,center,radius):
     cube_m=cube_.copy()
     cube_m[cube_<mean_circle]=1
     cube_m[cube_>=mean_circle]=0
+    # cube_m=cube_.copy()
+    # avg = 0.5 * (np.min(cube_)+np.max(cube_))
+    # cube_m[cube_<avg]=1
+    # cube_m[cube_>=avg]=0    
+
+
     cube_m_mask=mask*cube_m
     databool=cube_m_mask >0
     cube_m_mask=remove_small_objects(databool, min_size=50).astype(np.int8)
@@ -251,13 +267,32 @@ def density_fit(data_iso,center,radius):
     open=opening(cube_m_mask)
     databool=open >0
     opened=remove_small_objects(databool, min_size=50).astype(np.int16)
-    if np.sum(opened) < 1000:
-        return [None, None, None, 0]
-    #erded=erosion(opened,cube(2))
-    idx=get_indices_sparse(opened)
+    l = label(opened, connectivity=1)
     
+    d_min = 99999
+    label_vaule = 0
+    for i in range(np.max(l)):
+        points_i = np.where(l==(i+1))
+        points_z = points_i[0]
+        points_y = points_i[1]
+        points_x = points_i[2]
+        center_i=np.array([np.mean(points_z),np.mean(points_y),np.mean(points_x)])
+        center_label = np.array([1,1,1])*l.shape[0]//2
+        d = dis(center_i,center_label)
+        if d < d_min  and len(points_z)>200:
+            d_min = d
+            label_vaule = i+1
+    labeled = np.zeros_like(l)
+    labeled[l==label_vaule] = 1
+    if d_min == 99999: #if the num of points to fit is too small (<200)
+        return [None, None, None, 0]
+    if(np.sum(labeled)/np.sum(open)<0.8):
+        labeled = opened
+    idx=get_indices_sparse(labeled)
     vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
     [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
+    if np.min(center_cube) < 0: # if the shape of fitted ellipsoid is too strange
+        return [None, None, None, 0]
 
 
     tm = template(radii, center_cube, evecs, cube_.shape)
@@ -265,6 +300,10 @@ def density_fit(data_iso,center,radius):
     [center_fit, evecs_fit, radii_fit]=[center-padwidth+center_cube-cube_.shape[0]//2, evecs, radii]
 
     return [center_fit, evecs_fit, radii_fit, ccf]
+
+def dis(m,n):
+    d=np.linalg.norm(m-n)
+    return d
 
 def get_indices_sparse(data):
     M = compute_M(data)
@@ -278,16 +317,18 @@ def compute_M(data):
 def template(radii, center, evecs, shape, d=3):
     #generate a circle shape template
     ellip = mk.ellipsoid_point(radii, center+np.array([25,25,25]), evecs)
+    ellip_= []
     cube_ellip = np.zeros((shape[2]+50,shape[1]+50,shape[0]+50))
-
-
-    if cube_ellip.shape[0] <= np.max(ellip):
-        tm = 1-cube_ellip
-    else:
-        cube_ellip[ellip[:,0],ellip[:,1],ellip[:,2]] = 1
-        cube_ellip=closing(cube_ellip,cube(d))
-        circle = dilation(cube_ellip,cube(d)) - erosion(cube_ellip,cube(d))
-        tm = ndimage.gaussian_filter(circle,sigma=1).astype(np.float32)
+    for i in range(len(ellip)):
+        if ellip[i][0]<cube_ellip.shape[0] and ellip[i][1]<cube_ellip.shape[0] and ellip[i][2]<cube_ellip.shape[0]:
+            ellip_.append(ellip[i])
+    ellip_ = np.array(ellip_)
+    if len(ellip_)<5:
+        return cube_ellip
+    cube_ellip[ellip_[:,0],ellip_[:,1],ellip_[:,2]] = 1
+    cube_ellip=closing(cube_ellip,cube(d))
+    circle = dilation(cube_ellip,cube(d)) - erosion(cube_ellip,cube(d))
+    tm = ndimage.gaussian_filter(circle,sigma=1).astype(np.float32)
     tm = tm[25:-25,25:-25,25:-25]
     return tm
 
@@ -303,18 +344,29 @@ def CCF(img,template):
     return ccf
 
 def vesicle_rendering(vesicle_info, tomo_dims):
-    vesicle_info_list = vesicle_info['vesicles']
-    vesicle_tomo = np.zeros(np.array(tomo_dims) + np.array([30, 30, 30]), dtype=np.int16)
+    vesicle_info = vesicle_info['vesicles']
+    vesicle_tomo = np.zeros(np.array(tomo_dims)+np.array([30,30,30]),dtype=np.int16)
+    #vesicle_tomo = np.zeros(np.array(tomo_dims),dtype=np.uint8)
     logging.info('\nrendering vesicle\n')
-    for i in tqdm(range(len(vesicle_info_list)), file=sys.stdout):
-        ellip_i = mk.ellipsoid_point(vesicle_info_list[i]['radii'], vesicle_info_list[i]['center'], vesicle_info_list[i]['evecs'])
-        vesicle_tomo[ellip_i[:, 0], ellip_i[:, 1], ellip_i[:, 2]] = i + 1
-        xmin, xmax = np.min(ellip_i[:, 2]), np.max(ellip_i[:, 2])
-        ymin, ymax = np.min(ellip_i[:, 1]), np.max(ellip_i[:, 1])
-        zmin, zmax = np.min(ellip_i[:, 0]), np.max(ellip_i[:, 0])
-        cube_i = vesicle_tomo[zmin:zmax + 1, ymin:ymax + 1, xmin:xmax + 1]
-        cube_i = closing(cube_i, cube(3))
-        vesicle_tomo[zmin:zmax + 1, ymin:ymax + 1, xmin:xmax + 1] = cube_i
+    #for i,vesicle in enumerate(vesicle_info):
+    for i in tqdm(range(len(vesicle_info)), file=sys.stdout):
+        ellip_i = mk.ellipsoid_point(vesicle_info[i]['radii'], vesicle_info[i]['center'], vesicle_info[i]['evecs'])
+        # print(i)
+        # ellip_i = mk.ellipsoid_point(
+        #     np.array(vesicle['radii']),
+        #     np.array(vesicle['center']),
+        #     np.array(vesicle['evecs'])
+        # )
+        # ellip_i is an array (N,3) of points of a filled ellipsoid
+        
+        vesicle_tomo[ellip_i[:,0],ellip_i[:,1],ellip_i[:,2]] = i + 1
+        xmin, xmax = np.min(ellip_i[:,2]), np.max(ellip_i[:,2])
+        ymin, ymax = np.min(ellip_i[:,1]), np.max(ellip_i[:,1])
+        zmin, zmax = np.min(ellip_i[:,0]), np.max(ellip_i[:,0])
+        cube_i = vesicle_tomo[zmin:zmax+1,ymin:ymax+1,xmin:xmax+1]
+        cube_i = closing(cube_i,cube(3))
+        vesicle_tomo[zmin:zmax+1,ymin:ymax+1,xmin:xmax+1] = cube_i
 
-    logging.info('{} vesicles in total'.format(len(vesicle_info_list)))
-    return vesicle_tomo[0:tomo_dims[0], 0:tomo_dims[1], 0:tomo_dims[2]]
+    #vesicle_tomo = closing(vesicle_tomo,cube(3))
+    logging.info('{} vesicles in total'.format(len(vesicle_info)))
+    return vesicle_tomo[0:tomo_dims[0],0:tomo_dims[1],0:tomo_dims[2]]
