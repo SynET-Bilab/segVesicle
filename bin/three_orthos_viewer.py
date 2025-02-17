@@ -420,10 +420,14 @@ class MultipleViewerWidget(QWidget):
         if self._block:
             return
         
-        # 检查数据是否真的发生变化，如果没有变化则不进行同步
-        data_changed = any(event.source.data != model.layers[event.source.name].data
-                        for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3])
-        if not data_changed:
+        try:
+            data_changed = any(
+                np.any(event.source.data != model.layers[event.source.name].data)
+                for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]
+            )
+            if not data_changed:
+                return
+        except:
             return
         
         for model in [self.viewer, self.viewer_model1, self.viewer_model2, self.viewer_model3]:
