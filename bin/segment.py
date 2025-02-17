@@ -81,6 +81,8 @@ parser.add_argument('--tomo', type=str, default=None, help='tomo file')
 parser.add_argument('--tomo_file', type=str, default=None, help='the isonet_corrected tomo file')
 parser.add_argument('--tomo_deconv_file', type=str, default=None, help='the wbp_deconvolution tomo file')
 parser.add_argument('--mask_file', type=str, default=None, help='the output vesicle segment file name')
+parser.add_argument('--gpuID', type=str, default=0, help='The gpuID to used during the training. e.g 0,1,2,3.')
+
 args = parser.parse_args()
 
 # set some default files 
@@ -94,6 +96,8 @@ if args.mask_file is None:
 segVesicleHome = dirname(abspath(__file__))
 segVesicleHome = os.path.split(segVesicleHome)[0]+'/'
 
+args.gpuID = str(args.gpuID)
+os.environ["CUDA_VISIBLE_DEVICES"]=args.gpuID
 
 path_weights1 = segVesicleHome + 'pretrained/vesicle_seg_model_1.h5'
 path_weights2 = segVesicleHome + 'pretrained/vesicle_seg_model_2.h5'
