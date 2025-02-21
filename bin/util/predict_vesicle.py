@@ -359,7 +359,8 @@ def vesicle_rendering(vesicle_info, tomo_dims):
         # )
         # ellip_i is an array (N,3) of points of a filled ellipsoid
         
-        vesicle_tomo[ellip_i[:,0],ellip_i[:,1],ellip_i[:,2]] = i + 1
+        Id = int(vesicle_info[i]['name'][8:])
+        vesicle_tomo[ellip_i[:,0],ellip_i[:,1],ellip_i[:,2]] = Id
         xmin, xmax = np.min(ellip_i[:,2]), np.max(ellip_i[:,2])
         ymin, ymax = np.min(ellip_i[:,1]), np.max(ellip_i[:,1])
         zmin, zmax = np.min(ellip_i[:,0]), np.max(ellip_i[:,0])

@@ -41,6 +41,9 @@ class VesicleAnnotationWindow(QMainWindow):
 
         # 显示当前的囊泡组
         self.display_current_vesicles()
+        
+        # Automatically set the window to fullscreen
+        self.showMaximized()  # This will make the window open in fullscreen
 
     def init_ui(self):
         # 主部件

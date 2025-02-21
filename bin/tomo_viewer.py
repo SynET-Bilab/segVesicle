@@ -999,12 +999,13 @@ class TomoViewer:
                 root = tree.getroot()
 
                 # 定义类型映射
+                # skip pit class
                 type_mapping = {
                     'false': 0,
                     'tether': 1,
                     'contact': 2,
                     'omega': 3,
-                    'pit': 4,
+                    # 'pit': 4,
                     'CCV': 5,
                     'endosome': 6,
                     'DCV': 7,
