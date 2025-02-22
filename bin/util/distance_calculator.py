@@ -39,7 +39,15 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
         vl = VesicleList(ori_pix_size)
         vl.fromCenterList(center_list)
         surface = Surface()
-        surface.from_model_auto_segment(mod_path, objNum=2)
+        
+        '''
+        temporary use
+        '''
+        if 'premembrane.mod' in mod_path:
+            surface.from_model_use_imod_mesh(mod_path)
+            print('use manual membrane')
+        else:
+            surface.from_model_auto_segment(mod_path, objNum=2)
 
         # 定义2d囊泡需要保留的属性，用于后续删除不需要的属性
         attributes_to_keep = [
@@ -106,7 +114,10 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
                 print(f"Removed unwanted attributes for vesicle ID {vesicle.getId()}")
 
         # Calculate the distance to the surface
-        vl.distance_to_surface(surface, 3600, 'dense')
+        if 'premembrane.mod' in mod_path:
+            vl.distance_to_surface(surface, 3600, 'sparse')
+        else:
+            vl.distance_to_surface(surface, 3600, 'dense')
         
         vl.toXMLFile(xml_output_path)
         print_func(f"XML file successfully generated at: {xml_output_path}")

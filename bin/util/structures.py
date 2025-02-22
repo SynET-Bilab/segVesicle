@@ -751,7 +751,7 @@ class Surface:
                                                self._vertices[face[2]]))
 
 
-    def from_model_use_imod_mesh(self, model, objNum, outputVRML = "tmp.wrl"):
+    def from_model_use_imod_mesh(self, model, outputVRML = "tmp.wrl"):
         """Use imodmesh to generate surface
 
         @param model: imod model file

@@ -899,6 +899,13 @@ class TomoViewer:
             # Define the file paths
             json_path = self.tomo_path_and_stage.new_json_file_path
             mod_path = self.tomo_path_and_stage.memb_result_path
+            
+            '''
+            temporary use. Should we have a choose dialog here?
+            '''
+            if os.path.exists(self.tomo_path_and_stage.memb_manual_path):
+                mod_path = self.tomo_path_and_stage.memb_manual_path
+            
             xml_output_path = self.tomo_path_and_stage.ori_xml_path
 
             # Call the distance_calc function, passing the paths and a print function
