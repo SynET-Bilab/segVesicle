@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 import os
+import warnings
 import numpy as np
 from scipy.spatial import Delaunay
 from sklearn.neighbors import KDTree
@@ -331,12 +332,17 @@ class Vesicle:
         self._vesicleId = Id
 
     def getRadius(self):
+        if hasattr(self, '_radius3D'):
+            return self._radius3D
+        elif hasattr(self, '_radius2D'):
+            return self._radius2D
         return self._radius
 
     def getRadius2D(self):
         return self._radius2D
     
     def getRadius3D(self):
+        warnings.warn("Vesicle().getRadius3D() is deprecated and will be removed soon, please use getRadius() instead", UserWarning)
         return self._radius3D
 
     def setRadius(self, radius):
@@ -356,9 +362,6 @@ class Vesicle:
 
     def getId(self):
         return self._vesicleId
-
-    def getPixelSize(self):
-        return self._pixelSize
 
     def getProjectionPoint(self):
         return self._projectionPoint
