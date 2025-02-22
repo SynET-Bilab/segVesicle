@@ -391,11 +391,12 @@ class Vesicle:
         self._type = t
 
 
+from typing import List, Iterator
 class VesicleList:
     """parameters(radius, distance, position etc.) stores in pixel. If you want to use nm, please multiply self.getPixelSize
     """
     def __init__(self, pixelSize = 1.0):
-        self._vesicleList = []
+        self._vesicleList: List[Vesicle] = []
         self._pixelSize = pixelSize
 
     def __len__(self):
@@ -404,7 +405,7 @@ class VesicleList:
     def __setitem__(self, key, value):
         self._vesicleList[key]=value
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Vesicle:
         """retrive vesicle at position defined by key
         """
 
@@ -413,6 +414,9 @@ class VesicleList:
                 return self._vesicleList[key]
             else:
                 raise IndexError('Index out of range')
+    
+    def __iter__(self) -> Iterator[Vesicle]:
+        return iter(self._vesicleList)
 
     def __add__(self, vesicleList):
         """
