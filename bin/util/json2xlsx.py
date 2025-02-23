@@ -1,4 +1,5 @@
 import json
+import fire
 import pandas as pd
 
 def json_to_excel(json_path, excel_path):
@@ -37,4 +38,5 @@ def json_to_excel(json_path, excel_path):
     
 
 if __name__ == '__main__':
-    json_to_excel(json_path='/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/p2_vesicle.json', excel_path='/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/p2_vesicle.xlsx')
+    # json_to_excel(json_path='/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/p2_vesicle.json', excel_path='/home/liushuo/Documents/data/stack-out_demo/p2/ves_seg/p2_vesicle.xlsx')
+    fire.Fire(json_to_excel)
