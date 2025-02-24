@@ -45,6 +45,14 @@ def main():
     napari.run()
     
     if tomo_viewer.tomo_path_and_stage.tomo_name is not None:
+        
+        label_dir = os.path.dirname(tomo_viewer.tomo_path_and_stage.label_path)
+
+        # 如果 label_path 的文件夹不存在，则创建文件夹
+        if not os.path.exists(label_dir):
+            os.makedirs(label_dir)
+            print(f"Created directory: {label_dir}")
+            
         if os.path.exists(tomo_viewer.tomo_path_and_stage.new_label_file_path):
             print_pleasewait_ascii_art()
             print(f"Moving {tomo_viewer.tomo_path_and_stage.new_label_file_path} to {tomo_viewer.tomo_path_and_stage.label_path}, please wait...")
