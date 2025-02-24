@@ -20,7 +20,7 @@ from pathlib import Path
 
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
-from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox
+from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox, QRadioButton
 
 from util.distance_calculator import distance_calc
 # from window.vesicle_window import VesicleViewer
@@ -85,9 +85,10 @@ class TomoViewer:
         self.register_multi_class_visualize()
         self.register_export_final_xml()
         
-        self.register_manualy_draw_memb()
+        # self.register_manualy_draw_memb()
         # self.register_extract_memb()
-        self.register_interpolate_memb()
+        # self.register_interpolate_memb()
+        self.register_completing_membrane_button()
         self.register_save_mamually_memb()
         
         # self.register_analyze_by_volume()
@@ -538,6 +539,7 @@ class TomoViewer:
 
         # 使用Napari可视化
         self.viewer.add_labels(data, name='Membrane', opacity=1)
+        self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
 
         # 操作成功后输出提示
         self.print("Visualize successfully.")
@@ -598,190 +600,257 @@ class TomoViewer:
             pass
         self.toolbar_widget.draw_tomo_area_button.clicked.connect(create_area_mod)
         
-    def register_manualy_draw_memb(self):
-        def manualy_draw_memb():
-            # Step 1: Get the shape of the first layer
-            label_shape = self.viewer.layers[0].data.shape
+    # def register_manualy_draw_memb(self):
+    #     def manualy_draw_memb():
+    #         # Step 1: Get the shape of the first layer
+    #         label_shape = self.viewer.layers[0].data.shape
             
-            # Step 2: Create an array of zeros with the same shape
-            zero_array = np.zeros(label_shape, dtype=np.uint8)
+    #         # Step 2: Create an array of zeros with the same shape
+    #         zero_array = np.zeros(label_shape, dtype=np.uint8)
             
-            # Step 3: Add the array as a new layer with the name 'Draw Membrane'
-            membrane_layer = self.viewer.add_labels(zero_array, name='Draw Membrane')
+    #         # Step 3: Add the array as a new layer with the name 'Draw Membrane'
+    #         membrane_layer = self.viewer.add_labels(zero_array, name='Draw Membrane')
             
-            # Step 4: Set the layer to paint mode with brush size of 1
-            membrane_layer.mode = 'paint'
-            membrane_layer.brush_size = 1
+    #         # Step 4: Set the layer to paint mode with brush size of 1
+    #         membrane_layer.mode = 'paint'
+    #         membrane_layer.brush_size = 1
     
-        try:
-            self.toolbar_widget.manualy_draw_button.clicked.disconnect()
-        except TypeError:
-            pass
-        self.toolbar_widget.manualy_draw_button.clicked.connect(manualy_draw_memb)
+    #     try:
+    #         self.toolbar_widget.manualy_draw_button.clicked.disconnect()
+    #     except TypeError:
+    #         pass
+    #     self.toolbar_widget.manualy_draw_button.clicked.connect(manualy_draw_memb)
         
-    def register_extract_memb(self):
-        def extract_memb():
-            """
-            提取并处理膜层（Membrane）的mask数据。
+    # def register_extract_memb(self):
+    #     def extract_memb():
+    #         """
+    #         提取并处理膜层（Membrane）的mask数据。
 
-            参数：
-            - self: 类的实例，包含viewer和layers属性。
-            - extract_stride (int): 切片步长，每隔多少个z切片保留一次mask。
-            """
-            extract_stride = 10
+    #         参数：
+    #         - self: 类的实例，包含viewer和layers属性。
+    #         - extract_stride (int): 切片步长，每隔多少个z切片保留一次mask。
+    #         """
+    #         extract_stride = 10
             
-            # 获取原始的三维mask数据 (z, y, x)
-            original_data = self.viewer.layers['Membrane'].data
+    #         # 获取原始的三维mask数据 (z, y, x)
+    #         original_data = self.viewer.layers['Membrane'].data
 
-            # 步骤 2: 只保留mask值为2的部分，其余设置为0
-            # 生成一个与original_data形状相同的布尔数组，值为True的位置对应mask值为2
-            mask_value_2 = (original_data == 2)
+    #         # 步骤 2: 只保留mask值为2的部分，其余设置为0
+    #         # 生成一个与original_data形状相同的布尔数组，值为True的位置对应mask值为2
+    #         mask_value_2 = (original_data == 2)
             
-            # 创建一个新的数据数组，初始为全0
-            new_data = np.zeros_like(original_data, dtype=original_data.dtype)
+    #         # 创建一个新的数据数组，初始为全0
+    #         new_data = np.zeros_like(original_data, dtype=original_data.dtype)
             
-            # 将mask值为2的位置设置为2，其他位置保持为0
-            new_data[mask_value_2] = 1
+    #         # 将mask值为2的位置设置为2，其他位置保持为0
+    #         new_data[mask_value_2] = 1
 
-            # 步骤 3: 设置切片步长extract_stride
-            # 找到第一个z切片中mask不是全0的位置
-            # 通过对每个z切片求和，判断是否有非零值
-            z_sums = new_data.sum(axis=(1, 2))
-            non_zero_z_indices = np.where(z_sums > 0)[0]
+    #         # 步骤 3: 设置切片步长extract_stride
+    #         # 找到第一个z切片中mask不是全0的位置
+    #         # 通过对每个z切片求和，判断是否有非零值
+    #         z_sums = new_data.sum(axis=(1, 2))
+    #         non_zero_z_indices = np.where(z_sums > 0)[0]
             
-            if non_zero_z_indices.size == 0:
-                print("没有找到任何mask值为2的z切片。")
-                # 如果没有找到非零的z切片，直接覆盖原数据
-                self.viewer.layers['Membrane'].data = new_data
-                return
+    #         if non_zero_z_indices.size == 0:
+    #             print("没有找到任何mask值为2的z切片。")
+    #             # 如果没有找到非零的z切片，直接覆盖原数据
+    #             self.viewer.layers['Membrane'].data = new_data
+    #             return
             
-            # 第一个非零的z切片索引
-            start_z = non_zero_z_indices[0]
+    #         # 第一个非零的z切片索引
+    #         start_z = non_zero_z_indices[0]
             
-            # 生成一个布尔数组，标记需要保留的z切片
-            # 从start_z开始，每隔extract_stride个切片保留一次
-            mask_z = np.zeros(new_data.shape[0], dtype=bool)
-            mask_z[start_z::extract_stride] = True
+    #         # 生成一个布尔数组，标记需要保留的z切片
+    #         # 从start_z开始，每隔extract_stride个切片保留一次
+    #         mask_z = np.zeros(new_data.shape[0], dtype=bool)
+    #         mask_z[start_z::extract_stride] = True
             
-            # 应用z切片的mask，只保留标记为True的切片，其他切片置0
-            # 使用广播机制，将mask_z应用到所有y和x维度
-            new_data = np.where(mask_z[:, None, None], new_data, 0)
+    #         # 应用z切片的mask，只保留标记为True的切片，其他切片置0
+    #         # 使用广播机制，将mask_z应用到所有y和x维度
+    #         new_data = np.where(mask_z[:, None, None], new_data, 0)
             
-            # 步骤 4: 覆盖原始的mask数据
-            self.viewer.layers['Membrane'].data = new_data
+    #         # 步骤 4: 覆盖原始的mask数据
+    #         self.viewer.layers['Membrane'].data = new_data
 
-            print("膜层mask数据已成功提取并更新。")
+    #         print("膜层mask数据已成功提取并更新。")
     
-        try:
-            self.toolbar_widget.extract_memb_button.clicked.disconnect()
-        except TypeError:
-            pass
-        self.toolbar_widget.extract_memb_button.clicked.connect(extract_memb)
+    #     try:
+    #         self.toolbar_widget.extract_memb_button.clicked.disconnect()
+    #     except TypeError:
+    #         pass
+    #     self.toolbar_widget.extract_memb_button.clicked.connect(extract_memb)
         
-    def register_interpolate_memb(self):
-        def on_interpolate_memb_button_clicked():
-            dialog = InterpolateMembDialog(parent=self.viewer.window._qt_window)
-            if dialog.exec_():
-                operation, membrane_type, threshold = dialog.get_values()
-                try:
-                    interpolate_memb(operation, membrane_type, threshold)
-                except Exception as e:
-                    QMessageBox.critical(self.viewer.window._qt_window, "Error", str(e))
+    # def register_interpolate_memb(self):
+    #     def on_interpolate_memb_button_clicked():
+    #         dialog = InterpolateMembDialog(parent=self.viewer.window._qt_window)
+    #         if dialog.exec_():
+    #             operation, membrane_type, threshold = dialog.get_values()
+    #             try:
+    #                 interpolate_memb(operation, membrane_type, threshold)
+    #             except Exception as e:
+    #                 QMessageBox.critical(self.viewer.window._qt_window, "Error", str(e))
                     
-        def interpolate_memb(operation='dilation_erosion', membrane_type='front', threshold=0.2):
-            from scipy.ndimage import binary_dilation, binary_erosion
-            """
-            Interpolates membrane lines across multiple z-layers and creates a new label layer in Napari.
-            """
-            # Retrieve existing membrane mask data, assuming shape is (z, y, x)
-            if 'Draw Membrane' not in self.viewer.layers:
-                raise ValueError("Layer 'Draw Membrane' not found.")
+    #     def interpolate_memb(operation='dilation_erosion', membrane_type='front', threshold=0.2):
+    #         from scipy.ndimage import binary_dilation, binary_erosion
+    #         """
+    #         Interpolates membrane lines across multiple z-layers and creates a new label layer in Napari.
+    #         """
+    #         # Retrieve existing membrane mask data, assuming shape is (z, y, x)
+    #         if 'Draw Membrane' not in self.viewer.layers:
+    #             raise ValueError("Layer 'Draw Membrane' not found.")
 
-            membrane_mask = self.viewer.layers['Draw Membrane'].data
+    #         membrane_mask = self.viewer.layers['Draw Membrane'].data
 
-            if membrane_mask.ndim != 3:
-                raise ValueError("Data in 'Draw Membrane' layer should be a 3D array (z, y, x).")
+    #         if membrane_mask.ndim != 3:
+    #             raise ValueError("Data in 'Draw Membrane' layer should be a 3D array (z, y, x).")
 
-            # Determine which z-layers contain membrane annotations
-            labeled_z = np.where(membrane_mask.any(axis=(1, 2)))[0]
-            labeled_z = np.sort(labeled_z)
+    #         # Determine which z-layers contain membrane annotations
+    #         labeled_z = np.where(membrane_mask.any(axis=(1, 2)))[0]
+    #         labeled_z = np.sort(labeled_z)
 
-            if len(labeled_z) < 2:
-                raise ValueError("At least two z-layers with membrane annotations are required for interpolation.")
+    #         if len(labeled_z) < 2:
+    #             raise ValueError("At least two z-layers with membrane annotations are required for interpolation.")
 
-            # Initialize interpolated membrane mask with all zeros
-            interpolated_mask = np.zeros_like(membrane_mask, dtype=np.uint8)
+    #         # Initialize interpolated membrane mask with all zeros
+    #         interpolated_mask = np.zeros_like(membrane_mask, dtype=np.uint8)
 
-            structuring_element = np.ones((3, 3), dtype=bool)  # 3x3 structuring element
+    #         structuring_element = np.ones((3, 3), dtype=bool)  # 3x3 structuring element
 
-            # Perform morphological operations based on selected operation type
-            if operation == 'dilation_erosion':
-                # Apply dilation before interpolation
-                for z in labeled_z:
-                    membrane_mask[z] = binary_dilation(membrane_mask[z], structure=structuring_element)
-            elif operation == 'none':
-                pass  # No morphological operations
-            else:
-                raise ValueError("Unknown operation type")
+    #         # Perform morphological operations based on selected operation type
+    #         if operation == 'dilation_erosion':
+    #             # Apply dilation before interpolation
+    #             for z in labeled_z:
+    #                 membrane_mask[z] = binary_dilation(membrane_mask[z], structure=structuring_element)
+    #         elif operation == 'none':
+    #             pass  # No morphological operations
+    #         else:
+    #             raise ValueError("Unknown operation type")
 
-            # Copy existing membrane annotations to the interpolated mask
-            interpolated_mask[labeled_z] = membrane_mask[labeled_z]
+    #         # Copy existing membrane annotations to the interpolated mask
+    #         interpolated_mask[labeled_z] = membrane_mask[labeled_z]
 
-            # Iterate through adjacent labeled z-layers and perform linear interpolation
-            for i in range(len(labeled_z) - 1):
-                z_start = labeled_z[i]
-                z_end = labeled_z[i + 1]
-                mask_start = membrane_mask[z_start].astype(float)
-                mask_end = membrane_mask[z_end].astype(float)
-                num_interp = z_end - z_start - 1
+    #         # Iterate through adjacent labeled z-layers and perform linear interpolation
+    #         for i in range(len(labeled_z) - 1):
+    #             z_start = labeled_z[i]
+    #             z_end = labeled_z[i + 1]
+    #             mask_start = membrane_mask[z_start].astype(float)
+    #             mask_end = membrane_mask[z_end].astype(float)
+    #             num_interp = z_end - z_start - 1
 
-                if num_interp <= 0:
-                    continue  # Adjacent z-layers, no interpolation needed
+    #             if num_interp <= 0:
+    #                 continue  # Adjacent z-layers, no interpolation needed
 
-                for dz in range(1, num_interp + 1):
-                    z_interp = z_start + dz
-                    alpha = dz / (z_end - z_start)  # Interpolation weight
+    #             for dz in range(1, num_interp + 1):
+    #                 z_interp = z_start + dz
+    #                 alpha = dz / (z_end - z_start)  # Interpolation weight
 
-                    # Perform linear interpolation
-                    mask_interp = (1 - alpha) * mask_start + alpha * mask_end
+    #                 # Perform linear interpolation
+    #                 mask_interp = (1 - alpha) * mask_start + alpha * mask_end
 
-                    # Binarize the interpolation result
-                    mask_interp_binary = (mask_interp > threshold).astype(np.uint8)
+    #                 # Binarize the interpolation result
+    #                 mask_interp_binary = (mask_interp > threshold).astype(np.uint8)
 
-                    # Update the interpolated mask with binary values
-                    interpolated_mask[z_interp] = mask_interp_binary
+    #                 # Update the interpolated mask with binary values
+    #                 interpolated_mask[z_interp] = mask_interp_binary
 
-            # Perform morphological operations after interpolation
-            if operation == 'dilation_erosion':
-                # Apply erosion after interpolation
-                for z in range(interpolated_mask.shape[0]):
-                    if interpolated_mask[z].any():  # If the current layer has annotations
-                        interpolated_mask[z] = binary_erosion(interpolated_mask[z], structure=structuring_element) * interpolated_mask[z]
-            elif operation == 'none':
-                pass  # No morphological operations
-            else:
-                raise ValueError("Unknown operation type")
+    #         # Perform morphological operations after interpolation
+    #         if operation == 'dilation_erosion':
+    #             # Apply erosion after interpolation
+    #             for z in range(interpolated_mask.shape[0]):
+    #                 if interpolated_mask[z].any():  # If the current layer has annotations
+    #                     interpolated_mask[z] = binary_erosion(interpolated_mask[z], structure=structuring_element) * interpolated_mask[z]
+    #         elif operation == 'none':
+    #             pass  # No morphological operations
+    #         else:
+    #             raise ValueError("Unknown operation type")
 
-            # Update the interpolated mask with appropriate values based on membrane type
-            if membrane_type == 'front':
-                interpolated_mask[interpolated_mask > 0] = 2
-            elif membrane_type == 'rear':
-                interpolated_mask[interpolated_mask > 0] = 22
-            else:
-                raise ValueError("Unknown membrane type")
+    #         # Update the interpolated mask with appropriate values based on membrane type
+    #         if membrane_type == 'front':
+    #             interpolated_mask[interpolated_mask > 0] = 2
+    #         elif membrane_type == 'rear':
+    #             interpolated_mask[interpolated_mask > 0] = 22
+    #         else:
+    #             raise ValueError("Unknown membrane type")
 
-            # Add the new label layer to Napari
-            if 'Membrane Labels' in self.viewer.layers:
-                self.viewer.layers.remove('Membrane Labels')  # Remove old layer if it exists
+    #         # Add the new label layer to Napari
+    #         if 'Membrane Labels' in self.viewer.layers:
+    #             self.viewer.layers.remove('Membrane Labels')  # Remove old layer if it exists
 
-            self.viewer.add_labels(interpolated_mask, name='Membrane Labels')
-            self.viewer.layers.remove('Draw Membrane')
+    #         self.viewer.add_labels(interpolated_mask, name='Membrane Labels')
+    #         self.viewer.layers.remove('Draw Membrane')
                 
+    #     try:
+    #         self.toolbar_widget.interpolate_memb_button.clicked.disconnect()
+    #     except TypeError:
+    #         pass
+    #     self.toolbar_widget.interpolate_memb_button.clicked.connect(on_interpolate_memb_button_clicked)
+    
+    def register_completing_membrane_button(self):
+        def completing_membrane_dialog():
+            # 创建对话框
+            dialog = QDialog()
+            dialog.setWindowTitle("Select Membrane Type")
+
+            # 布局
+            layout = QVBoxLayout()
+
+            # 创建前后选择的单选按钮
+            front_radio = QRadioButton("Pre")
+            rear_radio = QRadioButton("Post")
+            front_radio.setChecked(True)  # 默认选择front
+
+            # 添加应用按钮
+            apply_button = QPushButton("Apply")
+
+            # 连接按钮的点击事件
+            def apply_completing_membrane():
+                # 根据用户选择front或rear来执行不同的ID更改
+                membrane_type = 2 if front_radio.isChecked() else 22
+                
+                # 执行completing_membrane逻辑
+                from membrane.draw_membrane import draw_membrane
+                from membrane.membrane_point2mask import membrane_point2mask
+                
+                guide_points = np.round(self.viewer.layers['edit vesicles'].data).astype(int)
+                membrane = self.viewer.layers['Membrane'].data
+                
+                points_list = draw_membrane(guide_points)
+                new_membrane = membrane_point2mask(membrane, points_list)
+                
+                # 根据选择的membrane_type修改ID
+                new_membrane[new_membrane > 0] = membrane_type
+                
+                self.viewer.layers['edit vesicles'].data = None
+                
+                # 添加Membrane Labels图层
+                self.viewer.add_labels(new_membrane, name='Membrane Labels')
+                
+                self.viewer.layers.selection.active = self.viewer.layers['edit vesicles']
+                
+                # 关闭对话框
+                dialog.accept()
+
+            # 将元素添加到布局
+            layout.addWidget(QLabel("Select membrane type:"))
+            layout.addWidget(front_radio)
+            layout.addWidget(rear_radio)
+            layout.addWidget(apply_button)
+
+            # 设置对话框布局
+            dialog.setLayout(layout)
+
+            # 连接Apply按钮点击事件
+            apply_button.clicked.connect(apply_completing_membrane)
+
+            # 显示对话框
+            dialog.exec_()
+            
+        
         try:
-            self.toolbar_widget.interpolate_memb_button.clicked.disconnect()
+            self.toolbar_widget.completing_membrane_button.clicked.disconnect()
         except TypeError:
             pass
-        self.toolbar_widget.interpolate_memb_button.clicked.connect(on_interpolate_memb_button_clicked)
+        self.toolbar_widget.completing_membrane_button.clicked.connect(completing_membrane_dialog)
     
     def register_save_mamually_memb(self):
         def save_mamually_memb():
