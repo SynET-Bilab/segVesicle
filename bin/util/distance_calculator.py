@@ -95,6 +95,7 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
                     r1, r2 = vesicle.getRadius3D()[1], vesicle.getRadius3D()[0]
                     vesicle.setRadius2D([r1, r2])
                     print(f"Updated Radius2D to r1: {r1}, r2: {r2}")
+                    vesicle.setRadius((r1+r2)/2)
                 else:
                     print(f"Warning: Vesicle ID {vesicle.getId()} lacks valid Radius3D data. Skipping Radius2D update.")
                     continue  # 如果 Radius3D 无效，跳过后续步骤
