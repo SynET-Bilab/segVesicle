@@ -41,7 +41,7 @@ def one_label_2d_fit(data):
 def labels2json(labels_data,jsonfile):
     results = []
     IDset = np.unique(labels_data)[1:]
-    data_pad = np.pad(labels_data,30,'constant',constant_values= 0)
+    data_pad = np.pad(labels_data,100,'constant',constant_values= 0)
     for ID in tqdm(IDset, file=sys.stdout):
         if ID > 20000: continue
         data = data_pad.copy()
@@ -68,15 +68,16 @@ def labels2json(labels_data,jsonfile):
         # this region为一个[0,1]的连通体球
         region = regionprops(data)[0]       
         center_region = np.array(region.centroid).astype(np.int16)
-        data_cube = data[center_region[0]-25:center_region[0]+25, center_region[1]-25:center_region[1]+25,center_region[2]-25:center_region[2]+25]
+        data_cube = data[center_region[0]-75:center_region[0]+75, center_region[1]-75:center_region[1]+75,center_region[2]-75:center_region[2]+75]
+
         # 判断是2d/3d
-        if data_cube[24,25,25] == 0:
-            center, evecs, radii = one_label_2d_fit(data_cube[25])
-            v_center = center_region - 30
+        if data_cube[74,75,75] == 0:
+            center, evecs, radii = one_label_2d_fit(data_cube[75])
+            v_center = center_region - 100
         else:
             center, evecs, radii = one_label_fit(data_cube)
             # v_center 为原label mrc下的坐标
-            v_center = center_region -25 + center - 30
+            v_center = center_region -75 + center - 100
         #label value 为 ID
         info={'name':'vesicle_'+str(ID),'center':v_center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(),'CCF':'1'}
         results.append(info)

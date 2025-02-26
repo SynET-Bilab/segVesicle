@@ -303,7 +303,7 @@ def density_fit_2d(data_iso,center,radius):
     cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
     img = cube_[cube_.shape[0]//2,:,:]
     img = ndimage.gaussian_filter(img,sigma=1)
-    img_reverse = -img
+    img_reverse = -img.astype(np.float32)
     img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
 
     mask = disk(cube_.shape[1]//2)
@@ -344,7 +344,7 @@ def density_fit_2d(data_iso,center,radius):
     labeled[l==label_vaule] = 1
     if d_min == 99999: #if the num of points to fit is too small (<10)
         return [None, None, None, 0]
-    if(np.sum(labeled)/np.sum(open)<0.6):
+    if(np.sum(labeled)/np.sum(open)<0.9):
         labeled = open
     cube_m_mask=np.zeros_like(cube_)
     cube_m_mask[cube_.shape[0]//2]=labeled
