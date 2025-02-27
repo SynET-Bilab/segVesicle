@@ -13,6 +13,357 @@ from io import *
 
 
 
+class Triangle:
+
+    def __init__(self, p1, p2, p3):
+        self.p1 = np.array(p1, dtype = np.float64)
+        self.p2 = np.array(p2, dtype = np.float64)
+        self.p3 = np.array(p3, dtype = np.float64)
+
+
+    def center(self):
+        return (self.p1+self.p2+self.p3)/3.0
+
+
+    def point_triangle_distance(self, p):
+        """calculate distance from a point to the triangle.
+        @param p: a list of 3 floats
+        @param standard: use the standard way to measure distance.
+        if not, use sampling points in the triangle to estamate the distance
+        if not, requires the triangle be sampled by self.sampling_triangle()
+        @return distance, nearest point:
+        """
+        return self.point_triangle_distance_using_sample_points(p)
+
+
+    def point_triangle_distance_using_sample_points(self, p):
+        """calculate distance from a point to the triangle, triangle represented by a set of points filling triangle
+
+        requires self.sampling_triangle
+        """
+        if hasattr(self, 'points') == False:
+            self.sampling_triangle()
+        distance = np.linalg.norm(p - self.points[0])
+        PP0 = self.points[0]
+
+        for pt in self.points[1:]:
+            dis = np.linalg.norm(p - pt)
+            if dis < distance:
+                distance = dis
+                PP0 = pt
+        return distance, PP0
+
+
+    def sampling_triangle(self, samplingStep = 1.0):
+        """generate a set of points filling the triangle,
+        assign values to self.points
+        It is better self.p1 is the cross over point of  longest and middle edge of the triangle
+        @param samplingStep: distance between points
+        @return: a list of points
+        @Auther: Liu Yuntao
+        """
+        a = self.p2 - self.p1
+        b = self.p3 - self.p1 #need test
+        samplingNum = np.array(list(map(np.linalg.norm,[a,b]))) / samplingStep
+        aVector = a / samplingNum[0]
+        bVector = b / samplingNum[1]
+
+        # To make the other direction uniform
+        dotab = np.dot(aVector, bVector)/ np.linalg.norm(aVector) / np.linalg.norm(bVector)
+        theta = np.arccos(dotab)
+        p = int(0.5 / np.tan(theta/2.0))
+
+        # i/Num0 + j/Num1 < 1
+        k = samplingNum[1]/samplingNum[0]
+        points = []
+        for i in np.arange(0, samplingNum[0]):
+            for j in np.arange(0, samplingNum[1]-i*k):
+                if p > 1:
+                    if int(i-j)%p ==0:
+                        pt = self.p1 + i*aVector + j*bVector
+                        points.append(pt)
+                else:
+                        pt = self.p1 + i*aVector + j*bVector
+                        points.append(pt)
+        self.points = points
+        return points
+
+    
+    def area(self):
+        '''
+        Comparing with Heron formula, cross product is more stable and efficient in 3d space.
+        '''
+        AB = self.p2 - self.p1
+        AC = self.p3 - self.p1
+        cross_product = np.cross(AB, AC)
+        return 0.5 * np.linalg.norm(cross_product)
+    
+    
+    def to_points(self) -> np.ndarray:
+        '''
+        output: vertices of the triangle, shape in (3, 3)
+        '''
+        return np.array([self.p1, self.p2, self.p3])
+
+
+class Surface:
+    '''
+    Representation of a membrane. Methods of this class are used to **load, triangulate and calculate basic properties** of the membrane.
+    Data could be loaded from 2 sources: manual segmentation or auto-segmentation.
+    
+    Generally, original points from manual segmentation are sparse, while those from auto-segmentation are dense.
+    For manual segmentation, the original result is a sparse set of points, which should be dense-sampling after triangulating (this process will done automatically when the membrane loaded).
+    For auto-segmentation result, this class could directly load the dense points.
+    '''
+
+    def __init__(self):
+        self._vertices = []
+        self._faces = []
+        self._triangleList : List[Triangle] = []
+
+
+    def _make_triangle_list(self):
+        """generate triangleList from vertices and faces
+
+        """
+        for face in self._faces:
+            self._triangleList.append(Triangle(self._vertices[face[0]],
+                                               self._vertices[face[1]],
+                                               self._vertices[face[2]]))
+
+
+    def from_model_use_imod_mesh(self, model, outputVRML = "tmp.wrl"):
+        """Use imodmesh to generate surface
+
+        @param model: imod model file
+        @param objNum: index of object, starts from 1
+        @return: Nothing
+        """
+        #from synTomo.files.modelhandler import ImodModel
+        #model = ImodModel(model)
+        #model.toModelFile("tmp.mod", objNum, closedContour = False)
+        from subprocess import call
+        s = 'imodmesh  -sP {0} >> /dev/null; imod2vrml2 {0} {1} >> /dev/null'.format(model, outputVRML)
+        call(s, shell = True)
+        self.fromVrml2(outputVRML)
+        return 0
+
+
+    def fromVrml2(self, wrlFile):
+        """initialize class from vrml file
+
+        @return: Nothing
+        """
+        with open(wrlFile) as f:
+            sVertices = False
+            sFaces = False
+            for line in f:
+                if (sVertices == True) and (']' in line):
+                    sVertices = False
+                if sVertices:
+                    self._vertices.append(list(map(float,line.split(",")[0].split())))
+                if 'point [' in line:
+                    sVertices = True
+
+                if (sFaces == True) and (']' in line):
+                    sFaces = False
+                if sFaces:
+                    self._faces.append(list(map(int,line.split(",")[0:3])))
+                if 'coordIndex [' in line:
+                    sFaces = True
+        self._make_triangle_list()
+        return 0
+    
+    
+    def from_model_auto_segment(self, model, objNum, amp=1):
+        '''
+        load membrane from model file produced by auto-segmentation
+        premembrane: object num: 2
+        postmembrane: object num: 3
+        '''
+        
+        def custom_round(x, base=0.5):
+            '''
+            set coordinate to the nearest 0.5
+            '''
+            return np.round(x / base) * base
+        
+
+        def avg_for_1d(idxs, length):
+            '''
+            average for 1d slice of x(or y)
+            '''
+            arr = np.zeros((length, )).astype(np.int16)
+            idxs_from0 = (np.array(idxs) - min(idxs)).astype(np.int16)
+            arr[idxs_from0] = 1
+            lbl = label(arr)
+            regions = regionprops(np.stack([lbl, lbl]))
+            idxs_mean = []
+            for r in regions:
+                rx = r.centroid
+                idxs_mean.append(custom_round(rx[1] + min(idxs)))
+            
+            return idxs_mean
+
+
+        def max_filter(unfiltered):
+            '''
+            to fix conflicts that in the same contour, points with the same x(or y) have different y(or x) (here just do a adjusted NMS by mean y(or x))
+            '''
+            filtered = []
+            contours = []
+            obj, _, _, _, _ = unfiltered[0]
+            for z in sorted(list(set(unfiltered[:, -1].tolist()))):
+                contours.append(unfiltered[unfiltered[:, -1] == z])
+            
+            for i, contour in enumerate(contours):
+                idx = i + 1
+                point_x_set = sorted(list(set(contour[:, 2].tolist())))
+                point_y_set = sorted(list(set(contour[:, 3].tolist())))
+                x_diff = max(point_x_set) - min(point_x_set)
+                y_diff = max(point_y_set) - min(point_y_set)
+                if x_diff < y_diff:  # membrane is vertical, so average along the x axis
+                    length = int(x_diff + 5)
+                    for y in point_y_set:
+                        point_equ_y = contour[contour[:, 3] == y]
+                        obj, _, _, y, z = point_equ_y[0]
+                        idxs = point_equ_y[:, 2]
+                        idxs_mean = avg_for_1d(idxs, length)
+                        for x in idxs_mean:
+                            filtered.append([obj, idx, x, y, z])
+                            
+                else:  # membrane is horizontal, so average along the y axis
+                    length = int(y_diff + 5)
+                    for x in point_x_set:
+                        point_equ_x = contour[contour[:, 2] == x]
+                        obj, _, x, _, z = point_equ_x[0]
+                        idxs = point_equ_x[:, 3]
+                        idxs_mean = avg_for_1d(idxs, length)
+                        for y in idxs_mean:
+                            filtered.append([obj, idx, x, y, z])
+
+            filtered = np.array(filtered)
+            
+            return filtered
+        
+        
+        cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
+        os.system(cmd)
+        untreated = np.loadtxt(model.replace('.mod', '.point'))
+        untreated = untreated[untreated[:, 0] == objNum]
+        
+        membrane = max_filter(untreated)
+        membrane = membrane * amp  # amplify the membrane to the original size
+        np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
+        
+        self._densePoints = membrane[:, 2:]
+        self._make_triangle_list_denseInput()
+
+
+    def sampling_triangles(self, samplingStep):
+        """Get points in side all the triangles in the surface
+        @param samplingStep: the interval of the adjecent sampling points, in pixels"""
+        for t in self._triangleList:
+            t.sampling_triangle(samplingStep)
+
+
+    def surface_area(self):
+        """Calculate area of the surface
+        @return: surface area in pixel^2
+
+        """
+        area = 0
+        for t in self._triangleList:
+            area += t.area()
+        return area
+
+
+    def center(self, onSurf = False):
+        """ if onSurf == True, the center is located on the surface
+        """
+        totalWeight = 0.0
+        center = []
+        for triangle in self._triangleList:
+            if len(center) == 0:
+                center = triangle.center()*triangle.area()
+            else:
+                center += triangle.center()*triangle.area()
+            totalWeight += triangle.area()
+
+        center = center / totalWeight
+
+        if onSurf:
+            dis,PP0 = self.point_distance(center)
+            center = PP0
+
+        return center
+    
+    
+    def setPoints(self, points : np.ndarray):
+        '''
+        For auto-segmentation result, load dense points directly
+        For load membrane from scratch, `from_model_auto_segment` method is recommended, which will load membrane from the original model file with no need for other process.
+        '''
+        self._densePoints = points
+        self._make_triangle_list_denseInput()
+    
+    
+    def getPoints(self) -> np.ndarray:
+        return self._densePoints
+    
+    
+    def _make_triangle_list_denseInput(self):
+        '''
+        For auto-segmentation result, generate triangle list from direct input dense points.
+        Delaunay triangulation is used here. It works well when points are 2d, so projection is needed.
+        
+        For nearly all membrane of our synapse data, the points form a surface that is almost perpendicular to the xy-plane. 
+        If projected directly onto the xy-plane, the points overlap significantly.
+        
+        Here we use PCA to get the normal vector of the surface, and project the points onto a plane perpendicular to the normal vector.
+        '''
+        
+        pca = PCA(n_components=2, random_state=0)
+        points_transformed = pca.fit_transform(self._densePoints)
+        
+        delaunay = Delaunay(points_transformed)
+        
+        for simplex in delaunay.simplices:
+            # use original coordinates here
+            p1 = self._densePoints[simplex[0]]
+            p2 = self._densePoints[simplex[1]]
+            p3 = self._densePoints[simplex[2]]
+            # not have the save z (exclude triangles on the top and bottom surfaces)
+            if not ((p1[2] == p2[2]) and (p1[2] == p3[2])):
+                self._triangleList.append(Triangle(p1, p2, p3))
+    
+    
+    def show_triangulated_surface(self, maps_color='tab20'):
+        
+        import matplotlib.pyplot as plt
+        
+        from matplotlib import colormaps
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+        
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        cmap = colormaps.get_cmap(maps_color)
+        colors = [cmap(i%20) for i in range(len(self._triangleList))]
+        
+        for i, triangle in enumerate(self._triangleList):
+            poly = Poly3DCollection([triangle.to_points()], alpha=0.6, facecolor=colors[i], edgecolor='k')
+            ax.add_collection3d(poly)
+        
+        ax.scatter(self._densePoints[:,0], self._densePoints[:,1], self._densePoints[:,2], c='r', s=1)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        
+        plt.tight_layout()
+        plt.show()
+
+
+
 class Vesicle:
 
     """
@@ -44,6 +395,9 @@ class Vesicle:
         self._center = [float(positionElement.get('X')),
                         float(positionElement.get('Y')),
                         float(positionElement.get('Z'))]
+        
+        classElement = vesicleElement.xpath('Class')[0]
+        self._radius = float(classElement.get('Name')) / pixelSize /2.0
 
 
     def fromXMLSynTomo(self, xmlObj, pixelSize):
@@ -61,7 +415,7 @@ class Vesicle:
                    "Distance", 
                    "ProjectionPoint", 
                    "Type",
-                   "PitPoint"]  # ls: 添加 PitPoint 到参数列表
+                   "PitPoint"]
         argStrList = ["Type"]
         
         for item in argList:
@@ -92,7 +446,7 @@ class Vesicle:
                 evecs[idx, :] = evec_values
             self._evecs = evecs
 
-        # ls: 解析 PitPoint 在 SynTomo 格式中
+        # ls: PitPoint
         pit_point_elements = vesicleElement.xpath('PitPoint')
         if pit_point_elements:
             pit_point = pit_point_elements[0]
@@ -161,7 +515,7 @@ class Vesicle:
                                                 X = str(self._projectionPoint[0]),\
                                                 Y = str(self._projectionPoint[1]),\
                                                 Z = str(self._projectionPoint[2])))
-        # ls: 添加 PitPoint 元素
+
         if hasattr(self, "_pitPoint"):
             vesicleElement.append(etree.Element("PitPoint",\
                                                 X = str(self._pitPoint[0]),\
@@ -184,7 +538,8 @@ class Vesicle:
 
     def ellipse_in_plane(self):
         '''
-        get the parameters of the 2D ellipse parallel to the xy-plane and the center of the 3D ellipsoid
+        get the parameters of the 2D ellipse parallel to the xy-plane and the center of the 3D ellipsoid.
+        For most vesicles, this _radius2D attribute will be covered by a real 2D-fitting. See bin/setradius2D.py
         '''
         A = self.ellipsoid_equation()
         A_2d = A[:2, :2]
@@ -211,6 +566,7 @@ class Vesicle:
     def distance_to_surface(self, surface, precision, tree, membrane_points):
         """
         @param surface: membrane.surface instance
+        
         @author: Lu Zhenhang
         @date: 2024-10-14
         """
@@ -241,8 +597,9 @@ class Vesicle:
 
     def sample_on_vesicle(self, precision : int) -> np.ndarray:
         """
-        @param precision: number of points sampled on vesicle (2d max section)
         @return: points list sampled on a vesicle
+        @param precision: number of points sampled on vesicle (2d max section)
+        
         @author: Lu Zhenhang
         @date: 2023-04-18
         """
@@ -532,13 +889,16 @@ class VesicleList:
             self._vesicleList.append(vesicle)
     
     
-    def distance_to_surface(self, surface, precision, mode='dense'):
+    def distance_to_surface(self, 
+                            surface : Surface, 
+                            precision : int, 
+                            mode='dense'):
         """
         -> rewrite by Lu Zhenhang, 2023-04-18. Using kd-tree to speed up the calculation
         -> rewrite by Lu Zhenhang, 2023-06-04. Add projection_point to output file
-        
         -> update by Lu Zhenhang, 2024-10-14. Add 3D ellipsoid support (data from DL-based segmentation)
-        @new param: mode: 'sparse' or 'dense', representing manual segmentation or auto-segmentation for membrane
+        
+        @param mode: 'sparse' or 'dense', representing manual segmentation or auto-segmentation for membrane
         """
         
         self._distance = []
@@ -605,9 +965,7 @@ class VesicleList:
         self._centerList = []
         for vesicle in self._vesicleList:
             self._centerList.append(vesicle.getCenter())
-
         self._centerList = np.array(self._centerList, dtype = float)
-
         return self._centerList
 
     def getRadius(self):
@@ -627,359 +985,6 @@ class VesicleList:
     
     def getRadius3D(self):
         return self._radius3D
-
-
-class Triangle:
-
-    def __init__(self, p1, p2, p3):
-        import numpy as np
-        self.p1 = np.array(p1, dtype = np.float64)
-        self.p2 = np.array(p2, dtype = np.float64)
-        self.p3 = np.array(p3, dtype = np.float64)
-
-
-    def center(self):
-        return (self.p1+self.p2+self.p3)/3.0
-
-
-    def point_triangle_distance(self, p):
-        """calculate distance from a point to the triangle.
-        @param p: a list of 3 floats
-        @param standard: use the standard way to measure distance.
-        if not, use sampling points in the triangle to estamate the distance
-        if not, requires the triangle be sampled by self.sampling_triangle()
-        @return distance, nearest point:
-        """
-        return self.point_triangle_distance_using_sample_points(p)
-
-
-    def point_triangle_distance_using_sample_points(self, p):
-        """calculate distance from a point to the triangle, triangle represented by a set of points filling triangle
-
-        requires self.sampling_triangle
-        """
-        if hasattr(self, 'points') == False:
-            self.sampling_triangle()
-        import numpy as np
-        distance = np.linalg.norm(p - self.points[0])
-        PP0 = self.points[0]
-
-        for pt in self.points[1:]:
-            dis = np.linalg.norm(p - pt)
-            if dis < distance:
-                distance = dis
-                PP0 = pt
-        return distance, PP0
-
-
-    def sampling_triangle(self, samplingStep = 1.0):
-        """generate a set of points filling the triangle,
-        assign values to self.points
-        It is better self.p1 is the cross over point of  longest and middle edge of the triangle
-        @param samplingStep: distance between points
-        @return: a list of points
-        @Auther: Liu Yuntao
-        """
-        import numpy as np
-        a = self.p2 - self.p1
-        b = self.p3 - self.p1 #need test
-        samplingNum = np.array(list(map(np.linalg.norm,[a,b]))) / samplingStep
-        aVector = a / samplingNum[0]
-        bVector = b / samplingNum[1]
-
-        # To make the other direction uniform
-        dotab = np.dot(aVector, bVector)/ np.linalg.norm(aVector) / np.linalg.norm(bVector)
-        theta = np.arccos(dotab)
-        p = int(0.5 / np.tan(theta/2.0))
-
-        # i/Num0 + j/Num1 < 1
-        k = samplingNum[1]/samplingNum[0]
-        points = []
-        for i in np.arange(0, samplingNum[0]):
-            for j in np.arange(0, samplingNum[1]-i*k):
-                if p > 1:
-                    if int(i-j)%p ==0:
-                        pt = self.p1 + i*aVector + j*bVector
-                        points.append(pt)
-                else:
-                        pt = self.p1 + i*aVector + j*bVector
-                        points.append(pt)
-        self.points = points
-        return points
-
-    
-    def area(self):
-        '''
-        Comparing with Heron formula, cross product is more stable and efficient in 3d space.
-        '''
-        AB = self.p2 - self.p1
-        AC = self.p3 - self.p1
-        cross_product = np.cross(AB, AC)
-        return 0.5 * np.linalg.norm(cross_product)
-    
-    
-    def to_points(self) -> np.ndarray:
-        '''
-        output: vertices of the triangle, shape in (3, 3)
-        '''
-        return np.array([self.p1, self.p2, self.p3])
-
-
-class Surface:
-    '''
-    Representation of a membrane. Methods of this class are used to **load, triangulate and calculate basic properties** of the membrane.
-    Data could be loaded from 2 sources: manual segmentation or auto-segmentation.
-    
-    Generally, original points from manual segmentation are sparse, while those from auto-segmentation are dense.
-    For manual segmentation, the original result is a sparse set of points, which should be dense-sampling after triangulating (this process will done automatically when the membrane loaded).
-    For auto-segmentation result, this class could directly load the dense points.
-    '''
-
-    def __init__(self):
-        self._vertices = []
-        self._faces = []
-        self._triangleList = []
-
-
-    def _make_triangle_list(self):
-        """generate triangleList from vertices and faces
-
-        """
-        for face in self._faces:
-            self._triangleList.append(Triangle(self._vertices[face[0]],
-                                               self._vertices[face[1]],
-                                               self._vertices[face[2]]))
-
-
-    def from_model_use_imod_mesh(self, model, outputVRML = "tmp.wrl"):
-        """Use imodmesh to generate surface
-
-        @param model: imod model file
-        @param objNum: index of object, starts from 1
-        @return: Nothing
-        """
-        #from synTomo.files.modelhandler import ImodModel
-        #model = ImodModel(model)
-        #model.toModelFile("tmp.mod", objNum, closedContour = False)
-        from subprocess import call
-        s = 'imodmesh  -sP {0} >> /dev/null; imod2vrml2 {0} {1} >> /dev/null'.format(model, outputVRML)
-        call(s, shell = True)
-        self.fromVrml2(outputVRML)
-        return 0
-
-
-    def fromVrml2(self, wrlFile):
-        """initialize class from vrml file
-
-        @return: Nothing
-        """
-        with open(wrlFile) as f:
-            sVertices = False
-            sFaces = False
-            for line in f:
-                if (sVertices == True) and (']' in line):
-                    sVertices = False
-                if sVertices:
-                    self._vertices.append(list(map(float,line.split(",")[0].split())))
-                if 'point [' in line:
-                    sVertices = True
-
-                if (sFaces == True) and (']' in line):
-                    sFaces = False
-                if sFaces:
-                    self._faces.append(list(map(int,line.split(",")[0:3])))
-                if 'coordIndex [' in line:
-                    sFaces = True
-        self._make_triangle_list()
-        return 0
-    
-    
-    def from_model_auto_segment(self, model, objNum, amp=1):
-        '''
-        load membrane from model file produced by auto-segmentation
-        premembrane: object num: 2
-        postmembrane: object num: 3
-        '''
-        
-        def custom_round(x, base=0.5):
-            '''
-            set coordinate to the nearest 0.5
-            '''
-            return np.round(x / base) * base
-        
-
-        def avg_for_1d(idxs, length):
-            '''
-            average for 1d slice of x(or y)
-            '''
-            arr = np.zeros((length, )).astype(np.int16)
-            idxs_from0 = (np.array(idxs) - min(idxs)).astype(np.int16)
-            arr[idxs_from0] = 1
-            lbl = label(arr)
-            regions = regionprops(np.stack([lbl, lbl]))
-            idxs_mean = []
-            for r in regions:
-                rx = r.centroid
-                idxs_mean.append(custom_round(rx[1] + min(idxs)))
-            
-            return idxs_mean
-
-
-        def max_filter(unfiltered):
-            '''
-            to fix conflicts that in the same contour, points with the same x(or y) have different y(or x) (here just do a adjusted NMS by mean y(or x))
-            '''
-            filtered = []
-            contours = []
-            obj, _, _, _, _ = unfiltered[0]
-            for z in sorted(list(set(unfiltered[:, -1].tolist()))):
-                contours.append(unfiltered[unfiltered[:, -1] == z])
-            
-            for i, contour in enumerate(contours):
-                idx = i + 1
-                point_x_set = sorted(list(set(contour[:, 2].tolist())))
-                point_y_set = sorted(list(set(contour[:, 3].tolist())))
-                x_diff = max(point_x_set) - min(point_x_set)
-                y_diff = max(point_y_set) - min(point_y_set)
-                if x_diff < y_diff:  # membrane is vertical, so average along the x axis
-                    length = int(x_diff + 5)
-                    for y in point_y_set:
-                        point_equ_y = contour[contour[:, 3] == y]
-                        obj, _, _, y, z = point_equ_y[0]
-                        idxs = point_equ_y[:, 2]
-                        idxs_mean = avg_for_1d(idxs, length)
-                        for x in idxs_mean:
-                            filtered.append([obj, idx, x, y, z])
-                            
-                else:  # membrane is horizontal, so average along the y axis
-                    length = int(y_diff + 5)
-                    for x in point_x_set:
-                        point_equ_x = contour[contour[:, 2] == x]
-                        obj, _, x, _, z = point_equ_x[0]
-                        idxs = point_equ_x[:, 3]
-                        idxs_mean = avg_for_1d(idxs, length)
-                        for y in idxs_mean:
-                            filtered.append([obj, idx, x, y, z])
-
-            filtered = np.array(filtered)
-            
-            return filtered
-        
-        
-        cmd = 'model2point -ob {} {} >> /dev/null'.format(model, model.replace('.mod', '.point'))
-        os.system(cmd)
-        untreated = np.loadtxt(model.replace('.mod', '.point'))
-        untreated = untreated[untreated[:, 0] == objNum]
-        
-        membrane = max_filter(untreated)
-        membrane = membrane * amp  # amplify the membrane to the original size
-        np.savetxt(model.replace('.mod', '_filter.point'), membrane, fmt='%d %d %.2f %.2f %.2f')
-        
-        self._densePoints = membrane[:, 2:]
-        self._make_triangle_list_denseInput()
-
-
-    def sampling_triangles(self, samplingStep):
-        """Get points in side all the triangles in the surface
-        @param samplingStep: the interval of the adjecent sampling points, in pixels"""
-        for t in self._triangleList:
-            t.sampling_triangle(samplingStep)
-
-
-    def surface_area(self):
-        """Calculate area of the surface
-        @return: surface area in pixel^2
-
-        """
-        area = 0
-        for t in self._triangleList:
-            area += t.area()
-        return area
-
-
-    def center(self, onSurf = False):
-        """ if onSurf == True, the center is located on the surface
-        """
-        totalWeight = 0.0
-        center = []
-        for triangle in self._triangleList:
-            if len(center) == 0:
-                center = triangle.center()*triangle.area()
-            else:
-                center += triangle.center()*triangle.area()
-            totalWeight += triangle.area()
-
-        center = center / totalWeight
-
-        if onSurf:
-            dis,PP0 = self.point_distance(center)
-            center = PP0
-
-        return center
-    
-    
-    def setPoints(self, points : np.ndarray):
-        '''
-        For auto-segmentation result, load dense points directly
-        For load membrane from scratch, `from_model_auto_segment` method is recommended, which will load membrane from the original model file with no need for other process.
-        '''
-        self._densePoints = points
-        self._make_triangle_list_denseInput()
-    
-    
-    def getPoints(self) -> np.ndarray:
-        return self._densePoints
-    
-    
-    def _make_triangle_list_denseInput(self):
-        '''
-        For auto-segmentation result, generate triangle list from direct input dense points.
-        Delaunay triangulation is used here. It works well when points are 2d, so projection is needed.
-        
-        For nearly all membrane of our synapse data, the points form a surface that is almost perpendicular to the xy-plane. 
-        If projected directly onto the xy-plane, the points overlap significantly.
-        
-        Here we use PCA to get the normal vector of the surface, and project the points onto a plane perpendicular to the normal vector.
-        '''
-        
-        pca = PCA(n_components=2, random_state=0)
-        points_transformed = pca.fit_transform(self._densePoints)
-        
-        delaunay = Delaunay(points_transformed)
-        
-        for simplex in delaunay.simplices:
-            # use original coordinates here
-            p1 = self._densePoints[simplex[0]]
-            p2 = self._densePoints[simplex[1]]
-            p3 = self._densePoints[simplex[2]]
-            # not have the save z (exclude triangles on the top and bottom surfaces)
-            if not ((p1[2] == p2[2]) and (p1[2] == p3[2])):
-                self._triangleList.append(Triangle(p1, p2, p3))
-    
-    
-    def show_triangulated_surface(self, maps_color='tab20'):
-        
-        import matplotlib.pyplot as plt
-        
-        from matplotlib import colormaps
-        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-        
-        fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(111, projection='3d')
-        cmap = colormaps.get_cmap(maps_color)
-        colors = [cmap(i%20) for i in range(len(self._triangleList))]
-        
-        for i, triangle in enumerate(self._triangleList):
-            poly = Poly3DCollection([triangle.to_points()], alpha=0.6, facecolor=colors[i], edgecolor='k')
-            ax.add_collection3d(poly)
-        
-        ax.scatter(self._densePoints[:,0], self._densePoints[:,1], self._densePoints[:,2], c='r', s=1)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        
-        plt.tight_layout()
-        plt.show()
 
 
 
