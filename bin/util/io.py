@@ -4,7 +4,6 @@ import os
 import tempfile
 import subprocess
 import mrcfile
-import pandas as pd
 import numpy as np
 
 def get_tomo(path):
@@ -32,6 +31,7 @@ def save_points_as_mod(points: np.ndarray, object_id: int, model_file: str):
     :param object_id: The object ID to use in the .mod file.
     :param model_file: The path to save the .mod file.
     """
+    import pandas as pd
     # Round z values to the nearest integer
     
     points[:, 2] = np.round(points[:, 2]).astype(int)
@@ -56,15 +56,16 @@ def save_points_as_mod(points: np.ndarray, object_id: int, model_file: str):
 
     # Create DataFrame and write to .mod file
     df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
-    write_model(model_file, df)
+    write_model(model_file, df, object_id, points)
 
-def write_model(model_file: str, model_df: pd.DataFrame):
+def write_model(model_file: str, model_df, object_id, points):
     """
     Converts the point data to a .mod file format using the IMOD tool point2model.
     
     :param model_file: Path where the .mod file will be saved.
     :param model_df: DataFrame containing the point data.
     """
+    import pandas as pd
     model = np.asarray(model_df)
 
     # Ensure the directory exists
@@ -103,13 +104,14 @@ def write_model(model_file: str, model_df: pd.DataFrame):
     df = pd.DataFrame(data, columns=["object", "contour", "x", "y", "z"])
     write_model(model_file, df)
 
-def write_model(model_file: str, model_df: pd.DataFrame):
+def write_model(model_file: str, model_df):
     """
     Converts the point data to a .mod file format using the IMOD tool point2model.
     
     :param model_file: Path where the .mod file will be saved.
     :param model_df: DataFrame containing the point data.
     """
+    import pandas as pd
     model = np.asarray(model_df)
 
     # Ensure the directory exists
