@@ -154,7 +154,7 @@ class VesicleAnnotationWindow(QMainWindow):
                     else:
                         vesicle_class_input.setCurrentText('others')  # 默认值
 
-                patch = self.get_patch_around_point(z, y, x, size=128)
+                patch = self.get_patch_around_point(z, y, x)
 
                 # 调整灰度级
                 min_val = np.percentile(patch, 0.1)
@@ -179,94 +179,49 @@ class VesicleAnnotationWindow(QMainWindow):
                     vesicle_class_input.setEnabled(False)
                     vesicle_class_input.setCurrentText('others')  # 重置为默认值
 
-    def get_patch_around_point(self, z, y, x, size=128):
-        half_size = size // 2
+    def get_patch_around_point(self, z, y, x, size_z=128, size_y=128, size_x=128):
+        # 计算每个维度的半尺寸
+        half_size_z = size_z // 2
+        half_size_y = size_y // 2
+        half_size_x = size_x // 2
+
         data = self.viewer.layers[0].data  # 假设图像数据在第一个层
         z, y, x = int(round(z)), int(round(y)), int(round(x))
-        
-        # 定义裁剪区域的起始和结束坐标
-        z_min = z - half_size
-        z_max = z + half_size
-        y_min = y - half_size
-        y_max = y + half_size
-        x_min = x - half_size
-        x_max = x + half_size
-
-        # 初始化填充后的patch，默认值为0（可根据需要修改）
-        patch = np.zeros((size, size, size), dtype=data.dtype)
-        
-        # 计算图像数据的维度
         z_dim, y_dim, x_dim = data.shape
+
+        # 计算图像数据中的有效裁剪区域（在数据边界内）
+        z_min_eff = max(z - half_size_z, 0)
+        z_max_eff = min(z + half_size_z, z_dim)
+        y_min_eff = max(y - half_size_y, 0)
+        y_max_eff = min(y + half_size_y, y_dim)
+        x_min_eff = max(x - half_size_x, 0)
+        x_max_eff = min(x + half_size_x, x_dim)
+
+        # 计算在patch中对应的放置起始位置（即当裁剪区域超出图像边界时，patch内部的偏移量）
+        patch_z_start = z_min_eff - (z - half_size_z)
+        patch_y_start = y_min_eff - (y - half_size_y)
+        patch_x_start = x_min_eff - (x - half_size_x)
         
-        # 计算裁剪区域与图像边界的重叠部分
-        # 对Z轴
-        if z_min < 0:
-            patch_z_start = -z_min
-            z_min = 0
-        else:
-            patch_z_start = 0
-        if z_max > z_dim:
-            patch_z_end = size - (z_max - z_dim)
-            z_max = z_dim
-        else:
-            patch_z_end = z_max - (z + half_size)
+        # patch中有效区域的尺寸与数据中对应区域尺寸一致
+        patch_z_end = patch_z_start + (z_max_eff - z_min_eff)
+        patch_y_end = patch_y_start + (y_max_eff - y_min_eff)
+        patch_x_end = patch_x_start + (x_max_eff - x_min_eff)
 
-        # 对Y轴
-        if y_min < 0:
-            patch_y_start = -y_min
-            y_min = 0
+        # 根据有效区域计算填充值（若有效区域为空，则退回到整个数据的最小值）
+        if (z_max_eff - z_min_eff) > 0 and (y_max_eff - y_min_eff) > 0 and (x_max_eff - x_min_eff) > 0:
+            fill_value = data[z_min_eff:z_max_eff, y_min_eff:y_max_eff, x_min_eff:x_max_eff].min()
         else:
-            patch_y_start = 0
-        if y_max > y_dim:
-            patch_y_end = size - (y_max - y_dim)
-            y_max = y_dim
-        else:
-            patch_y_end = y_max - (y + half_size)
+            fill_value = data.min()
 
-        # 对X轴
-        if x_min < 0:
-            patch_x_start = -x_min
-            x_min = 0
-        else:
-            patch_x_start = 0
-        if x_max > x_dim:
-            patch_x_end = size - (x_max - x_dim)
-            x_max = x_dim
-        else:
-            patch_x_end = x_max - (x + half_size)
+        # 初始化patch，填充值为有效区域的最小值
+        patch = np.full((size_z, size_y, size_x), fill_value, dtype=data.dtype)
 
-        # 计算在图像数据中的有效区域
-        data_z_start = z_min
-        data_z_end = z_max
-        data_y_start = y_min
-        data_y_end = y_max
-        data_x_start = x_min
-        data_x_end = x_max
-
-        # 计算在patch中的放置位置
-        patch_z_start = max(patch_z_start, 0)
-        patch_z_end = patch_z_start + (data_z_end - data_z_start)
-        patch_y_start = max(patch_y_start, 0)
-        patch_y_end = patch_y_start + (data_y_end - data_y_start)
-        patch_x_start = max(patch_x_start, 0)
-        patch_x_end = patch_x_start + (data_x_end - data_x_start)
-
-        # 将有效数据填充到patch中
+        # 将数据中的有效区域复制到patch中相应位置
         patch[patch_z_start:patch_z_end, patch_y_start:patch_y_end, patch_x_start:patch_x_end] = \
-            data[data_z_start:data_z_end, data_y_start:data_y_end, data_x_start:data_x_end]
+            data[z_min_eff:z_max_eff, y_min_eff:y_max_eff, x_min_eff:x_max_eff]
         
         return patch
-        # half_size = size // 2
-        # data = self.viewer.layers[0].data  # 假设图像数据在第一个层
-        # z, y, x = int(round(z)), int(round(y)), int(round(x))
-        # z_min = max(z - half_size, 0)
-        # z_max = min(z + half_size, data.shape[0])
-        # y_min = max(y - half_size, 0)
-        # y_max = min(y + half_size, data.shape[1])
-        # x_min = max(x - half_size, 0)
-        # x_max = min(x + half_size, data.shape[2])
-        # patch = data[z_min:z_max, y_min:y_max, x_min:x_max]
-        # return patch
+
 
     def update_class(self, idx, value):
         # 更新类别字典
