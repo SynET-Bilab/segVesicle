@@ -3,14 +3,23 @@ import numpy as np
 import os
 from qtpy.QtWidgets import (
     QMainWindow, QWidget, QLabel, QPushButton, QVBoxLayout,
-    QHBoxLayout, QGridLayout, QComboBox, QMessageBox
+    QHBoxLayout, QGridLayout, QComboBox, QMessageBox, QApplication
 )
 from qtpy.QtCore import Qt
 import napari
 
 class VesicleAnnotationWindow(QMainWindow):
     def __init__(self, parent):
+        # 弹出“please wait”提示
+        self.wait_dialog = QMessageBox(parent.viewer.window.qt_viewer)
+        self.wait_dialog.setWindowTitle("Please Wait")
+        self.wait_dialog.setText("Loading")
+        self.wait_dialog.setStandardButtons(QMessageBox.NoButton)
+        self.wait_dialog.show()
+        QApplication.processEvents()  # 确保提示及时显示
+        
         super().__init__(parent.viewer.window.qt_viewer)
+
         self.setWindowTitle('Annotate Vesicle Types')
         self.parent = parent
         self.viewer = parent.viewer
@@ -42,8 +51,13 @@ class VesicleAnnotationWindow(QMainWindow):
         # 显示当前的囊泡组
         self.display_current_vesicles()
         
+        # 初始化结束后自动关闭“please wait”提示
+        self.wait_dialog.done(0)
+        QApplication.processEvents()
+        
         # Automatically set the window to fullscreen
-        self.showMaximized()  # This will make the window open in fullscreen
+        # self.showMaximized()  # This will make the window open in fullscreen
+        
 
     def init_ui(self):
         # 主部件
@@ -67,6 +81,7 @@ class VesicleAnnotationWindow(QMainWindow):
                 button_layout.addWidget(self.next_button)
                 container = QWidget()
                 container.setLayout(button_layout)
+                container.setFixedSize(168, 168)  # 固定尺寸为168x168
                 main_layout.addWidget(container, row, col)
             else:
                 container = QWidget()
@@ -85,6 +100,7 @@ class VesicleAnnotationWindow(QMainWindow):
                 container_layout.addWidget(vesicle_class_input)
 
                 container.setLayout(container_layout)
+                container.setFixedSize(256, 256)  # 固定尺寸为168x168
                 main_layout.addWidget(container, row, col)
                 self.class_inputs[i] = vesicle_class_input  # 保存输入框引用
 
