@@ -672,7 +672,7 @@ class Vesicle:
         return points
     
     
-    def getCenter(self):
+    def getCenter(self) -> np.ndarray:
         if hasattr(self,'_center3D'):
             return self._center3D
         elif hasattr(self,'_center2D'):
@@ -680,25 +680,28 @@ class Vesicle:
         else:
             return self._center
 
-    def setCenter(self, center):
+    def setCenter(self, center:np.ndarray):
         self._center = center
         self._center2D = center
         self._center3D = center
-
+    
+    def setCenter2D(self, center2D:np.ndarray):
+        self._center2D = center2D
+    
     def setId(self, Id):
         self._vesicleId = Id
 
-    def getRadius(self):
+    def getRadius(self) -> np.ndarray:
         if hasattr(self, '_radius3D'):
             return self._radius3D
         elif hasattr(self, '_radius2D'):
             return self._radius2D
         return self._radius
 
-    def getRadius2D(self):
+    def getRadius2D(self) -> np.ndarray:
         return self._radius2D
     
-    def getRadius3D(self):
+    def getRadius3D(self) -> np.ndarray:
         warnings.warn("Vesicle().getRadius3D() is deprecated and will be removed soon, please use getRadius() instead", UserWarning)
         return self._radius3D
 
@@ -714,13 +717,13 @@ class Vesicle:
     def setEvecs(self, evecs):
         self._evecs = evecs
     
-    def getEvecs(self):
+    def getEvecs(self) -> np.ndarray:
         return self._evecs
 
-    def getId(self):
+    def getId(self) -> int:
         return self._vesicleId
 
-    def getProjectionPoint(self):
+    def getProjectionPoint(self) -> np.ndarray:
         return self._projectionPoint
 
     def setProjectionPoint(self, projectionPoint):
