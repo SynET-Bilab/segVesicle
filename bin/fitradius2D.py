@@ -10,7 +10,7 @@ from segVesicle.bin.util.structures import VesicleList
 
 
 
-def normalize_scale(image : np.ndarray):
+def normalize_scale(image : np.ndarray) -> np.ndarray:
     img = image.copy()
     max_value = img.max()
     min_value = img.min()
@@ -47,12 +47,6 @@ def set_2D_radius(synapse, path):
         center = np.round(vl[i].getCenter()).astype(np.uint16)
         radius = vl[i].getRadius().mean()
         x_init, y_init, z_init = center
-        img = data_pad[
-            z_init + padwidth,
-            int(y_init + padwidth - radius - margin): int(y_init + padwidth + radius + margin),
-            int(x_init + padwidth - radius - margin): int(x_init + padwidth + radius + margin)
-        ]
-        img_norm = normalize_scale(img)
         
         z_range = range(z_init - 1, z_init + 1)
         r_ma = 0
@@ -69,23 +63,30 @@ def set_2D_radius(synapse, path):
                     vl[i].setRadius2D(np.array([radii_fit[1], radii_fit[2]]))
                     vl[i].setRotation2D(phi)
                     
+        radius_new = vl[i].getRadius2D().mean()
         fit_vesicle = vl[i].sample_on_vesicle(360)
         shift = np.array([
-            x_init - radius - margin - 1, 
-            y_init - radius - margin - 1,
+            vl[i]._center2D[0] - radius_new - margin, 
+            vl[i]._center2D[1] - radius_new - margin,
             fit_vesicle[:, 2].mean()
         ])
         fit_vesicle_shift = np.round(fit_vesicle - shift).astype(np.uint16)  # local coordinate, xyz, and z=0
         
+        img = data_pad[
+            int(vl[i]._center2D[2] + padwidth - 1),
+            int(vl[i]._center2D[1] + padwidth - radius_new - margin - 1): int(vl[i]._center2D[1] + padwidth + radius_new + margin - 1),
+            int(vl[i]._center2D[0] + padwidth - radius_new - margin - 1): int(vl[i]._center2D[0] + padwidth + radius_new + margin - 1)
+        ]  # xml from 1, but array from 0
+        img_norm = normalize_scale(img)
         out = np.array([img_norm] * 3)
-        out[0, 
-            np.round(vl[i].getCenter()[1] - (y_init - radius - margin)).astype(np.uint16), 
-            np.round(vl[i].getCenter()[0] - (x_init - radius - margin)).astype(np.uint16)] = 255
-        out[0, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 255
+        
+        out[0, np.round(radius_new + margin).astype(np.uint16), np.round(radius_new + margin).astype(np.uint16)] = 255  # center
+        out[0, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 255  # ellipse, RGB:(255,0,0), in red
         out[1, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
         out[2, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
         
         imwrite(os.path.join(img_path, '{}.tif'.format(vl[i].getId())), out, photometric='rgb')
+        
     vl.toXMLFile(xml_file)
 
 
