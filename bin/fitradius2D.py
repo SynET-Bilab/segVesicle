@@ -71,8 +71,8 @@ def set_2D_radius(synapse, path):
                     
         fit_vesicle = vl[i].sample_on_vesicle(360)
         shift = np.array([
-            vl[i]._center2D[0] - radius - margin, 
-            vl[i]._center2D[1] - radius - margin,
+            x_init - radius - margin - 1, 
+            y_init - radius - margin - 1,
             fit_vesicle[:, 2].mean()
         ])
         fit_vesicle_shift = np.round(fit_vesicle - shift).astype(np.uint16)  # local coordinate, xyz, and z=0
