@@ -26,7 +26,7 @@ def set_2D_radius(synapse, path):
     xml_file = os.path.join(path, 'ves_seg/vesicle_analysis/{}_vesicle_class.xml'.format(synapse))
     if not os.path.exists(xml_file.replace('.xml', '.xml.bak')):
         os.system('cp {} {}'.format(xml_file, xml_file.replace('.xml', '.xml.bak')))
-    img_path = os.path.join(path, 'ves_seg/images')
+    img_path = os.path.join(path, 'ves_seg/vesicle_analysis/images')
     if not os.path.exists(img_path):
         os.mkdir(img_path)
     
@@ -43,9 +43,9 @@ def set_2D_radius(synapse, path):
     vl = VesicleList()
     vl.fromXMLFile(xml_file)
     
-    for i, sv in enumerate(vl):
-        center = np.round(sv.getCenter()).astype(np.uint16)
-        radius = sv.getRadius().mean()
+    for i in range(250, len(vl)):
+        center = np.round(vl[i].getCenter()).astype(np.uint16)
+        radius = vl[i].getRadius().mean()
         x_init, y_init, z_init = center
         img = data_pad[
             z_init + padwidth,
@@ -63,10 +63,10 @@ def set_2D_radius(synapse, path):
                 r_z = 0.5 * (radii_fit[1] + radii_fit[2])
                 if r_z > r_ma:
                     r_ma = r_z
-                    X, Y = evecs_fit[2, 1], evecs_fit[1, 1]
+                    X, Y = evecs_fit[1, 2], evecs_fit[1, 1]
                     phi = np.arctan2(Y, X) - np.pi/2
-                    vl[i].setCenter2D(center_fit[[2, 1, 0]])  # zyx to xyz
-                    vl[i].setRadius2D(np.array([radii_fit[2], radii_fit[1]]))
+                    vl[i].setCenter2D(center_fit[[2, 1, 0]] + np.array([1, 1, 1]))  # zyx to xyz
+                    vl[i].setRadius2D(np.array([radii_fit[1], radii_fit[2]]))
                     vl[i].setRotation2D(phi)
                     
         fit_vesicle = vl[i].sample_on_vesicle(360)
@@ -78,12 +78,15 @@ def set_2D_radius(synapse, path):
         fit_vesicle_shift = np.round(fit_vesicle - shift).astype(np.uint16)  # local coordinate, xyz, and z=0
         
         out = np.array([img_norm] * 3)
+        out[0, 
+            np.round(vl[i].getCenter()[1] - (y_init - radius - margin)).astype(np.uint16), 
+            np.round(vl[i].getCenter()[0] - (x_init - radius - margin)).astype(np.uint16)] = 255
         out[0, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 255
         out[1, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
         out[2, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
         
         imwrite(os.path.join(img_path, '{}.tif'.format(vl[i].getId())), out, photometric='rgb')
-    # vl.toXMLFile(xml_file)
+    vl.toXMLFile(xml_file)
 
 
 def main(path : str = '.'):
