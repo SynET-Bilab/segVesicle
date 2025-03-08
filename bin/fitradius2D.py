@@ -2,6 +2,7 @@
 import os
 import fire
 import mrcfile
+import multiprocessing
 import numpy as np
 
 from tifffile.tifffile import imwrite
@@ -43,7 +44,7 @@ def set_2D_radius(synapse, path):
     vl = VesicleList()
     vl.fromXMLFile(xml_file)
     
-    for i in range(250, len(vl)):
+    for i in range(len(vl)):
         center = np.round(vl[i].getCenter()).astype(np.uint16)
         radius = vl[i].getRadius().mean()
         x_init, y_init, z_init = center
@@ -90,24 +91,33 @@ def set_2D_radius(synapse, path):
     vl.toXMLFile(xml_file)
 
 
-def main(path : str = '.'):
-    '''
-    under 'stack-out' level
-    '''
+def main(path: str = '.', cpu: int = 1):
+    """
+    """
     batch_file = os.path.join(os.path.abspath(path), 'segVesicle.batch')
-    
     with open(batch_file) as f:
         items = f.readlines()
-    for item in items:
-        synapse = item.strip()
-        if synapse == '':
-            continue
-        check_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_vesicle_class.xml'.format(synapse))
-        
-        if os.path.exists(check_path):
-            set_2D_radius(synapse, os.path.join(path, synapse))
+    synapses = [item.strip() for item in items if item.strip()]
+    
+    if cpu <= 1:
+        for synapse in synapses:
+            check_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_vesicle_class.xml'.format(synapse))
+            if os.path.exists(check_path):
+                set_2D_radius(synapse, os.path.join(path, synapse))
+    else:
+        tasks = []
+        for synapse in synapses:
+            xml_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_vesicle_class.xml'.format(synapse))
+            if os.path.exists(xml_path):
+                tasks.append((synapse, os.path.join(path, synapse)))
+        with multiprocessing.Pool(processes=cpu) as pool:
+            pool.starmap(set_2D_radius, tasks)
 
 
 
 if __name__ == "__main__":
+    import time
+    start = time.time()
     fire.Fire(main)
+    end = time.time()
+    print('Time consumed: {:.2f} s'.format(end - start))
