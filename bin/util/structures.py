@@ -4,9 +4,6 @@ import os
 import warnings
 import numpy as np
 from scipy.spatial import Delaunay
-from sklearn.neighbors import KDTree
-from sklearn.decomposition import PCA
-from skimage.measure import label, regionprops
 from tqdm import tqdm
 from lxml import etree
 from io import *
@@ -193,6 +190,8 @@ class Surface:
             '''
             average for 1d slice of x(or y)
             '''
+            from skimage.measure import label, regionprops
+            
             arr = np.zeros((length, )).astype(np.int16)
             idxs_from0 = (np.array(idxs) - min(idxs)).astype(np.int16)
             arr[idxs_from0] = 1
@@ -322,6 +321,7 @@ class Surface:
         
         Here we use PCA to get the normal vector of the surface, and project the points onto a plane perpendicular to the normal vector.
         '''
+        from sklearn.decomposition import PCA
         
         pca = PCA(n_components=2, random_state=0)
         points_transformed = pca.fit_transform(self._densePoints)
@@ -903,6 +903,7 @@ class VesicleList:
         
         @param mode: 'sparse' or 'dense', representing manual segmentation or auto-segmentation for membrane
         """
+        from sklearn.neighbors import KDTree
         
         self._distance = []
         self._projectionPoint = []
