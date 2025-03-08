@@ -116,8 +116,4 @@ def main(path: str = '.', cpu: int = 1):
 
 
 if __name__ == "__main__":
-    import time
-    start = time.time()
     fire.Fire(main)
-    end = time.time()
-    print('Time consumed: {:.2f} s'.format(end - start))
