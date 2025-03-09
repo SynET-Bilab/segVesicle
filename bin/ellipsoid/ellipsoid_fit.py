@@ -258,7 +258,8 @@ def objective_vectorized(params, data, a_threshold, gamma):
     
     # 向量化权重计算
     weights = sigmoid(distances, a_threshold, gamma)
-    total = np.sum(distances**2 * weights)
+    # total = np.sum(distances**2 * weights)
+    total = np.sum(distances**2) + 1000*np.sum(weights**2)
     return total
 
 
@@ -267,7 +268,7 @@ def ellipse_fit_n(x, y, Zc):
     y=np.array(y,dtype=np.double)
     data = np.array([x,y]).T
     initial_params = [np.mean(x), np.mean(y), 0, 0.5*(np.max(x)-np.min(x)), 0.5*(np.max(x)-np.min(x))]
-    result = minimize(objective_vectorized, initial_params, args=(data, 1.25,0.01),
+    result = minimize(objective_vectorized, initial_params, args=(data, 1.5, 0.5),
                   method='L-BFGS-B', 
                   bounds=[(None, None), (None, None), (None, None), (1e-6, None), (1e-6, None)],
                   options={'maxiter': 200})
