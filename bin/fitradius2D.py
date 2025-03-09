@@ -51,7 +51,7 @@ def set_2D_radius(synapse, path):
         radius = vl[i].getRadius().mean()
         x_init, y_init, z_init = center
         
-        z_range = range(z_init - 1, z_init + 1)
+        z_range = range(z_init - 1, z_init + 2)
         r_ma = 0
         for z in z_range:
             center_z = np.array([z, y_init, x_init])
@@ -93,23 +93,32 @@ def set_2D_radius(synapse, path):
     vl.toXMLFile(xml_file)
 
 
-def main(path: str = '.', cpu: int = 1):
+def main(path: str = '.', 
+         cpu: int = 1,
+         batch_file : str = 'segVesicle.batch',
+         xml_file_tail : str = 'vesicle_class.xml'):
     """
+    @param path: father path of synapse folders
+    @param cpu: number of processes to run
+    @param batch_file: file with synapses to process
+    @param xml_file_tail: xml file, should in pixel size 1.714
     """
-    batch_file = os.path.join(os.path.abspath(path), 'segVesicle.batch')
+    batch_file = os.path.join(os.path.abspath(path), batch_file)
     with open(batch_file) as f:
         items = f.readlines()
     synapses = [item.strip() for item in items if item.strip()]
     
     if cpu <= 1:
         for synapse in synapses:
-            check_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_vesicle_class.xml'.format(synapse))
+            synapse = synapse.split('-')[0]
+            check_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
             if os.path.exists(check_path):
                 set_2D_radius(synapse, os.path.join(path, synapse))
     else:
         tasks = []
         for synapse in synapses:
-            xml_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_vesicle_class.xml'.format(synapse))
+            synapse = synapse.split('-')[0]
+            xml_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
             if os.path.exists(xml_path):
                 tasks.append((synapse, os.path.join(path, synapse)))
         with multiprocessing.Pool(processes=cpu) as pool:
