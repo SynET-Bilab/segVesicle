@@ -353,7 +353,7 @@ def density_fit_2d(data_iso,center,radius):
     x = np.asarray(cloud[2])
     y = np.asarray(cloud[1])
     z = np.asarray(cloud[0])[0]
-    [center_cube, evecs, radii]=ef.ellipse_fit(x,y,z)
+    [center_cube, evecs, radii]=ef.ellipse_fit_n(x,y,z)
     if np.min(center_cube) < 0: # if the shape of fitted ellipsoid is too strange
         return [None, None, None, 0]
 

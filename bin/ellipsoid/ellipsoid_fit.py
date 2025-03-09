@@ -3,7 +3,7 @@ import math
 import scipy
 from scipy.sparse import csr_matrix
 from numpy.linalg import eig, inv
-
+from scipy.optimize import minimize
 #A*x.^2 + B*x.*y + C*y.^2 + D*x + E*y + F
 def solve_ellipse(A,B,C,D,E,F):
             
@@ -225,3 +225,61 @@ def ellispoid_fit_RSS(center,evecs,radii,X):
     d = np.sqrt(np.sum(cloud_n * cloud_n, axis = 1))
     rss = np.sum((d - 1) ** 2)
     return rss/len(d)
+
+
+
+def sigmoid(d, a_threshold, gamma):
+    """向量化sigmoid函数"""
+    return 1 / (1 + np.exp(-(d - a_threshold) / gamma))
+
+def compute_distances_vectorized(u_all, v_all, a, b, max_iter=20):
+    """向量化近似距离计算 (基于椭圆代数距离近似几何距离)"""
+    # 代数投影近似公式 (避免牛顿迭代)
+    phi = np.arctan2(v_all * a, u_all * b)  # 初始角度估计
+    u_proj = a * np.cos(phi)
+    v_proj = b * np.sin(phi)
+    distances = np.sqrt((u_all - u_proj)**2 + (v_all - v_proj)**2)
+    return distances
+
+def objective_vectorized(params, data, a_threshold, gamma):
+    """向量化目标函数"""
+    h, k, theta, a, b = params
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    
+    # 批量坐标变换 (矩阵运算)
+    dx = data[:, 0] - h
+    dy = data[:, 1] - k
+    u_all = dx * cos_theta + dy * sin_theta  # 向量化计算
+    v_all = -dx * sin_theta + dy * cos_theta
+    
+    # 向量化距离计算
+    distances = compute_distances_vectorized(u_all, v_all, a, b)
+    
+    # 向量化权重计算
+    weights = sigmoid(distances, a_threshold, gamma)
+    total = np.sum(distances**2 * weights)
+    return total
+
+
+def ellipse_fit_n(x, y, Zc):
+    x=np.array(x,dtype=np.double)
+    y=np.array(y,dtype=np.double)
+    data = np.array([x,y]).T
+    initial_params = [np.mean(x), np.mean(y), 0, 0.5*(np.max(x)-np.min(x)), 0.5*(np.max(x)-np.min(x))]
+    result = minimize(objective_vectorized, initial_params, args=(data, 1.25,0.01),
+                  method='L-BFGS-B', 
+                  bounds=[(None, None), (None, None), (None, None), (1e-6, None), (1e-6, None)],
+                  options={'maxiter': 200})
+    optimized_params = result.x
+    # 提取参数
+    h_opt, k_opt, angle, a_opt, b_opt = optimized_params
+
+    
+    # 计算方向向量
+   
+    center = np.array([Zc,k_opt,h_opt])
+    evecs = np.array([[1,0,0], [0, np.sin(angle), np.cos(angle)],[0, np.cos(angle), -np.sin(angle)]])
+    radii = np.array([0.01, a_opt, b_opt])
+
+    return center, evecs, radii
