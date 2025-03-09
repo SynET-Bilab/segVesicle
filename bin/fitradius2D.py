@@ -28,6 +28,8 @@ def set_2D_radius(synapse, path):
     if not os.path.exists(xml_file.replace('.xml', '.xml.bak')):
         os.system('cp {} {}'.format(xml_file, xml_file.replace('.xml', '.xml.bak')))
     img_path = os.path.join(path, 'ves_seg/vesicle_analysis/images')
+    if os.path.exists(img_path):
+        os.system('mv {} {}'.format(img_path, img_path + '_bak'))
     if not os.path.exists(img_path):
         os.mkdir(img_path)
     
@@ -74,9 +76,9 @@ def set_2D_radius(synapse, path):
         fit_vesicle_shift = np.round(fit_vesicle - shift).astype(np.uint16)  # local coordinate, xyz, and z=0
         
         img = data_pad[
-            int(vl[i]._center2D[2] + padwidth - 1),
-            int(vl[i]._center2D[1] + padwidth - radius_new - margin - 1): int(vl[i]._center2D[1] + padwidth + radius_new + margin - 1),
-            int(vl[i]._center2D[0] + padwidth - radius_new - margin - 1): int(vl[i]._center2D[0] + padwidth + radius_new + margin - 1)
+            np.round(vl[i]._center2D[2] + padwidth - 1).astype(np.uint16),
+            np.round(vl[i]._center2D[1] + padwidth - radius_new - margin - 1).astype(np.uint16): np.round(vl[i]._center2D[1] + padwidth + radius_new + margin - 1).astype(np.uint16),
+            np.round(vl[i]._center2D[0] + padwidth - radius_new - margin - 1).astype(np.uint16): np.round(vl[i]._center2D[0] + padwidth + radius_new + margin - 1).astype(np.uint16)
         ]  # xml from 1, but array from 0
         img_norm = normalize_scale(img)
         out = np.array([img_norm] * 3)
