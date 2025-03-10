@@ -19,12 +19,12 @@ def normalize_scale(image : np.ndarray) -> np.ndarray:
     return img_norm
 
 
-def set_2D_radius(synapse, path):
+def set_2D_radius(synapse, path, xml_file_tail):
     '''
     '''
     # prepare path
     mrc_file = os.path.join(path, 'ves_seg/{}_wbp_corrected.mrc'.format(synapse))
-    xml_file = os.path.join(path, 'ves_seg/vesicle_analysis/{}_vesicle_class.xml'.format(synapse))
+    xml_file = os.path.join(path, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
     if not os.path.exists(xml_file.replace('.xml', '.xml.bak')):
         os.system('cp {} {}'.format(xml_file, xml_file.replace('.xml', '.xml.bak')))
     img_path = os.path.join(path, 'ves_seg/vesicle_analysis/images')
@@ -113,14 +113,14 @@ def main(path: str = '.',
             synapse = synapse.split('-')[0]
             check_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
             if os.path.exists(check_path):
-                set_2D_radius(synapse, os.path.join(path, synapse))
+                set_2D_radius(synapse, os.path.join(path, synapse), xml_file_tail)
     else:
         tasks = []
         for synapse in synapses:
             synapse = synapse.split('-')[0]
             xml_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
             if os.path.exists(xml_path):
-                tasks.append((synapse, os.path.join(path, synapse)))
+                tasks.append((synapse, os.path.join(path, synapse), xml_file_tail))
         with multiprocessing.Pool(processes=cpu) as pool:
             pool.starmap(set_2D_radius, tasks)
 
