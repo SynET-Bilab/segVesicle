@@ -37,7 +37,7 @@ def set_2D_radius(synapse, path, xml_file_tail):
     with mrcfile.open(mrc_file) as mrc:
         mrc_data = mrc.data
         
-    padwidth = 50
+    padwidth = 100
     margin = 15
     mean_value = mrc_data.mean()
     data_pad = np.pad(mrc_data, padwidth, mode='constant', constant_values=mean_value)
@@ -110,17 +110,15 @@ def main(path: str = '.',
     
     if cpu <= 1:
         for synapse in synapses:
-            synapse = synapse.split('-')[0]
-            check_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
+            check_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse.split('-')[0], xml_file_tail))
             if os.path.exists(check_path):
-                set_2D_radius(synapse, os.path.join(path, synapse), xml_file_tail)
+                set_2D_radius(synapse.split('-')[0], os.path.join(path, synapse), xml_file_tail)
     else:
         tasks = []
         for synapse in synapses:
-            synapse = synapse.split('-')[0]
-            xml_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
+            xml_path = os.path.join(path, synapse, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse.split('-')[0], xml_file_tail))
             if os.path.exists(xml_path):
-                tasks.append((synapse, os.path.join(path, synapse), xml_file_tail))
+                tasks.append((synapse.split('-')[0], os.path.join(path, synapse), xml_file_tail))
         with multiprocessing.Pool(processes=cpu) as pool:
             pool.starmap(set_2D_radius, tasks)
 
