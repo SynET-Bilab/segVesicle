@@ -29,6 +29,8 @@ def set_2D_radius(synapse, path, xml_file_tail):
         os.system('cp {} {}'.format(xml_file, xml_file.replace('.xml', '.xml.bak')))
     img_path = os.path.join(path, 'ves_seg/vesicle_analysis/images')
     if os.path.exists(img_path):
+        if os.path.exists(img_path + '_bak'):
+            os.system('rm -r {}'.format(img_path + '_bak'))
         os.system('mv {} {}'.format(img_path, img_path + '_bak'))
     if not os.path.exists(img_path):
         os.mkdir(img_path)
