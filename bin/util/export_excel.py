@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os
 import fire
 import json
@@ -48,7 +49,7 @@ def main(path : str = '.',
             else:
                 s.from_model_auto_segment(membrane, objNum=2)
                 
-            print(vl._pixelSize, len(vl))
+            print(syn_name, vl._pixelSize, len(vl))
             stimulation = stim
             batchID = abspath.split('/')[-2]
             synID = syn_name
@@ -96,7 +97,7 @@ def main(path : str = '.',
     ]
 
     df = pd.DataFrame(mask, columns=columns)
-    df.to_excel(path+'vesicle_all_statistics.xlsx', index=False)
+    df.to_excel(os.path.join(path, 'vesicle_all_statistics.xlsx'), index=False)
 
 
 if __name__ == '__main__':
