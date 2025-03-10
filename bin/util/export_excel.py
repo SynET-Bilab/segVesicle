@@ -9,15 +9,17 @@ from segVesicle.bin.util.structures import VesicleList, Surface
 
 def main(path : str = '.',
          stim : str = '',
-         write_to_excel : bool = True):
+         use2D : bool = True,
+         batch : str = 'segVesicle.batch',
+         check : str = 'segVesicle_QCheckBox_state.json'):
     '''
     @param path: str, 'stack-out' path. Default is the working dir;
     @param stim: str, stimulation condition like 'ctrl'. Default is empty.
     '''
     
     abspath = os.path.abspath(path)
-    batch_file = abspath + '/segVesicle.batch'
-    json_file = abspath + '/segVesicle_QCheckBox_state.json'
+    batch_file = '{}/{}'.format(abspath, batch)
+    json_file = '{}/{}'.format(abspath, check)
     
     with open(json_file, 'r') as j:
         check_state = json.load(j)
@@ -28,23 +30,19 @@ def main(path : str = '.',
     for item in items:
         syn_name = item.rstrip()
         if not syn_name in check_state:
-            print(syn_name, ' not found')
             continue
         if check_state[syn_name]:
             path_xml = os.path.join(abspath, syn_name, 'ves_seg', 'vesicle_analysis', '{}.xml'.format(syn_name.split('-')[0]))
             membrane = os.path.join(abspath, syn_name, 'ves_seg', 'membrane', '{}.mod'.format(syn_name.split('-')[0]))
             manual_mem = os.path.join(abspath, syn_name, 'ves_seg', 'membrane', 'premembrane.mod')
             if not os.path.exists(path_xml):
-                print(path_xml, ' not found')
+                print('{} is checked as True, but {} not found'.format(syn_name, path_xml))
                 continue
             
             vl = VesicleList()
             vl.fromXMLFile(path_xml)
             s = Surface()
-            # try:
-            #     s.from_model_auto_segment(membrane, objNum=2)
-            # except:
-            #     s.from_model_use_imod_mesh(membrane)
+
             if os.path.exists(manual_mem):
                 s.from_model_use_imod_mesh(manual_mem)
             else:
@@ -59,11 +57,11 @@ def main(path : str = '.',
             
             for i, sv in enumerate(vl):
                 vesicleID = sv.getId()
-                # radius_px = sv.getRadius2D()  # if use 2D
                 radius_px = sv.getRadius()
+                if use2D:
+                    radius_px = sv.getRadius2D()
                 distance_px = sv.getDistance()
                 type_sv = sv.getType()
-                center = sv.getCenter()
                 
                 if len(radius_px) == 2:
                     r1_px, r2_px = radius_px
@@ -98,9 +96,7 @@ def main(path : str = '.',
     ]
 
     df = pd.DataFrame(mask, columns=columns)
-    
-    if write_to_excel:
-        df.to_excel(path+'vesicle_all_statistics.xlsx', index=False)
+    df.to_excel(path+'vesicle_all_statistics.xlsx', index=False)
 
 
 if __name__ == '__main__':
