@@ -9,8 +9,10 @@
 
 # Load required modules
 #source /usr/share/Modules/init/bash
+export MODULEPATH=/share/root/users/luzh/modulefiles:$MODULEPATH
 module purg
 module load imod/4.12.16
+module load segVesicle/20250309
 
 # Input: Original Pixel Size
 ORIGINAL_PIXEL_SIZE=$1
@@ -37,7 +39,7 @@ for folder in */ ; do
     if [[ -f "$class_xml_path" ]]; then
         # Call the Python script to process the XML
         echo "Processing $class_xml_path with original pixel size $ORIGINAL_PIXEL_SIZE"
-        /share/home/liushuo/.conda/envs/npr/bin/python /share/data/CryoET_Data/liushuo/segVesicle/bin/util/generate_xml.py "$class_xml_path" "$ORIGINAL_PIXEL_SIZE"
+        python /share/data/CryoET_Data/software/segVesicle/bin/util/generate_xml.py "$class_xml_path" "$ORIGINAL_PIXEL_SIZE"
     else
         echo "Warning: $class_xml_path does not exist, skipping."
     fi
