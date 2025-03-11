@@ -25,7 +25,7 @@ def set_2D_radius(input_json_file,output_file, mrc_data):
         ves = json.load(f)
     vesicle_info = ves['vesicles']
     for info in tqdm((vesicle_info), file=sys.stdout):
-    # for info in (vesicle_info[222],):
+    # for info in (vesicle_info[75],):
         center = np.array(info['center'])
         radius3D = np.array(info['radii'])
         radius_init = np.mean(radius3D)
