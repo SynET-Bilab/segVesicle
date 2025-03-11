@@ -324,7 +324,7 @@ def density_fit_2d(data_iso,center,radius):
     img_reverse = -img.astype(np.float32)
     img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
 
-    sigma = int(radius)  # 调整sigma控制衰减范围
+    sigma = int(radius)+5  # 调整sigma控制衰减范围
     gaussian_weights = generate_2d_gaussian_weights(img.shape[0], sigma)
     img_normalize = img_normalize * gaussian_weights  # 直接相乘增强中心
     # with mrcfile.new('/home/lvzy/test/ves_seg/img.mrc',overwrite=True) as m:
@@ -353,8 +353,7 @@ def density_fit_2d(data_iso,center,radius):
     # with mrcfile.new('/home/lvzy/test/ves_seg/open.mrc',overwrite=True) as m:
     #     m.set_data(open2)
     l = label(open, connectivity=1)
-    d_min = 99999
-    label_vaule = 0
+    labeled = open
     for i in range(np.max(l)):
         points_i = np.where(l==(i+1))
         points_y = points_i[0]
@@ -362,15 +361,9 @@ def density_fit_2d(data_iso,center,radius):
         center_i=np.array([np.mean(points_y),np.mean(points_x)])
         center_label = np.array([1,1])*l.shape[0]//2
         d = dis(center_i,center_label)
-        if d < d_min and len(points_y) > 10:
-            d_min = d
-            label_vaule = i+1
-    labeled = np.zeros_like(l)
-    labeled[l==label_vaule] = 1
-    if d_min == 99999: #if the num of points to fit is too small (<10)
-        return [None, None, None, 0]
-    if(np.sum(labeled)/np.sum(open)<0.9):
-        labeled = open
+        if d > radius and len(points_y) > 10:
+            labeled[l==i+1] = 0    
+    
     cube_m_mask=np.zeros_like(cube_)
     cube_m_mask[cube_.shape[0]//2]=labeled
     # cube_m_mask2=np.pad(cube_m_mask,10,'constant',constant_values= 0)
