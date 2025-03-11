@@ -324,15 +324,15 @@ def density_fit_2d(data_iso,center,radius):
     img_reverse = -img.astype(np.float32)
     img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
 
-    sigma = int(radius)+5  # 调整sigma控制衰减范围
+    sigma = int(radius)  # 调整sigma控制衰减范围
     gaussian_weights = generate_2d_gaussian_weights(img.shape[0], sigma)
     img_normalize = img_normalize * gaussian_weights  # 直接相乘增强中心
     # with mrcfile.new('/home/lvzy/test/ves_seg/img.mrc',overwrite=True) as m:
-    #         m.set_data(img_normalize.astype(np.float32))
+    #         m.set_data(-img_normalize.astype(np.float32))
     mask = disk(cube_.shape[1]//2)
-    
+    img = -img_normalize
     mask_circle=img.copy()
-    p=np.percentile(img, 75)
+    p=np.percentile(img, 50)
     mask_circle[img<p]=1
     mask_circle[img>=p]=0
     mean_circle=np.sum(mask_circle * img)/np.sum(mask_circle)
