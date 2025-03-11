@@ -37,7 +37,7 @@ def set_2D_radius(synapse, path, xml_file_tail):
     
     # prepare data to fit and show
     with mrcfile.open(mrc_file) as mrc:
-        mrc_data = mrc.data
+        mrc_data = mrc.data.astype(np.float32)
         
     padwidth = 100
     margin = 15
@@ -52,13 +52,14 @@ def set_2D_radius(synapse, path, xml_file_tail):
         center = np.round(vl[i].getCenter()).astype(np.uint16)
         radius = vl[i].getRadius().mean()
         x_init, y_init, z_init = center
-        
         z_range = range(z_init - 1, z_init + 2)
         r_ma = 0
+        ccf_sv = 1
+        
         for z in z_range:
             center_z = np.array([z, y_init, x_init])
-            center_fit, evecs_fit, radii_fit, _ = density_fit_2d(mrc_data, center_z, radius)
-            if radii_fit is not None:
+            center_fit, evecs_fit, radii_fit, ccf = density_fit_2d(mrc_data, center_z, radius)
+            if (radii_fit is not None) and (ccf >= 0.3):
                 r_z = 0.5 * (radii_fit[1] + radii_fit[2])
                 if r_z > r_ma:
                     r_ma = r_z
@@ -67,8 +68,9 @@ def set_2D_radius(synapse, path, xml_file_tail):
                     vl[i].setCenter2D(center_fit[[2, 1, 0]] + np.array([1, 1, 1]))  # zyx to xyz
                     vl[i].setRadius2D(np.array([radii_fit[1], radii_fit[2]]))
                     vl[i].setRotation2D(phi)
+                    ccf_sv = ccf
                     
-        radius_new = vl[i].getRadius2D().mean()
+        radius_new = vl[i].getRadius2D().max()
         fit_vesicle = vl[i].sample_on_vesicle(360)
         shift = np.array([
             vl[i]._center2D[0] - radius_new - margin, 
@@ -89,6 +91,11 @@ def set_2D_radius(synapse, path, xml_file_tail):
         out[0, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 255  # ellipse, RGB:(255,0,0), in red
         out[1, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
         out[2, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
+        if r_ma == 0:
+            out[1, np.round(radius_new + margin).astype(np.uint16), np.round(radius_new + margin).astype(np.uint16)] = 255
+            out[0, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
+            out[1, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 255
+            out[2, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
         
         imwrite(os.path.join(img_path, '{}.tif'.format(vl[i].getId())), out, photometric='rgb')
         
