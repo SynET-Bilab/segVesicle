@@ -99,6 +99,8 @@ class FolderListWidget(QWidget):
         if current_path:
             top_level_folders = set()
             for root, dirs, filenames in os.walk(current_path, topdown=True):
+                if root == current_path:
+                    continue
                 found = False
                 for filename in filenames:
                     if filename.endswith('.rec') or filename.endswith('.mrc'):
