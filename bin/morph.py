@@ -287,7 +287,21 @@ def CCF(img,template):
     else:
         ccf = np.sum((img - img_mean) * (template - tm_mean)) / np.sqrt(np.sum((img - img_mean)**2) * np.sum((template - tm_mean)**2))
     return ccf
-
+def generate_2d_gaussian_weights(size, sigma=1.0):
+    """
+    生成2维高斯权重矩阵，中心值最大，周围衰减。
+    - size: 数组的尺寸（假设为立方体，即 size x size ）
+    - sigma: 控制衰减速度，sigma越小中心越突出
+    """
+    center = size // 2
+    x, y = np.meshgrid(np.arange(size), np.arange(size), indexing='ij')
+    x_centered = x - center
+    y_centered = y - center
+    squared_dist = x_centered**2 + y_centered**2 
+    gauss = np.exp(-squared_dist / (2 * sigma**2))
+    # 可选：归一化到0-1范围，或保持中心为1
+    gauss /= gauss.max()  # 使中心权重为1，周围按比例衰减
+    return gauss
 def density_fit_2d(data_iso,center,radius):
     '''input center(z,y,x), output center(z,y.x), both in array
     '''
@@ -301,13 +315,22 @@ def density_fit_2d(data_iso,center,radius):
 
     center = np.round(center+padwidth).astype(np.int16)
     cube_=data_pad[center[0]-int(radius)-5: center[0]+int(radius)+5+1,center[1]-int(radius)-5: center[1]+int(radius)+5+1,center[2]-int(radius)-5: center[2]+int(radius)+5+1]
+    # cube_2=data_pad[center[0]-int(radius)-15: center[0]+int(radius)+15+1,center[1]-int(radius)-15: center[1]+int(radius)+15+1,center[2]-int(radius)-15: center[2]+int(radius)+15+1]
+    # with mrcfile.new('/home/lvzy/test/ves_seg/cube.mrc',overwrite=True) as m:
+    #     m.set_data(cube_2)
     img = cube_[cube_.shape[0]//2,:,:]
     img = ndimage.gaussian_filter(img,sigma=1)
+
     img_reverse = -img.astype(np.float32)
     img_normalize = (img_reverse - np.min(img_reverse))/(np.max(img_reverse)-np.min(img_reverse))
 
+    sigma = int(radius)+5  # 调整sigma控制衰减范围
+    gaussian_weights = generate_2d_gaussian_weights(img.shape[0], sigma)
+    img_normalize = img_normalize * gaussian_weights  # 直接相乘增强中心
+    # with mrcfile.new('/home/lvzy/test/ves_seg/img.mrc',overwrite=True) as m:
+    #         m.set_data(-img_normalize.astype(np.float32))
     mask = disk(cube_.shape[1]//2)
-    
+    img = -img_normalize
     mask_circle=img.copy()
     p=np.percentile(img, 50)
     mask_circle[img<p]=1
@@ -326,10 +349,11 @@ def density_fit_2d(data_iso,center,radius):
     open=opening(img_m_mask,square(2))
     databool=open >0
     open=remove_small_objects(databool, min_size=10).astype(np.int16)
-
+    # open2=np.pad(open,10,'constant',constant_values= 0)
+    # with mrcfile.new('/home/lvzy/test/ves_seg/open.mrc',overwrite=True) as m:
+    #     m.set_data(open2)
     l = label(open, connectivity=1)
-    d_min = 99999
-    label_vaule = 0
+    labeled = open
     for i in range(np.max(l)):
         points_i = np.where(l==(i+1))
         points_y = points_i[0]
@@ -337,18 +361,14 @@ def density_fit_2d(data_iso,center,radius):
         center_i=np.array([np.mean(points_y),np.mean(points_x)])
         center_label = np.array([1,1])*l.shape[0]//2
         d = dis(center_i,center_label)
-        if d < d_min and len(points_y) > 10:
-            d_min = d
-            label_vaule = i+1
-    labeled = np.zeros_like(l)
-    labeled[l==label_vaule] = 1
-    if d_min == 99999: #if the num of points to fit is too small (<10)
-        return [None, None, None, 0]
-    if(np.sum(labeled)/np.sum(open)<0.9):
-        labeled = open
+        if d > radius and len(points_y) > 10:
+            labeled[l==i+1] = 0    
+    
     cube_m_mask=np.zeros_like(cube_)
     cube_m_mask[cube_.shape[0]//2]=labeled
-
+    # cube_m_mask2=np.pad(cube_m_mask,10,'constant',constant_values= 0)
+    # with mrcfile.new('/home/lvzy/test/ves_seg/pts.mrc',overwrite=True) as m:
+    #     m.set_data(cube_m_mask2)
     cloud=np.where(cube_m_mask>0)
     x = np.asarray(cloud[2])
     y = np.asarray(cloud[1])

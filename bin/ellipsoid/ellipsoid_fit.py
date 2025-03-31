@@ -268,7 +268,7 @@ def ellipse_fit_n(x, y, Zc):
     y=np.array(y,dtype=np.double)
     data = np.array([x,y]).T
     initial_params = [np.mean(x), np.mean(y), 0, 0.5*(np.max(x)-np.min(x)), 0.5*(np.max(x)-np.min(x))]
-    result = minimize(objective_vectorized, initial_params, args=(data, 1.5, 0.5),
+    result = minimize(objective_vectorized, initial_params, args=(data, 1.5, 0.1),
                   method='L-BFGS-B', 
                   bounds=[(None, None), (None, None), (None, None), (1e-6, None), (1e-6, None)],
                   options={'maxiter': 200})
