@@ -125,6 +125,7 @@ def save_label_layer(tomo_viewer, layer_idx):
         # data = np.flip(data, axis=1)
         with mrcfile.new(save_path, overwrite=True) as mrc:
             mrc.set_data(data)
+            mrc.voxel_size = 17.14
     # show_info('Saved at {}'.format(os.path.abspath(save_path)))
 
 def get_info_from_json(json_file):
