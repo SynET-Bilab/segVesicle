@@ -16,7 +16,7 @@ module load segVesicle/20250309
 current_path=$(pwd)
 
 # Add the path to vesicle_distance_and_filter script to PATH
-export PATH=/share/data/CryoET_Data/liushuo/segVesicle/bin:$PATH
+# export PATH=/share/data/CryoET_Data/software/segVesicle/bin/:$PATH
 
 # Define distance_nm, can be passed via SBATCH parameter or set here
 distance_nm=${distance_nm:-50}  # Default to 50 if not passed
