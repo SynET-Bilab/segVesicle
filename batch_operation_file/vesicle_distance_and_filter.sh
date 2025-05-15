@@ -7,10 +7,10 @@
 #SBATCH --job-name=veseg
 #SBATCH --output=slurm-%j.out
 
-# Load required modules
-# source /usr/share/Modules/init/bash
-module purge
-# module load isonet/20220823
+export MODULEPATH=/share/root/users/luzh/modulefiles:$MODULEPATH
+module purg
+module load imod/4.12.16
+module load segVesicle/20250309
 
 # Define the current path
 current_path=$(pwd)
@@ -77,7 +77,7 @@ for tomo_dir in "$current_path"/*/; do
     fi
 
     # Call the Python script for processing
-    /share/home/liushuo/.conda/envs/npr/bin/python /share/data/CryoET_Data/liushuo/segVesicle/bin/vesicle_distance_and_filter.py --json_path "$json_path" --mod_path "$mod_path" --xml_output_path "$xml_output_path" --filter_xml_path "$filter_xml_path" --distance_nm "$distance_nm" --isonet_tomo_path "$isonet_tomo_path"
+    python /share/data/CryoET_Data/software/segVesicle/bin/vesicle_distance_and_filter.py --json_path "$json_path" --mod_path "$mod_path" --xml_output_path "$xml_output_path" --filter_xml_path "$filter_xml_path" --distance_nm "$distance_nm" --isonet_tomo_path "$isonet_tomo_path"
 
     # Check if the Python script executed successfully
     if [ $? -ne 0 ]; then
