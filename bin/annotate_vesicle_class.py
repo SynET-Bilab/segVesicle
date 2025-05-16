@@ -115,10 +115,17 @@ class FolderListWidget(QWidget):
             widget = QWidget()
             h = QHBoxLayout(widget)
             h.setContentsMargins(2, 2, 2, 2)
-            # 心形复选框
+            
+            # 获取当前脚本文件所在的目录
+            self.script_dir = os.path.dirname(os.path.abspath(__file__))
+
+            # 构建图像文件的完整路径
+            self.heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/heart.svg')
+            self.broken_heart_icon_path = os.path.join(self.script_dir, 'resource/imgs/broken_heart.svg')
+            
             heart = QCheckBox()
-            heart_icon = QIcon(QPixmap('resource/imgs/heart.svg'))
-            broken_icon = QIcon(QPixmap('resource/imgs/broken_heart.svg'))
+            heart_icon = QIcon(QPixmap(self.heart_icon_path))
+            broken_icon = QIcon(QPixmap(self.broken_heart_icon_path))
             heart.setIcon(heart_icon)
             if self.heart_states.get(name, False):
                 heart.setChecked(True)
