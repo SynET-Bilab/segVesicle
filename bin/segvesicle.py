@@ -30,7 +30,7 @@ def main():
     timer = QTimer()
     timer.setInterval(100)  # 设置定时器间隔，单位为毫秒
     
-    viewer = napari.Viewer(title='VesicleSeg')
+    viewer = napari.Viewer(title='Vesicle3D')
     # 使用封装类
     
     tomo_viewer = TomoViewer(viewer, current_path, pid)

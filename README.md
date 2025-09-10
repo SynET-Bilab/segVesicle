@@ -1,4 +1,4 @@
-# segVesicle
+# Vesicle3D
 
 DL-based vesicle segmentation program for cryo electron tomography images, with user-friendly GUI based on [napari](https://napari.org/stable/) for manual correction.
 
@@ -8,7 +8,7 @@ DL-based vesicle segmentation program for cryo electron tomography images, with 
 
 ## Installation
 
-1. Source code installation. Both `segVesicle` and `IsoNet` are needed. [IsoNet](https://github.com/IsoNet-cryoET/IsoNet) is used for missing wedge restoration and denoising to improve the segmentation performance. 
+1. Source code installation. Both `Vesicle3D` and `IsoNet` are needed. [IsoNet](https://github.com/IsoNet-cryoET/IsoNet) is used for missing wedge restoration and denoising to improve the segmentation performance. 
 
 ```bash
 git clone git@github.com:IsoNet-cryoET/IsoNet.git
@@ -22,7 +22,7 @@ conda env create -f environment.yml
 conda activate segVesicle
 ```
 
-3. `segVesicle` relies on tensorflow-gpu2, the specific version of `tensorflow-gpu` should be determined by the version of `cuda` . For the correspondence, see https://www.tensorflow.org/install/source?hl=en#gpu. For example, if you use `cuda-11.2`, `tensorflow-gpu` 2.5.0 to 2.11.0 is ok. `cudnn` with proper version should also be installed. 
+3. `Vesicle3D` relies on tensorflow-gpu2, the specific version of `tensorflow-gpu` should be determined by the version of `cuda` . For the correspondence, see https://www.tensorflow.org/install/source?hl=en#gpu. For example, if you use `cuda-11.2`, `tensorflow-gpu` 2.5.0 to 2.11.0 is ok. `cudnn` with proper version should also be installed. 
 
 ```bash
 pip install tensorflow-gpu==2.x.x
