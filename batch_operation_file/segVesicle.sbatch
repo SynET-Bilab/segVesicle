@@ -18,7 +18,7 @@ module load isonet/20220823
 pixelsize=17.14  #change every time
 suffix="-bin4-wbp.rec"   #wbp file 后缀
 areafile="area.mod"
-snrfalloff=0.7   #0.3 for vpp, 0.7 for novpp
+snrfalloff=0.3   #0.3 for vpp, 0.7 for novpp
 isonet_model_path='/path_to_vesicle3d/pretrained/vesicle_corrected_model.h5'
 
 run_correct(){
@@ -27,8 +27,9 @@ run_correct(){
 
     isonet.py prepare_star ./tomoset --pixel_size 17.14 
     isonet.py deconv tomograms.star --snrfalloff ${snrfalloff}  --deconv_folder tomo_deconv    
-    isonet.py predict tomograms.star --output_dir ./ ${isonet_model_path} --gpuID 0,1,2,3
+    isonet.py predict tomograms.star --output_dir ./ "${isonet_model_path}" --gpuID 0,1,2,3
     mv $1_wbp_resample_corrected.mrc $1_wbp_corrected.mrc
+    mrcbyte $1_wbp_corrected.mrc $1_wbp_corrected.mrc
 }
 
 run_segment(){
@@ -60,7 +61,7 @@ do
     tomo_wbp=$tomo$suffix
 
     ###isonet correct
-    #run_correct $tomo $pixelsize $tomo_wbp
+    run_correct $tomo $pixelsize $tomo_wbp
     ###segment and fit
     run_segment $tomo $areafile $pixelsize
 
