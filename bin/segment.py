@@ -7,6 +7,14 @@ import time
 from os.path import dirname, abspath
 from segVesicle.models import resunet3D as models
 
+
+def cleanup_tf():
+    import tensorflow as tf
+    import gc
+    tf.keras.backend.clear_session()
+    gc.collect()
+
+
 def segment(path_weights,tomopath,patch_size=192):
     with mrcfile.open(tomopath) as m:
         dataArray=m.data
@@ -31,6 +39,10 @@ def segment(path_weights,tomopath,patch_size=192):
     pcenterZ = list(range(l, dim[0] - l, step))
     pcenterY = list(range(l, dim[1] - l, step))
     pcenterX = list(range(l, dim[2] - l, step))
+    # pcenterZ = list(range(l, dim[0] - l, step)) if dim[0] > 2 * l else [dim[0] // 2]
+    # pcenterY = list(range(l, dim[1] - l, step)) if dim[1] > 2 * l else [dim[1] // 2]
+    # pcenterX = list(range(l, dim[2] - l, step)) if dim[2] > 2 * l else [dim[2] // 2]
+    
     # If there are still few pixels at the end:
     if pcenterX[-1] < dim[2] - l:
         pcenterX.append(dim[2] - l)
@@ -72,62 +84,64 @@ def segment(path_weights,tomopath,patch_size=192):
 
 
 
+if __name__ == "__main__":
 
-import argparse
+    import argparse
 
-parser = argparse.ArgumentParser(description='Process some integers.')
-parser.add_argument('--tomo', type=str, default=None, help='tomo file')
-parser.add_argument('--tomo_file', type=str, default=None, help='the isonet_corrected tomo file')
-parser.add_argument('--iso_path', type=str, default=None, help='the isonet_model.h5 file path')
-parser.add_argument('--tomo_deconv_file', type=str, default=None, help='the wbp_deconvolution tomo file')
-parser.add_argument('--dec_path', type=str, default=None, help='the dec_model.h5 file path')
-parser.add_argument('--mask_file', type=str, default=None, help='the output vesicle segment file name')
-parser.add_argument('--gpuID', type=str, default=0, help='The gpuID to used during the training. e.g 0,1,2,3.')
-parser.add_argument('--mode', type=int, default=0, help='0 for double models, 1 for only iso-model, 2 for only dec-model')
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--tomo', type=str, default=None, help='tomo file')
+    parser.add_argument('--tomo_file', type=str, default=None, help='the isonet_corrected tomo file')
+    parser.add_argument('--iso_path', type=str, default=None, help='the isonet_model.h5 file path')
+    parser.add_argument('--tomo_deconv_file', type=str, default=None, help='the wbp_deconvolution tomo file')
+    parser.add_argument('--dec_path', type=str, default=None, help='the dec_model.h5 file path')
+    parser.add_argument('--mask_file', type=str, default=None, help='the output vesicle segment file name')
+    parser.add_argument('--gpuID', type=str, default=0, help='The gpuID to used during the training. e.g 0,1,2,3.')
+    parser.add_argument('--mode', type=int, default=0, help='0 for double models, 1 for only iso-model, 2 for only dec-model')
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-# set some default files 
-if args.tomo_file is None:
-    args.tomo_file = args.tomo + '_wbp_corrected.mrc'
-if args.tomo_deconv_file is None:
-    args.tomo_deconv_file = args.tomo + '_wbp_dec.mrc'
-if args.mask_file is None:
-    args.mask_file = args.tomo + '_segment.mrc'
+    # set some default files 
+    if args.tomo_file is None:
+        args.tomo_file = args.tomo + '_wbp_corrected.mrc'
+    if args.tomo_deconv_file is None:
+        args.tomo_deconv_file = args.tomo + '_wbp_dec.mrc'
+    if args.mask_file is None:
+        args.mask_file = args.tomo + '_segment.mrc'
 
-segVesicleHome = dirname(abspath(__file__))
-segVesicleHome = os.path.split(segVesicleHome)[0]+'/'
+    segVesicleHome = dirname(abspath(__file__))
+    segVesicleHome = os.path.split(segVesicleHome)[0]+'/'
 
-args.gpuID = str(args.gpuID)
-os.environ["CUDA_VISIBLE_DEVICES"]=args.gpuID
+    args.gpuID = str(args.gpuID)
+    os.environ["CUDA_VISIBLE_DEVICES"]=args.gpuID
 
-path_weights1 = args.iso_path
-if args.iso_path is None:
-    path_weights1 = segVesicleHome + 'pretrained/vesicle_seg_model_1.h5'
-if not os.path.exists(path_weights1):
-    raise ValueError(f"Iso-Model file {path_weights1} does not exist.")
+    path_weights1 = args.iso_path
+    if args.iso_path is None:
+        path_weights1 = segVesicleHome + 'pretrained/vesicle_seg_model_1.h5'
+    if not os.path.exists(path_weights1):
+        raise ValueError(f"Iso-Model file {path_weights1} does not exist.")
 
-path_weights2 = args.dec_path
-if args.dec_path is None:
-    path_weights2 = segVesicleHome + 'pretrained/vesicle_seg_model_2.h5'
-if not os.path.exists(path_weights2):
-    raise ValueError(f"Dec-Model file {path_weights2} does not exist.")
+    path_weights2 = args.dec_path
+    if args.dec_path is None:
+        path_weights2 = segVesicleHome + 'pretrained/vesicle_seg_model_2.h5'
+    if not os.path.exists(path_weights2):
+        raise ValueError(f"Dec-Model file {path_weights2} does not exist.")
 
-tomopath1 = args.tomo_file
-tomopath2=args.tomo_deconv_file
+    tomopath1 = args.tomo_file
+    tomopath2=args.tomo_deconv_file
 
-if args.mode == 1:
-    seg1 = segment(path_weights1,tomopath1)
-    seg2 = 0
-elif args.mode == 2:
-    seg1 = 0
-    seg2 = segment(path_weights2,tomopath2)
-elif args.mode == 0:
-    seg1 = segment(path_weights1,tomopath1)
-    seg2 = segment(path_weights2,tomopath2)
-else:
-    raise ValueError("Wrong mode!")
+    if args.mode == 1:
+        seg1 = segment(path_weights1,tomopath1)
+        seg2 = 0
+    elif args.mode == 2:
+        seg1 = 0
+        seg2 = segment(path_weights2,tomopath2)
+    elif args.mode == 0:
+        seg1 = segment(path_weights1,tomopath1)
+        cleanup_tf()
+        seg2 = segment(path_weights2,tomopath2)
+    else:
+        raise ValueError("Wrong mode!")
 
-with mrcfile.new(args.mask_file,overwrite=True) as m:
-    m.set_data(np.sign(seg1+seg2).astype(np.int8))
+    with mrcfile.new(args.mask_file,overwrite=True) as m:
+        m.set_data(np.sign(seg1+seg2).astype(np.int8))
 
