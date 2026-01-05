@@ -12,7 +12,8 @@ def main(path : str = '.',
          stim : str = '',
          use2D : bool = True,
          batch : str = 'segVesicle.batch',
-         check : str = 'segVesicle_QCheckBox_state.json'):
+         check : str = 'segVesicle_QCheckBox_state.json',
+         output_file : str = 'vesicle_all_statistics.xlsx'):
     '''
     @param path: str, 'stack-out' path. Default is the working dir;
     @param stim: str, stimulation condition like 'ctrl'. Default is empty.
@@ -97,7 +98,7 @@ def main(path : str = '.',
     ]
 
     df = pd.DataFrame(mask, columns=columns)
-    df.to_excel(os.path.join(path, 'vesicle_all_statistics.xlsx'), index=False)
+    df.to_excel(os.path.join(path, output_file), index=False)
 
 
 if __name__ == '__main__':
