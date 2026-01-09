@@ -495,11 +495,11 @@ class Vesicle:
             vesicleElement.append(etree.Element("Rotation2D",\
                                                 phi = str(self._rotation2D)))
         if hasattr(self,"_evecs"):
-            for i, evec in enumerate(self._evecs.T):
+            for i, evec in enumerate(self._evecs):
                 vesicleElement.append(etree.Element("Evecs",\
-                                                    X = str(evec[2]),\
+                                                    X = str(evec[0]),\
                                                     Y = str(evec[1]),\
-                                                    Z = str(evec[0]),\
+                                                    Z = str(evec[2]),\
                                                     idx = str(i)))
         if hasattr(self,"_distance"):
             vesicleElement.append(etree.Element("Distance",\
