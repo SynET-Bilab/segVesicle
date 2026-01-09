@@ -145,7 +145,9 @@ def process_xml(class_xml_path, original_pixel_size_a, print_func=print):
         scale_radius(vesicle, 'Radius2D', scale, print_func)
         scale_radius(vesicle, 'Radius3D', scale, print_func)
         scale_distance(vesicle, 'Distance', scale, print_func)
+        scale_distance(vesicle, 'Distance2D', scale, print_func)
         scale_coordinates(vesicle, 'ProjectionPoint', scale, print_func)
+        scale_coordinates(vesicle, 'ProjectionPoint2D', scale, print_func)
         scale_coordinates(vesicle, 'PitPoint', scale, print_func)
     
     root.set('pixelSize', f"{original_pixel_size_nm}")
