@@ -87,8 +87,8 @@ def distance_calc(json_path, mod_path, xml_output_path, print_func):
             vesicle.setRadius2D(np.asarray(radius2D, dtype=float) * ratio)
             vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
             
-            # 7. 若为 2D 膜囊泡，进行校正 (update: use [1,0,0] instead of [0,0,1])
-            if np.array_equal(vesicle._evecs[0], [1.0, 0.0, 0.0]):
+            # 7. 若为 2D 膜囊泡，进行校正 (update: use row 2 instead of row 0)
+            if np.array_equal(vesicle._evecs[2], [0.0, 0.0, 1.0]):
                 print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
                 
                 # 7.1 使用 Radius3D 的 r1 和 r2 更新 Radius2D
