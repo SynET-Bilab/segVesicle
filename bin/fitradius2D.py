@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 import os
+from turtle import st
 import fire
 import mrcfile
 import multiprocessing
 import numpy as np
 
 from tifffile.tifffile import imwrite
+from datetime import datetime
+from tqdm import tqdm
 from morph import density_fit_2d
-from segVesicle.bin.util.structures import VesicleList
+from segVesicle.bin.util.structures import VesicleList, Surface
 
 
 
@@ -25,8 +28,23 @@ def set_2D_radius(synapse, path, xml_file_tail):
     # prepare path
     mrc_file = os.path.join(path, 'ves_seg/{}_wbp_corrected.mrc'.format(synapse))
     xml_file = os.path.join(path, 'ves_seg/vesicle_analysis/{}_{}'.format(synapse, xml_file_tail))
-    if not os.path.exists(xml_file.replace('.xml', '.xml.bak')):
-        os.system('cp {} {}'.format(xml_file, xml_file.replace('.xml', '.xml.bak')))
+    membrane_file = os.path.join(path, 'ves_seg/membrane/{}.mod'.format(synapse))
+    
+    time_string = datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+    if os.path.exists(xml_file):
+        xml_file_bak = xml_file.replace('.xml', '_{}.xml'.format(time_string))
+        os.system('cp {} {}'.format(xml_file, xml_file_bak))
+    
+    cal_2d_distance = True
+    manual_membrane_path = os.path.join(path, 'ves_seg/membrane/premembrane.mod')
+    if not os.path.exists(membrane_file):
+        if os.path.exists(manual_membrane_path):
+            membrane_file = manual_membrane_path
+            print('use manual membrane')
+        else:
+            print('no membrane file found, skip calculating distance using 2D fit result')
+            cal_2d_distance = False
+    
     img_path = os.path.join(path, 'ves_seg/vesicle_analysis/images')
     if os.path.exists(img_path):
         if os.path.exists(img_path + '_bak'):
@@ -48,7 +66,7 @@ def set_2D_radius(synapse, path, xml_file_tail):
     vl = VesicleList()
     vl.fromXMLFile(xml_file)
     
-    for i in range(len(vl)):
+    for i in tqdm(range(len(vl))):
         center = np.round(vl[i].getCenter()).astype(np.uint16)
         radius = vl[i].getRadius().mean()
         x_init, y_init, z_init = center
@@ -59,7 +77,7 @@ def set_2D_radius(synapse, path, xml_file_tail):
         for z in z_range:
             center_z = np.array([z, y_init, x_init])
             center_fit, evecs_fit, radii_fit, ccf = density_fit_2d(mrc_data, center_z, radius)
-            if (radii_fit is not None) and (ccf >= 0.3):
+            if (radii_fit is not None) and (ccf >= 0.6):
                 r_z = 0.5 * (radii_fit[1] + radii_fit[2])
                 if r_z > r_ma:
                     r_ma = r_z
@@ -69,7 +87,7 @@ def set_2D_radius(synapse, path, xml_file_tail):
                     vl[i].setRadius2D(np.array([radii_fit[1], radii_fit[2]]))
                     vl[i].setRotation2D(phi)
                     ccf_sv = ccf
-                    
+        
         radius_new = vl[i].getRadius2D().max()
         fit_vesicle = vl[i].sample_on_vesicle(360)
         shift = np.array([
@@ -98,7 +116,17 @@ def set_2D_radius(synapse, path, xml_file_tail):
             out[2, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
         
         imwrite(os.path.join(img_path, '{}.tif'.format(vl[i].getId())), out, photometric='rgb')
-        
+    
+    # calculate distance using 2D fit result
+    if cal_2d_distance:
+        surface = Surface()
+        if 'premembrane.mod' in membrane_file:
+            surface.from_model_use_imod_mesh(membrane_file)
+            vl.distance_to_surface(surface, precision=360, mode='sparse', sample_mode='2d', stay_ori_dist_proj=True)
+        else:
+            surface.from_model_auto_segment(membrane_file, objNum=2)
+            vl.distance_to_surface(surface, precision=360, mode='dense', sample_mode='2d', stay_ori_dist_proj=True)
+    
     vl.toXMLFile(xml_file)
 
 

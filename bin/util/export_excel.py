@@ -44,7 +44,7 @@ def main(path : str = '.',
             vl = VesicleList()
             vl.fromXMLFile(path_xml)
             s = Surface()
-
+            
             if os.path.exists(manual_mem):
                 s.from_model_use_imod_mesh(manual_mem)
             else:
@@ -62,7 +62,10 @@ def main(path : str = '.',
                 radius_px = sv.getRadius()
                 if use2D:
                     radius_px = sv.getRadius2D()
-                distance_px = sv.getDistance()
+                    try:
+                        distance_px = sv.getDistance2D()
+                    except:
+                        distance_px = sv.getDistance()
                 type_sv = sv.getType()
                 
                 if len(radius_px) == 2:
@@ -83,20 +86,18 @@ def main(path : str = '.',
                         r1_px, r2_px, r3_px, distance_px, type_sv,
                         r1, r2, r3, distance, diameter])
                 mask.append(sv_info)
-
-
+    
     mask = np.array(mask).astype(object)
     mask[:, 3:5] = mask[:, 3:5].astype(np.float64)
     mask[:, 5] = mask[:, 5].astype(int)  # vesicleID
     mask[:, 6:10] = mask[:, 6:10].astype(np.float64)  # 10 is vesicle type
     mask[:, 11:] = mask[:, 11:].astype(np.float64)
-
+    
     columns = [
         'Stimulation', 'BatchID', 'SynID', 'PreArea/ nm^2', 'PixelSize',
         'VesicleID', 'Radius_r1_px', 'Radius_r2_px', 'Radius_r3_px', 'Distance_d', 'type_t',
         'Radius_r1_nm', 'Radius_r2_nm', 'Radius_r3_nm', 'Distance_d_nm', 'Diameter_nm'
     ]
-
     df = pd.DataFrame(mask, columns=columns)
     df.to_excel(os.path.join(path, output_file), index=False)
 

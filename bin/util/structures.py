@@ -410,8 +410,10 @@ class Vesicle:
                     "Center", 
                     "Center2D", 
                     "Center3D", 
-                    "Distance", 
-                    "ProjectionPoint", 
+                    "Distance",
+                    "Distance2D",
+                    "ProjectionPoint",
+                    "ProjectionPoint2D",
                     "Type",
                     "PitPoint"]
         argStrList = ["Type"]
@@ -504,11 +506,19 @@ class Vesicle:
         if hasattr(self,"_distance"):
             vesicleElement.append(etree.Element("Distance",\
                                                 d = str(self._distance)))
+        if hasattr(self,"_distance2D"):
+            vesicleElement.append(etree.Element("Distance2D",\
+                                                d = str(self._distance2D)))
         if hasattr(self,"_projectionPoint"):
             vesicleElement.append(etree.Element("ProjectionPoint",\
                                                 X = str(self._projectionPoint[0]),\
                                                 Y = str(self._projectionPoint[1]),\
                                                 Z = str(self._projectionPoint[2])))
+        if hasattr(self,"_projectionPoint2D"):
+            vesicleElement.append(etree.Element("ProjectionPoint2D",\
+                                                X = str(self._projectionPoint2D[0]),\
+                                                Y = str(self._projectionPoint2D[1]),\
+                                                Z = str(self._projectionPoint2D[2])))
         if hasattr(self, "_pitPoint"):
             vesicleElement.append(etree.Element("PitPoint",\
                                                 X = str(self._pitPoint[0]),\
@@ -555,7 +565,7 @@ class Vesicle:
         return self._center3D, axes_lengths, rotation_matrix
     
     
-    def distance_to_surface(self, surface, precision, tree, membrane_points):
+    def distance_to_surface(self, surface, precision, tree, membrane_points, mode='3d', stay_ori=False):
         """
         @param surface: membrane.surface instance
         
@@ -563,7 +573,7 @@ class Vesicle:
         @date: 2024-10-14
         """
         
-        if hasattr(self, "_center3D"):
+        if mode == '3d' and hasattr(self, "_center3D"):
             
             points = self.sample_on_vesicle_3d_fibonacci(precision)
             dist, idx = tree.query(points, k=1)
@@ -572,7 +582,7 @@ class Vesicle:
             nearest_point = points[np.argmin(dist)]
             PP0 = membrane_points[fit_PP0_idx[0]]
             
-        elif hasattr(self, "_center2D"):
+        elif mode == '2d' and hasattr(self, "_center2D"):
             
             points = self.sample_on_vesicle(precision)
             dist, idx = tree.query(points, k=1)
@@ -580,9 +590,13 @@ class Vesicle:
             fit_PP0_idx = idx[np.argmin(dist)]
             nearest_point = points[np.argmin(dist)]
             PP0 = membrane_points[fit_PP0_idx[0]]
+            
+            self._distance2D = dis
+            self._projectionPoint2D = PP0
         
-        self._distance = dis
-        self._projectionPoint = PP0
+        if not stay_ori:  # in most cases, below will be executed, but when doing fitradius2D.py after all done, we do not want to change the original distance and projection point attributes
+            self._distance = dis
+            self._projectionPoint = PP0
         
         return dis, PP0, nearest_point
     
@@ -695,6 +709,9 @@ class Vesicle:
     def getProjectionPoint(self) -> np.ndarray:
         return self._projectionPoint
     
+    def getProjectionPoint2D(self) -> np.ndarray:
+        return self._projectionPoint2D
+    
     def getRotation2D(self):
         return self._rotation2D
     
@@ -703,6 +720,9 @@ class Vesicle:
     
     def getDistance(self):
         return self._distance
+    
+    def getDistance2D(self):
+        return self._distance2D
     
     def getType(self):
         return self._type
@@ -898,13 +918,17 @@ class VesicleList:
     def distance_to_surface(self, 
                             surface : Surface, 
                             precision : int, 
-                            mode='dense'):
+                            mode='dense',
+                            sample_mode='3d',
+                            stay_ori_dist_proj=False):
         """
         -> rewrite by Lu Zhenhang, 2023-04-18. Using kd-tree to speed up the calculation
         -> rewrite by Lu Zhenhang, 2023-06-04. Add projection_point to output file
         -> update by Lu Zhenhang, 2024-10-14. Add 3D ellipsoid support (data from DL-based segmentation)
         
         @param mode: 'sparse' or 'dense', representing manual segmentation or auto-segmentation for membrane
+        @param sample_mode: '2d' or '3d', for vesicles
+        @param stay_ori_dist_proj: whether to keep original distance and projection point attributes of vesicles (only use in fitradius2D.py)
         """
         from sklearn.neighbors import KDTree
         
@@ -940,7 +964,14 @@ class VesicleList:
             
             # elif vesicle.getType() == 'vesicle':
             else:
-                dis, PP0, nearest_point = vesicle.distance_to_surface(surface, precision, tree, surface._densePoints)
+                dis, PP0, nearest_point = vesicle.distance_to_surface(
+                    surface, 
+                    precision, 
+                    tree, 
+                    surface._densePoints, 
+                    mode=sample_mode,
+                    stay_ori=stay_ori_dist_proj
+                )
                 self._distance.append(dis)
                 self._projectionPoint.append(PP0)
                 nearest_point_list.append(nearest_point)
