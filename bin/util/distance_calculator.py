@@ -75,6 +75,7 @@ def distance_calc(
         attributes_to_keep = [
             '_vesicleId', '_type', '_center', '_radius',
             '_center2D', '_radius2D', '_rotation2D',
+            # temporary keep 3D attributes
             '_center3D', '_radius3D', '_evecs',
         ]
 
@@ -166,6 +167,9 @@ def distance_calc(
             data_pad = np.pad(mrc_data, padwidth, mode='constant', constant_values=mean_value)
 
             for i in tqdm(range(len(vl))):
+                # debug
+                if i == 2:
+                    breakpoint()
                 center = np.round(vl[i].getCenter()).astype(np.uint16)
                 radius = vl[i].getRadius().mean()
                 x_init, y_init, z_init = center
