@@ -21,7 +21,7 @@ current_path=$(pwd)
 # Define distance_nm, can be passed via SBATCH parameter or set here
 distance_nm=${distance_nm:-50}  # Default to 50 if not passed
 # Enable 2D fitting when fit_2d is set to true
-fit_2d=${fit_2d:-false}
+fit_2d=${fit_2d:-true}
 
 # Define the path for segVesicle_heart_broken.json
 heart_broken_json="$current_path/segVesicle_heart_broken.json"

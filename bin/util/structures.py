@@ -578,11 +578,10 @@ class Vesicle:
                 and for 2d vesicle only has center2D, distance/ projectionpoint and distance2d/ projectionpoint2d update to 2d cal result
             2. for mode fitradius2D, update distance2d/ projectionpoint2d and protect distance/ projectionpoint
         """
-        
+        precision = int(precision)
         if mode == 'basic':
-            
             # 3d and 2d vesicle both do 2d distance calculation first
-            points2d = self.sample_on_vesicle(precision/10)  # typical num of 3d sampling is 3600, whereas 2d is 360
+            points2d = self.sample_on_vesicle(int(precision/10))  # typical num of 3d sampling is 3600, whereas 2d is 360
             dist, idx = tree.query(points2d, k=1)
             dis = np.min(dist)
             fit_PP0_idx2d = idx[np.argmin(dist)]
