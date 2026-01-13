@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
-from ast import mod
+
 import os
-import warnings
 import numpy as np
 from scipy.spatial import Delaunay
 from tqdm import tqdm
@@ -715,7 +714,6 @@ class Vesicle:
         return self._radius2D
     
     def getRadius3D(self) -> np.ndarray:
-        warnings.warn("Vesicle().getRadius3D() is deprecated and will be removed soon, please use getRadius() instead", UserWarning)
         return self._radius3D
     
     def getEvecs(self) -> np.ndarray:
@@ -745,24 +743,38 @@ class Vesicle:
     def getType(self):
         return self._type
     
+    @staticmethod
+    def set_check(arr):
+        if not isinstance(arr, np.ndarray):
+            try:
+                arr = np.asarray(arr)
+            except:
+                raise ValueError("Input cannot be converted to numpy array")
+        return arr
+    
     def setCenter(self, center:np.ndarray):
+        center = Vesicle.set_check(center)
         self._center = center
         self._center2D = center
         self._center3D = center
     
     def setCenter2D(self, center2D:np.ndarray):
+        center2D = Vesicle.set_check(center2D)
         self._center2D = center2D
     
     def setRadius(self, radius):
         self._radius = radius
     
     def setRadius2D(self, radius2D):
+        radius2D = Vesicle.set_check(radius2D)
         self._radius2D = radius2D
     
     def setRadius3D(self, radius3D):
+        radius3D = Vesicle.set_check(radius3D)
         self._radius3D = radius3D
     
     def setEvecs(self, evecs):
+        evecs = Vesicle.set_check(evecs)
         self._evecs = evecs
     
     def setId(self, Id):
@@ -775,6 +787,7 @@ class Vesicle:
         self._distance = d
     
     def setProjectionPoint(self, projectionPoint):
+        projectionPoint = Vesicle.set_check(projectionPoint)
         self._projectionPoint = projectionPoint
     
     def setRotation2D(self, Rotation2D):

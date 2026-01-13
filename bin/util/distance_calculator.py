@@ -75,9 +75,7 @@ def distance_calc(
         attributes_to_keep = [
             '_vesicleId', '_type', '_center', '_radius',
             '_center2D', '_radius2D', '_rotation2D',
-            # temporary keep 3D attributes
-            # '_center3D', 
-            # '_radius3D', '_evecs',
+            '_distance', '_distance2D', '_projectionPoint', '_projectionPoint2D'
         ]
 
         for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
@@ -126,18 +124,12 @@ def distance_calc(
                     continue  # 如果 Radius3D 无效，跳过后续步骤
                 
                 # 7.2 计算 Rotation2D
-                X, Y = vesicle._evecs[2, 1], vesicle._evecs[1, 1]
+                X, Y = vesicle._evecs[0, 1], vesicle._evecs[1, 1]  #TODO: need to test
                 phi = np.arctan2(Y, X) - np.pi / 2  # to same definition of phi: vesicle._rotation2D
                 vesicle.setRotation2D(phi)
                 print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
-                
-        # 8. Calculate the distance to the surface (3D)
-        if 'premembrane.mod' in mod_path:
-            vl.distance_to_surface(surface, 3600, 'sparse')
-        else:
-            vl.distance_to_surface(surface, 3600, 'dense')
-            
-        # 9. 移除2d囊泡不需要的属性
+        
+        # 8. 移除2d囊泡不需要的属性
         for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
             if np.array_equal(vesicle._evecs[2], [0.0, 0.0, 1.0]):
                 current_attrs = list(vars(vesicle).keys())
@@ -145,7 +137,13 @@ def distance_calc(
                     if attr not in attributes_to_keep:
                         delattr(vesicle, attr)
                 print(f"Removed unwanted attributes for vesicle ID {vesicle.getId()}")
-                
+        
+        # 9. Calculate the distance to the surface
+        if 'premembrane.mod' in mod_path:
+            vl.distance_to_surface(surface, 3600, 'sparse')
+        else:
+            vl.distance_to_surface(surface, 3600, 'dense')
+        
         if fit_2d:
             # copy from bin/fitradius2D.py, which is difficult to import directly
             # maybe need to functionalize bin/fitradius2D.py later
@@ -168,9 +166,6 @@ def distance_calc(
             data_pad = np.pad(mrc_data, padwidth, mode='constant', constant_values=mean_value)
 
             for i in tqdm(range(len(vl))):
-                # debug
-                if i == 2:
-                    breakpoint()
                 center = np.round(vl[i].getCenter()).astype(np.uint16)
                 radius = vl[i].getRadius().mean()
                 x_init, y_init, z_init = center
@@ -231,7 +226,10 @@ def distance_calc(
         print_func(f"Distance calculation failed: {str(e)}")
 
 
-# distance_calc('/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test.json', 
-#               '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/membrane/pp95.mod',
-#               '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/vesicles/pp95_vesicle_test.xml',
-#               print,)
+distance_calc('/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test.json', 
+              '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/membrane/pp95.mod',
+              '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test1.xml',
+              print,
+              fit_2d=False,
+              mrc_path='/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_wbp_corrected.mrc',
+              img_output_path='/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/images')
