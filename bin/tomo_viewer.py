@@ -965,6 +965,15 @@ class TomoViewer:
     def register_distance_calc(self):
         
         def distance_calculation():
+            fit_reply = QMessageBox.question(
+                self.main_viewer,
+                "2D Fit",
+                "Do you want to fit 2D vesicles?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            fit_2d = fit_reply == QMessageBox.Yes
+
             # Define the file paths
             json_path = self.tomo_path_and_stage.new_json_file_path
             mod_path = self.tomo_path_and_stage.memb_result_path
@@ -978,7 +987,14 @@ class TomoViewer:
             xml_output_path = self.tomo_path_and_stage.ori_xml_path
 
             # Call the distance_calc function, passing the paths and a print function
-            distance_calc(json_path, mod_path, xml_output_path, self.print)
+            distance_calc(
+                json_path,
+                mod_path,
+                xml_output_path,
+                self.print,
+                fit_2d=fit_2d,
+                mrc_path=self.tomo_path_and_stage.isonet_tomo_path,
+            )
 
         
         try:
