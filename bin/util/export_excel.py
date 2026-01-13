@@ -7,6 +7,15 @@ import pandas as pd
 
 from segVesicle.bin.util.structures import VesicleList, Surface
 
+def export_final_execl(tomo_path_and_stage, print_func, use2D=True):
+    export_path = tomo_path_and_stage.current_path
+    try:
+        main(path=export_path, use2D=use2D)
+    except Exception as exc:
+        print_func(f"Export final excel failed: {exc}")
+        return
+    output_file = os.path.join(export_path, 'vesicle_all_statistics.xlsx')
+    print_func(f"Final excel exported: {output_file}")
 
 def main(path : str = '.',
          stim : str = '',
