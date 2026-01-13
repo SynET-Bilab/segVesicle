@@ -967,8 +967,8 @@ class TomoViewer:
         def distance_calculation():
             fit_reply = QMessageBox.question(
                 self.main_viewer,
-                "2D Fit",
-                "Do you want to fit 2D vesicles?",
+                "fit_radius_2D",
+                "Do you want to do fit_radius_2D?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
             )
