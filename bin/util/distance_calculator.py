@@ -5,9 +5,9 @@ import numpy as np
 import mrcfile
 
 from tqdm import tqdm
-from util.structures import VesicleList, Surface
+from segVesicle.bin.util.structures import VesicleList, Surface
 from tifffile.tifffile import imwrite
-from morph import density_fit_2d
+from segVesicle.bin.morph import density_fit_2d
 
 
 def normalize_scale(image: np.ndarray) -> np.ndarray:
@@ -76,7 +76,7 @@ def distance_calc(
             '_vesicleId', '_type', '_center', '_radius',
             '_center2D', '_radius2D', '_rotation2D',
             # temporary keep 3D attributes
-            '_center3D', 
+            # '_center3D', 
             # '_radius3D', '_evecs',
         ]
 
@@ -110,15 +110,8 @@ def distance_calc(
             # * 6. for 2D section parralleled to xy plane of 3D vesicle
             _, radius2D, eigvecs = vesicle.ellipse_in_plane()
             vesicle.setRadius2D(np.asarray(radius2D, dtype=float) * ratio)
-            vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
-        
-        # 7. Calculate the distance to the surface (3D)
-        if 'premembrane.mod' in mod_path:
-            vl.distance_to_surface(surface, 3600, 'sparse')
-        else:
-            vl.distance_to_surface(surface, 3600, 'dense')
-
-        for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
+            vesicle.setRotation2D(np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2)
+            
             if np.array_equal(vesicle._evecs[2], [0.0, 0.0, 1.0]):
                 print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
                 
@@ -137,13 +130,21 @@ def distance_calc(
                 phi = np.arctan2(Y, X) - np.pi / 2  # to same definition of phi: vesicle._rotation2D
                 vesicle.setRotation2D(phi)
                 print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
-                    
-                # 8.3 移除2d囊泡不需要的属性
-                current_attrs = list(vars(vesicle).keys())
-                for attr in current_attrs:
-                    if attr not in attributes_to_keep:
-                        delattr(vesicle, attr)
-                print(f"Removed unwanted attributes for vesicle ID {vesicle.getId()}")
+                
+        # 7. Calculate the distance to the surface (3D)
+        if 'premembrane.mod' in mod_path:
+            vl.distance_to_surface(surface, 3600, 'sparse')
+        else:
+            vl.distance_to_surface(surface, 3600, 'dense')
+
+        for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
+            
+            # 8.3 移除2d囊泡不需要的属性
+            current_attrs = list(vars(vesicle).keys())
+            for attr in current_attrs:
+                if attr not in attributes_to_keep:
+                    delattr(vesicle, attr)
+            print(f"Removed unwanted attributes for vesicle ID {vesicle.getId()}")
                 
         if fit_2d:
             # copy from bin/fitradius2D.py, which is difficult to import directly
@@ -219,11 +220,17 @@ def distance_calc(
                 imwrite(os.path.join(img_path, '{}.tif'.format(vl[i].getId())), out, photometric='rgb')
 
             if 'premembrane.mod' in mod_path:
-                vl.distance_to_surface(surface, precision=360, mode='sparse', sample_mode='2d', stay_ori_dist_proj=True)
+                vl.distance_to_surface(surface, precision=360, mode='sparse', vesicle_mode='fitradius2D')
             else:
-                vl.distance_to_surface(surface, precision=360, mode='dense', sample_mode='2d', stay_ori_dist_proj=True)
+                vl.distance_to_surface(surface, precision=360, mode='dense', vesicle_mode='fitradius2D')
         vl.toXMLFile(xml_output_path)
         print_func(f"XML file successfully generated at: {xml_output_path}")
 
     except Exception as e:
         print_func(f"Distance calculation failed: {str(e)}")
+
+
+distance_calc('/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test.json', 
+              '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/membrane/pp95.mod',
+              '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/vesicles/pp95_vesicle_test.xml',
+              print,)

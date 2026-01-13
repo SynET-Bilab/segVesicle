@@ -122,10 +122,10 @@ def set_2D_radius(synapse, path, xml_file_tail):
         surface = Surface()
         if 'premembrane.mod' in membrane_file:
             surface.from_model_use_imod_mesh(membrane_file)
-            vl.distance_to_surface(surface, precision=360, mode='sparse', sample_mode='2d', stay_ori_dist_proj=True)
+            vl.distance_to_surface(surface, precision=360, mode='sparse', vesicle_mode='fitradius2D')
         else:
             surface.from_model_auto_segment(membrane_file, objNum=2)
-            vl.distance_to_surface(surface, precision=360, mode='dense', sample_mode='2d', stay_ori_dist_proj=True)
+            vl.distance_to_surface(surface, precision=360, mode='dense', vesicle_mode='fitradius2D')
     
     vl.toXMLFile(xml_file)
 

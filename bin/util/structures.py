@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
+from ast import mod
 import os
 import warnings
 import numpy as np
@@ -565,24 +566,46 @@ class Vesicle:
         return self._center3D, axes_lengths, rotation_matrix
     
     
-    def distance_to_surface(self, surface, precision, tree, membrane_points, mode='3d', stay_ori=False):
+    def distance_to_surface(self, surface, precision, tree, membrane_points, mode='3d'):
         """
         @param surface: membrane.surface instance
         
         @author: Lu Zhenhang
         @date: 2024-10-14
+        
+        -> rewrite by Lu Zhenhang:
+            1. for mode basic, if has center3D, distance/ projectionpoint update to 3d cal result, and distance2d/ projectionpoint2d update to 2d cal result 
+                and for 2d vesicle only has center2D, distance/ projectionpoint and distance2d/ projectionpoint2d update to 2d cal result
+            2. for mode fitradius2D, update distance2d/ projectionpoint2d and protect distance/ projectionpoint
         """
         
-        if mode == '3d' and hasattr(self, "_center3D"):
+        if mode == 'basic':
             
-            points = self.sample_on_vesicle_3d_fibonacci(precision)
-            dist, idx = tree.query(points, k=1)
+            # 3d and 2d vesicle both do 2d distance calculation first
+            points2d = self.sample_on_vesicle(precision/10)  # typical num of 3d sampling is 3600, whereas 2d is 360
+            dist, idx = tree.query(points2d, k=1)
             dis = np.min(dist)
-            fit_PP0_idx = idx[np.argmin(dist)]
-            nearest_point = points[np.argmin(dist)]
-            PP0 = membrane_points[fit_PP0_idx[0]]
+            fit_PP0_idx2d = idx[np.argmin(dist)]
+            nearest_point = points2d[np.argmin(dist)]
+            PP0 = membrane_points[fit_PP0_idx2d[0]]
             
-        elif mode == '2d' and hasattr(self, "_center2D"):
+            self._distance2D = dis
+            self._projectionPoint2D = PP0
+            self._distance = dis
+            self._projectionPoint = PP0
+            
+            if hasattr(self, "_center3D"):
+                points = self.sample_on_vesicle_3d_fibonacci(precision)
+                dist, idx = tree.query(points, k=1)
+                dis = np.min(dist)
+                fit_PP0_idx = idx[np.argmin(dist)]
+                nearest_point = points[np.argmin(dist)]
+                PP0 = membrane_points[fit_PP0_idx[0]]
+                
+                self._distance = dis
+                self._projectionPoint = PP0
+        
+        elif mode == 'fitradius2D':
             
             points = self.sample_on_vesicle(precision)
             dist, idx = tree.query(points, k=1)
@@ -593,10 +616,6 @@ class Vesicle:
             
             self._distance2D = dis
             self._projectionPoint2D = PP0
-        
-        if not stay_ori:  # in most cases, below will be executed, but when doing fitradius2D.py after all done, we do not want to change the original distance and projection point attributes
-            self._distance = dis
-            self._projectionPoint = PP0
         
         return dis, PP0, nearest_point
     
@@ -919,16 +938,14 @@ class VesicleList:
                             surface : Surface, 
                             precision : int, 
                             mode='dense',
-                            sample_mode='3d',
-                            stay_ori_dist_proj=False):
+                            vesicle_mode='basic'):
         """
         -> rewrite by Lu Zhenhang, 2023-04-18. Using kd-tree to speed up the calculation
         -> rewrite by Lu Zhenhang, 2023-06-04. Add projection_point to output file
         -> update by Lu Zhenhang, 2024-10-14. Add 3D ellipsoid support (data from DL-based segmentation)
         
         @param mode: 'sparse' or 'dense', representing manual segmentation or auto-segmentation for membrane
-        @param sample_mode: '2d' or '3d', for vesicles
-        @param stay_ori_dist_proj: whether to keep original distance and projection point attributes of vesicles (only use in fitradius2D.py)
+        @param vesicle_mode: 'basic' or 'fitradius2D', for vesicles
         """
         from sklearn.neighbors import KDTree
         
@@ -969,8 +986,7 @@ class VesicleList:
                     precision, 
                     tree, 
                     surface._densePoints, 
-                    mode=sample_mode,
-                    stay_ori=stay_ori_dist_proj
+                    mode=vesicle_mode
                 )
                 self._distance.append(dis)
                 self._projectionPoint.append(PP0)
