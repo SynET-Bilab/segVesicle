@@ -76,7 +76,8 @@ def distance_calc(
             '_vesicleId', '_type', '_center', '_radius',
             '_center2D', '_radius2D', '_rotation2D',
             # temporary keep 3D attributes
-            '_center3D', '_radius3D', '_evecs',
+            '_center3D', 
+            # '_radius3D', '_evecs',
         ]
 
         for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
@@ -110,12 +111,18 @@ def distance_calc(
             _, radius2D, eigvecs = vesicle.ellipse_in_plane()
             vesicle.setRadius2D(np.asarray(radius2D, dtype=float) * ratio)
             vesicle._rotation2D = np.arctan2(eigvecs[0, 1], eigvecs[0, 0]) - np.pi / 2
-            
-            # 7. 若为 2D 膜囊泡，进行校正 (update: use row 2 instead of row 0)
+        
+        # 7. Calculate the distance to the surface (3D)
+        if 'premembrane.mod' in mod_path:
+            vl.distance_to_surface(surface, 3600, 'sparse')
+        else:
+            vl.distance_to_surface(surface, 3600, 'dense')
+
+        for i, vesicle in tqdm(enumerate(vl), total=len(vl), desc="Processing vesicles", dynamic_ncols=True):
             if np.array_equal(vesicle._evecs[2], [0.0, 0.0, 1.0]):
                 print(f"Correcting 2D vesicle with ID: {vesicle.getId()}")
                 
-                # 7.1 使用 Radius3D 的 r1 和 r2 更新 Radius2D
+                # 8.1 使用 Radius3D 的 r1 和 r2 更新 Radius2D
                 if hasattr(vesicle, '_radius3D') and len(vesicle.getRadius3D()) >= 2:
                     r1, r2 = vesicle.getRadius3D()[1], vesicle.getRadius3D()[0]
                     vesicle.setRadius2D([r1, r2])
@@ -125,26 +132,19 @@ def distance_calc(
                     print(f"Warning: Vesicle ID {vesicle.getId()} lacks valid Radius3D data. Skipping Radius2D update.")
                     continue  # 如果 Radius3D 无效，跳过后续步骤
                 
-                
-                # 7.3 计算 Rotation2D
+                # 8.2 计算 Rotation2D
                 X, Y = vesicle._evecs[2, 1], vesicle._evecs[1, 1]
                 phi = np.arctan2(Y, X) - np.pi / 2  # to same definition of phi: vesicle._rotation2D
                 vesicle.setRotation2D(phi)
                 print(f"Computed Rotation2D for vesicle ID {vesicle.getId()}: phi = {phi} radians")
-                
-                # 7.4 移除2d囊泡不需要的属性
+                    
+                # 8.3 移除2d囊泡不需要的属性
                 current_attrs = list(vars(vesicle).keys())
                 for attr in current_attrs:
                     if attr not in attributes_to_keep:
                         delattr(vesicle, attr)
                 print(f"Removed unwanted attributes for vesicle ID {vesicle.getId()}")
-        
-        # Calculate the distance to the surface (3D)
-        if 'premembrane.mod' in mod_path:
-            vl.distance_to_surface(surface, 3600, 'sparse')
-        else:
-            vl.distance_to_surface(surface, 3600, 'dense')
-
+                
         if fit_2d:
             # copy from bin/fitradius2D.py, which is difficult to import directly
             # maybe need to functionalize bin/fitradius2D.py later
