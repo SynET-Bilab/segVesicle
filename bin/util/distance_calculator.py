@@ -226,10 +226,10 @@ def distance_calc(
         print_func(f"Distance calculation failed: {str(e)}")
 
 
-distance_calc('/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test.json', 
-              '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/membrane/pp95.mod',
-              '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test1.xml',
-              print,
-              fit_2d=False,
-              mrc_path='/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_wbp_corrected.mrc',
-              img_output_path='/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/images')
+# distance_calc('/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test.json', 
+#               '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/membrane/pp95.mod',
+#               '/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_vesicle_test1.xml',
+#               print,
+#               fit_2d=False,
+#               mrc_path='/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/pp95_wbp_corrected.mrc',
+#               img_output_path='/share/data/CryoET_Data/zhenhang/software_test/segVesicle_test/test_fitradius2D_fix2D_SV_cannot_use/images')
