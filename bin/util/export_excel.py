@@ -75,6 +75,8 @@ def main(path : str = '.',
                         distance_px = sv.getDistance2D()
                     except:
                         distance_px = sv.getDistance()
+                else:
+                    distance_px = sv.getDistance()
                 type_sv = sv.getType()
                 
                 if len(radius_px) == 2:
