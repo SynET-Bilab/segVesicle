@@ -68,7 +68,6 @@ def main(path : str = '.',
             
             for i, sv in enumerate(vl):
                 vesicleID = sv.getId()
-                radius_px = sv.getRadius()
                 if use2D:
                     radius_px = sv.getRadius2D()
                     try:
@@ -76,6 +75,7 @@ def main(path : str = '.',
                     except:
                         distance_px = sv.getDistance()
                 else:
+                    radius_px = sv.getRadius()
                     distance_px = sv.getDistance()
                 type_sv = sv.getType()
                 
