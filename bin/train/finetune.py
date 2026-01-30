@@ -41,7 +41,7 @@ def train_model(dim_in, batch_size, epochs, load_model_pth, datadir, mode='iso')
     # 设置其他参数
     Ncl = 2
     optimizer = Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-    loss = losses.tversky_loss
+    loss = losses.dice_loss
     flag_pretrained = True  # 是否加载预训练模型
 
     # 生成当前日期字符串
@@ -112,6 +112,9 @@ def train_model(dim_in, batch_size, epochs, load_model_pth, datadir, mode='iso')
             with mf.open(os.path.join(datadir, 'label', all_label[index[i]])) as m:
                 patch_target = m.data.astype(np.int8)
             if if_val == 0:
+                if np.random.uniform() < 0.5:
+                    patch_data = np.rot90(patch_data, k=2, axes=(1, 2))
+                    patch_target = np.rot90(patch_target, k=2, axes=(1, 2))
                 if np.random.uniform() < 0.33:
                     M = np.mean(patch_data)
                     patch_data = random_erase_np(patch_data, M)

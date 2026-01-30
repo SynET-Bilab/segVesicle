@@ -4,187 +4,126 @@ import scipy
 from scipy.sparse import csr_matrix
 from numpy.linalg import eig, inv
 from scipy.optimize import minimize
-#A*x.^2 + B*x.*y + C*y.^2 + D*x + E*y + F
-def solve_ellipse(A,B,C,D,E,F):
-            
-    Xc = (B*E-2*C*D)/(4*A*C-B**2)
-    Yc = (B*D-2*A*E)/(4*A*C-B**2)
+
+def ellipsoid_fit(X, alpha=1.5, gamma=0.1, lambda_reg=1000.0):
+    # 标归一化
+    mean = np.mean(X, axis=0)
+    std = np.std(X, axis=0)
+    std[std < 1e-6] = 1.0 
+    points_norm = (X - mean) / std
+    
+    # 2. 初始化参数
+    center_init = np.mean(points_norm, axis=0)
+    A_init = np.diag([1.0, 1.0, 1.0])  
+    
+    # 从对称矩阵A提取下三角参数 (6个独立参数)
+    def matrix_to_params(A):
+        return np.array([A[0,0], A[1,0], A[1,1], A[2,0], A[2,1], A[2,2]])
+    
+    # 从参数构建对称正定矩阵 (通过下三角分解)
+    def params_to_matrix(params):
+        L = np.array([
+            [params[0], 0, 0],
+            [params[1], params[2], 0],
+            [params[3], params[4], params[5]]
+        ])
+        return L @ L.T  # 保证对称正定
+    
+    # 3. 定义目标函数 (带正则项)
+    def objective(params, pts):
+        center = params[:3]
+        A = params_to_matrix(params[3:])
         
-    FA1 = 2*(A*Xc**2+C*Yc**2+B*Xc*Yc-F)
-    FA2 = np.sqrt((A-C)**2+B**2)
-    
-    MA = np.sqrt(FA1/(A+C+FA2)) 
-    SMA= np.sqrt(FA1/(A+C-FA2)) if A+C-FA2!=0 else 0
-            
-    if MA<SMA:
-        MA,SMA = SMA,MA
-            
-    return MA, SMA
-
-
-def data_regularize(data, type="spherical", divs=10):
-    limits = np.array([
-        [min(data[:, 0]), max(data[:, 0])],
-        [min(data[:, 1]), max(data[:, 1])],
-        [min(data[:, 2]), max(data[:, 2])]])
+        # 计算代数距离 F(x) = (x-c)^T A (x-c) - 1
+        diff = pts - center
+        F_vals = np.einsum('ni,ij,nj->n', diff, A, diff) - 1.0
         
-    regularized = []
-
-    if type == "cubic": # take mean from points in the cube
+        # 计算梯度范数 ||∇F|| = 2 * ||A(x-c)||
+        grad_norm = 2 * np.linalg.norm((A @ diff.T).T, axis=1)
         
-        X = np.linspace(*limits[0], num=divs)
-        Y = np.linspace(*limits[1], num=divs)
-        Z = np.linspace(*limits[2], num=divs)
-
-        for i in range(divs-1):
-            for j in range(divs-1):
-                for k in range(divs-1):
-                    points_in_sector = []
-                    for point in data:
-                        if (point[0] >= X[i] and point[0] < X[i+1] and
-                                point[1] >= Y[j] and point[1] < Y[j+1] and
-                                point[2] >= Z[k] and point[2] < Z[k+1]):
-                            points_in_sector.append(point)
-                    if len(points_in_sector) > 0:
-                        regularized.append(np.mean(np.array(points_in_sector), axis=0))
-
-    elif type == "spherical": #take mean from points in the sector
-        divs_u = divs 
-        divs_v = divs * 2
-
-        center = np.array([
-            0.5 * (limits[0, 0] + limits[0, 1]),
-            0.5 * (limits[1, 0] + limits[1, 1]),
-            0.5 * (limits[2, 0] + limits[2, 1])])
-        d_c = data - center
-    
-        #spherical coordinates around center
-        r_s = np.sqrt(d_c[:, 0]**2. + d_c[:, 1]**2. + d_c[:, 2]**2.)
-        d_s = np.array([
-            r_s,
-            np.arccos(d_c[:, 2] / r_s),
-            np.arctan2(d_c[:, 1], d_c[:, 0])]).T
-
-        u = np.linspace(0, np.pi, num=divs_u)
-        v = np.linspace(-np.pi, np.pi, num=divs_v)
-
-        for i in range(divs_u - 1):
-            for j in range(divs_v - 1):
-                points_in_sector = []
-                for k, point in enumerate(d_s):
-                    if (point[1] >= u[i] and point[1] < u[i + 1] and
-                            point[2] >= v[j] and point[2] < v[j + 1]):
-                        points_in_sector.append(data[k])
-
-                if len(points_in_sector) > 0:
-                    regularized.append(np.mean(np.array(points_in_sector), axis=0))
-# Other strategy of finding mean values in sectors
-#                    p_sec = np.array(points_in_sector)
-#                    R = np.mean(p_sec[:,0])
-#                    U = (u[i] + u[i+1])*0.5
-#                    V = (v[j] + v[j+1])*0.5
-#                    x = R*math.sin(U)*math.cos(V)
-#                    y = R*math.sin(U)*math.sin(V)
-#                    z = R*math.cos(U)
-#                    regularized.append(center + np.array([x,y,z]))
-    return np.array(regularized)
-
-
-# https://github.com/minillinim/ellipsoid
-def ellipsoid_plot(center, radii, rotation, ax, plot_axes=False, cage_color='b', cage_alpha=0.2):
-    """Plot an ellipsoid"""
+        # 加权代数距离 (近似几何距离): |F| / ||∇F||
+        epsilon = 1e-8
+        weights = 1.0 / np.maximum(grad_norm, epsilon)
+        weighted_dist = np.abs(F_vals) * weights
         
-    u = np.linspace(0.0, 2.0 * np.pi, 100)
-    v = np.linspace(0.0, np.pi, 100)
+        # 计算原始损失 (最小二乘)
+        loss = np.sum(weighted_dist**2)
+        
+        # 计算正则项
+        d_i = weighted_dist  # 点到椭球表面的距离
+        
+        # sigmoid函数 σ(d_i) = 1/(1+e^(-((d_i-α)/γ)))
+        # 数值稳定实现：限制输入范围防止exp溢出
+        sigmoid_input = (d_i - alpha) / gamma
+        sigmoid_input = np.clip(sigmoid_input, -100, 100)  # 防止数值溢出
+        sigma = 1.0 / (1.0 + np.exp(-sigmoid_input))
+        
+        # 正则项: λ·∑〖σ^2 (d_i)〗
+        regularization = lambda_reg * np.sum(sigma**2)
+        
+        return loss + regularization
     
-    # cartesian coordinates that correspond to the spherical angles:
-    x = radii[0] * np.outer(np.cos(u), np.sin(v))
-    y = radii[1] * np.outer(np.sin(u), np.sin(v))
-    z = radii[2] * np.outer(np.ones_like(u), np.cos(v))
-    # rotate accordingly
-    for i in range(len(x)):
-        for j in range(len(x)):
-            [x[i, j], y[i, j], z[i, j]] = np.dot([x[i, j], y[i, j], z[i, j]], rotation) + center
-
-    if plot_axes:
-        # make some purdy axes
-        axes = np.array([[radii[0],0.0,0.0],
-                         [0.0,radii[1],0.0],
-                         [0.0,0.0,radii[2]]])
-        # rotate accordingly
-        for i in range(len(axes)):
-            axes[i] = np.dot(axes[i], rotation)
-
-        # plot axes
-        for p in axes:
-            X3 = np.linspace(-p[0], p[0], 100) + center[0]
-            Y3 = np.linspace(-p[1], p[1], 100) + center[1]
-            Z3 = np.linspace(-p[2], p[2], 100) + center[2]
-            ax.plot(X3, Y3, Z3, color=cage_color)
-
-    # plot ellipsoid
-    ax.plot_wireframe(x, y, z,  rstride=4, cstride=4, color=cage_color, alpha=cage_alpha)
-
-
-# http://www.mathworks.com/matlabcentral/fileexchange/24693-ellipsoid-fit
-# for arbitrary axes
-def ellipsoid_fit(X):
-    x = X[:, 0]
-    y = X[:, 1]
-    z = X[:, 2]
-    D = np.array([x * x + y * y - 2 * z * z,
-                 x * x + z * z - 2 * y * y,
-                 2 * x * y,
-                 2 * x * z,
-                 2 * y * z,
-                 2 * x,
-                 2 * y,
-                 2 * z,
-                 1 - 0 * x])
-    d2 = np.array(x * x + y * y + z * z).T # rhs for LLSQ
-    u = np.linalg.solve(D.dot(D.T), D.dot(d2))
-    a = np.array([u[0] + 1 * u[1] - 1])
-    b = np.array([u[0] - 2 * u[1] - 1])
-    c = np.array([u[1] - 2 * u[0] - 1])
-    v = np.concatenate([a, b, c, u[2:]], axis=0).flatten()
-    A = np.array([[v[0], v[3], v[4], v[6]],
-                  [v[3], v[1], v[5], v[7]],
-                  [v[4], v[5], v[2], v[8]],
-                  [v[6], v[7], v[8], v[9]]])
-
-    center = np.linalg.solve(- A[:3, :3], v[6:9])
-
-    translation_matrix = np.eye(4)
-    translation_matrix[3, :3] = center.T
-
-    R = translation_matrix.dot(A).dot(translation_matrix.T)
-
-    evals, evecs = np.linalg.eig(R[:3, :3] / -R[3, 3])
-    evecs = evecs.T
-
-    radii = np.sqrt(1. / np.abs(evals))
-    radii *= np.sign(evals)
-
-    '''
-    z0 = center[0]
-    [A, B, C, D, E, F] = [u[0] + u[1] - 1,
-                          u[2],
-                          u[0] - 2*u[1] - 1,
-                          u[3]*z0 + u[5],
-                          u[4]*z0 + u[6],
-                          z0*z0*(u[1] - 2*u[0] -1) + u[7]*z0 + u[8]]
-    MA, SMA = solve_ellipse(A, B, C, D, E, F)
+    # 4. 设置初始参数和边界
+    params_init = np.concatenate([
+        center_init, 
+        matrix_to_params(A_init)
+    ])
     
-    return center, evecs, radii, MA, SMA
-    '''
+    # 边界设置
+    bounds = [
+        (np.min(points_norm[:,0]), np.max(points_norm[:,0])),
+        (np.min(points_norm[:,1]), np.max(points_norm[:,1])),
+        (np.min(points_norm[:,2]), np.max(points_norm[:,2])),
+        (1e-6, None),  
+        (None, None),   
+        (1e-6, None),  
+        (None, None),   
+        (None, None),   
+        (1e-6, None)   
+    ]
     
-    return center, evecs, radii
+    # 5. L-BFGS-B
+    result = minimize(
+        fun=objective,
+        x0=params_init,
+        args=(points_norm,),
+        method='L-BFGS-B',
+        bounds=bounds,
+        options={'maxiter': 1000, 'ftol': 1e-8, 'gtol': 1e-8, 'disp': False}
+    )
+    
+    # 6. 从优化结果提取参数
+    opt_params = result.x
+    center_norm = opt_params[:3]
+    A_norm = params_to_matrix(opt_params[3:])
+    
+    # 7. 转换回原始坐标系
+    center_orig = center_norm * std + mean
+    
+    # 计算原始坐标系的变换矩阵
+    D = np.diag(std)  # 缩放矩阵
+    A_orig = np.linalg.inv(D) @ A_norm @ np.linalg.inv(D)
+    
+    # 8. 从矩阵A提取几何参数 (特征值分解)
+    eigvals, eigvecs = np.linalg.eigh(A_orig)
+    
+    # 椭球标准方程: (x-c)^T A (x-c) = 1
+    # 半轴长度 a=1/sqrt(λ1), b=1/sqrt(λ2), c=1/sqrt(λ3)
+    radii = 1.0 / np.sqrt(np.maximum(eigvals, 1e-10))
+    
+    # 9. 确保特征向量形成右手坐标系
+    if np.linalg.det(eigvecs) < 0:
+        eigvecs[:, 2] = -eigvecs[:, 2]
+    
+    # 10. 按半轴长度降序排列 (可选，保持与原方法一致)
+    order = np.argsort(radii)[::-1]
+    radii = radii[order]
+    eigvecs = eigvecs[:, order]
+    
+    return center_orig, eigvecs, radii
 
 def ellipse_fit(x, y, Zc):
-    """
-    ellipse fitting by least square method
-    http://nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
-    """
+
     x=np.array(x,dtype=np.double)
     y=np.array(y,dtype=np.double)
     x = x[:,np.newaxis]
@@ -216,71 +155,86 @@ def ellipse_fit(x, y, Zc):
     return center, evecs, radii
 
 
-
-def ellispoid_fit_RSS(center,evecs,radii,X):
-    # Calculate residual sum of squared errors (chi^2), this chi2 is in the coordinate frame in which the ellipsoid is a unit sphere. X.shape is (3, n)
-    cloud = X.T - center
-    cloud_r = np.dot(cloud,evecs)
-    cloud_n = cloud_r / [radii[2],radii[1],radii[0]] 
-    d = np.sqrt(np.sum(cloud_n * cloud_n, axis = 1))
-    rss = np.sum((d - 1) ** 2)
-    return rss/len(d)
-
-
-
-def sigmoid(d, a_threshold, gamma):
-    """向量化sigmoid函数"""
-    return 1 / (1 + np.exp(-(d - a_threshold) / gamma))
-
-def compute_distances_vectorized(u_all, v_all, a, b, max_iter=20):
-    """向量化近似距离计算 (基于椭圆代数距离近似几何距离)"""
-    # 代数投影近似公式 (避免牛顿迭代)
-    phi = np.arctan2(v_all * a, u_all * b)  # 初始角度估计
-    u_proj = a * np.cos(phi)
-    v_proj = b * np.sin(phi)
-    distances = np.sqrt((u_all - u_proj)**2 + (v_all - v_proj)**2)
-    return distances
-
-def objective_vectorized(params, data, a_threshold, gamma):
-    """向量化目标函数"""
-    h, k, theta, a, b = params
-    cos_theta = np.cos(theta)
-    sin_theta = np.sin(theta)
-    
-    # 批量坐标变换 (矩阵运算)
-    dx = data[:, 0] - h
-    dy = data[:, 1] - k
-    u_all = dx * cos_theta + dy * sin_theta  # 向量化计算
-    v_all = -dx * sin_theta + dy * cos_theta
-    
-    # 向量化距离计算
-    distances = compute_distances_vectorized(u_all, v_all, a, b)
-    
-    # 向量化权重计算
-    weights = sigmoid(distances, a_threshold, gamma)
-    # total = np.sum(distances**2 * weights)
-    total = np.sum(distances**2) + 1000*np.sum(weights**2)
-    return total
-
-
 def ellipse_fit_n(x, y, Zc):
-    x=np.array(x,dtype=np.double)
-    y=np.array(y,dtype=np.double)
-    data = np.array([x,y]).T
-    initial_params = [np.mean(x), np.mean(y), 0, 0.5*(np.max(x)-np.min(x)), 0.5*(np.max(x)-np.min(x))]
-    result = minimize(objective_vectorized, initial_params, args=(data, 1.5, 0.1),
-                  method='L-BFGS-B', 
-                  bounds=[(None, None), (None, None), (None, None), (1e-6, None), (1e-6, None)],
-                  options={'maxiter': 200})
-    optimized_params = result.x
-    # 提取参数
-    h_opt, k_opt, angle, a_opt, b_opt = optimized_params
+    def sigmoid(d, a_threshold, gamma):
+        """向量化sigmoid函数"""
+        return 1 / (1 + np.exp(-(d - a_threshold) / gamma))
 
+    def compute_distances_vectorized(u_all, v_all, a, b, max_iter=20):
+        """向量化近似距离计算 (基于椭圆代数距离近似几何距离)"""
+        # 代数投影近似公式 (避免牛顿迭代)
+        phi = np.arctan2(v_all * a, u_all * b)  
+        u_proj = a * np.cos(phi)
+        v_proj = b * np.sin(phi)
+        distances = np.sqrt((u_all - u_proj)**2 + (v_all - v_proj)**2)
+        return distances
+
+    def objective_vectorized(params, data, a_threshold, gamma):
+        """向量化目标函数"""
+        h, k, theta, a, b = params
+        cos_theta = np.cos(theta)
+        sin_theta = np.sin(theta)
+        
+        # 批量坐标变换 (矩阵运算)
+        dx = data[:, 0] - h
+        dy = data[:, 1] - k
+        u_all = dx * cos_theta + dy * sin_theta 
+        v_all = -dx * sin_theta + dy * cos_theta
+        
+        # 向量化距离计算
+        distances = compute_distances_vectorized(u_all, v_all, a, b)
+        
+        # 向量化权重计算
+        weights = sigmoid(distances, a_threshold, gamma)
+        total = np.sum(distances**2) + 1000*np.sum(weights**2)
+        return total
     
-    # 计算方向向量
-   
-    center = np.array([Zc,k_opt,h_opt])
-    evecs = np.array([[1,0,0], [0, np.sin(angle), np.cos(angle)],[0, np.cos(angle), -np.sin(angle)]])
+    # 转换输入为numpy数组
+    x = np.array(x, dtype=np.double)
+    y = np.array(y, dtype=np.double)
+    data = np.column_stack((x, y))
+    
+    # 设置初始参数 [h, k, theta, a, b]
+    # h, k: 椭圆中心坐标
+    # theta: 旋转角度
+    # a, b: 半长轴和半短轴
+    initial_params = [
+        np.mean(x), 
+        np.mean(y), 
+        0, 
+        0.5 * (np.max(x) - np.min(x)), 
+        0.5 * (np.max(y) - np.min(y))
+    ]
+    
+    # 执行优化
+    result = minimize(
+        objective_vectorized, 
+        initial_params, 
+        args=(data, 1.5, 0.1),
+        method='L-BFGS-B', 
+        bounds=[
+            (None, None),    
+            (None, None),   
+            (None, None),    
+            (1e-6, None),    
+            (1e-6, None)     
+        ],
+        options={'maxiter': 200, 'ftol': 1e-8}
+    )
+    
+    # 提取优化后的参数
+    h_opt, k_opt, angle, a_opt, b_opt = result.x
+    
+    # 构建3D椭球参数
+    center = np.array([Zc, k_opt, h_opt])
+    evecs = np.array([
+        [1, 0, 0], 
+        [0, np.sin(angle), np.cos(angle)],
+        [0, np.cos(angle), -np.sin(angle)]
+    ])
+    
+    # 半轴长度 [z半轴, y半轴, x半轴]
+    # z方向半轴设为0.01，表示扁平椭球
     radii = np.array([0.01, a_opt, b_opt])
-
+    
     return center, evecs, radii

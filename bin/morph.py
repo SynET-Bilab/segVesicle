@@ -47,9 +47,10 @@ def morph_process(mask, area_file, pixelsize=17.14, elem_len=1, radius=10, save_
 
     logging.info('\nFirst separatation of the mask by volume thresholding\n')
     for i in tqdm(range(1, num_pre+1), file=sys.stdout):
-        if idx_pre[i][0].shape[0] > area_thre*15:
-            pre_pro[idx_pre[i][0], idx_pre[i][1], idx_pre[i][2]] = 1
+        if idx_pre[i][0].shape[0] > area_thre*12:
             labeled_pre[idx_pre[i][0], idx_pre[i][1], idx_pre[i][2]] = 0
+            pre_pro[idx_pre[i][0], idx_pre[i][1], idx_pre[i][2]] = 1
+            
     labeled_pre[labeled_pre > 1] = 1
 
     kernel_pre = cube(11)
@@ -211,13 +212,7 @@ def density_fit(data_iso,center,radius):
 
     return [center_fit, evecs_fit, radii_fit, ccf]
 
-    # cloud = np.array(np.where(opened==1))
-    # [center_cube, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
 
-    # rss = ef.ellispoid_fit_RSS(center_cube, evecs, radii, cloud)
-    # [center_fit, evecs_fit, radii_fit]=[center[::-1]-padwidth+center_cube-cube.shape[0]//2, evecs, radii]
-
-    # return [center_fit, evecs_fit, radii_fit, rss]
 
 def template(radii, center, evecs, shape, d=3):
     #generate a circle shape template
@@ -472,72 +467,7 @@ def vesicle_measure(data, vesicle_list, shape, min_radius, outfile):
     pool = multiprocessing.Pool(poolnum)
     results = pool.starmap(measure_one, [(i,data,vesicle_list,min_radius) for i in idxs])
     results = list(filter(None, results))
-    # for i in tqdm(range(len(vesicle_list)), file=sys.stdout):
-    #     #print('fitting vesicle_',i)
-    #     [center0, evecs, radii]=ef.ellipsoid_fit(vesicle_list[i])
-    #     if min(center0-max(radii))<=0 or min(np.array(data.shape)-1-center0-max(radii))<=0:
-    #         continue
 
-
-    #     [center, evecs, radii, ccf]=density_fit(data,center0,np.max(radii))
-    #     #[center, evecs, radii]=density_fit(data,center0,np.max(radii))
-    #     if ccf < 0.3: #delete wrong segments
-    #         continue
-
-    #     if if_normal(radii):
-    #         info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
-    #         #info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
-    #         results.append(info)
-    #         '''
-    #         # check whether a vesicle in given presyn
-    #         c = np.delete(center, 0)
-    #         c[0], c[1] = c[1], c[0]
-    #         if Check(CH, len(CH), c):
-    #             results_in.append(info)
-    #             #print('in vesicle {}'.format(i))
-    #             in_count = in_count+1
-    #     # else:
-    #     #     print('bad vesicle {}'.format(i))
-    #         '''
-    # '''
-    # for i in range(len(vesicle_list_sup)):
-    #     print('fitting ellipse vesicle_',i)
-    #     z = vesicle_list_sup[i][:, 0]
-    #     Zc = np.mean(z)
-    #     X_temp = np.delete(vesicle_list_sup[i], 0, axis=1)
-    #     X = np.zeros(X_temp.shape)
-    #     X[:, 0] = X_temp[:, 1]
-    #     X[:, 1] = X_temp[:, 0]
-    #     mask = np.zeros((shape[2], shape[1]))
-    #     for k in range(len(X)):
-    #         mask[int(X[k][0]), int(X[k][1])] = 1
-    #     kernel = np.reshape([1, 1, 1, 1, 1, 1, 1, 1, 1], (3, 3))
-    #     boundaries = mask - erosion(mask, kernel)
-    #     bd_labeled = label(boundaries)
-    #     idx = get_indices_sparse(bd_labeled)
-    #     for id in range(1, len(idx)):
-    #         bd_shape += idx[id][0].shape[0]
-    #     bd_x = np.hstack((idx[j][0] for j in range(1, len(idx))))
-    #     bd_y = np.hstack((idx[j][1] for j in range(1, len(idx))))
-    #     #vesicle_sup = np.dstack((bd_x, bd_y))
-
-    #     [center, evecs, radii] = ef.ellipse_fit(bd_x, bd_y, Zc)
-    #     if if_normal(radii):
-    #         info_sup = {'name':'vesicle_'+str(i+len(vesicle_list)), 'center':center.tolist(), 'radii':radii.tolist(), 'evecs':evecs.tolist()}
-    #         #sup_results.append(info_sup)
-    #         results.append(info_sup)
-    #         c = np.delete(center, 0)
-    #         c[0], c[1] = c[1], c[0]
-    #         if Check(CH, len(CH), c):
-    #             #sup_results_in.append(info_sup)
-    #             results_in.append(info_sup)
-    #             print('in vesicle {}'.format(i+len(vesicle_list)))
-    #             in_count = in_count + 1
-    #             sup_in_count = sup_in_count + 1
-    #     else:
-    #         print('bad vesicle {}'.format(i+len(vesicle_list)))
-    # '''    
-    # return vesicle information dict and save as json
     vesicle_info={'vesicles':results}
     #in_vesicle_info={'vesicles':results_in}
 
