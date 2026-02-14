@@ -22,18 +22,16 @@ conda env create -f environment.yml
 conda activate segVesicle
 ```
 
-3. `Vesicle3D` relies on tensorflow-gpu2, the specific version of `tensorflow-gpu` should be determined by the version of `cuda` . For the correspondence, see https://www.tensorflow.org/install/source?hl=en#gpu. For example, if you use `cuda-11.2`, `tensorflow-gpu` 2.5.0 to 2.11.0 is ok. `cudnn` with proper version should also be installed. 
+3. Proper version of `cuda` and `cudnn` should be installed. For specific correspondence, see https://www.tensorflow.org/install/source?hl=en#gpu.
 
-```bash
-pip install tensorflow-gpu==2.x.x
-```
 
 4. Add environment variables
 
 ```bash
+# IsoNet
 export PATH=PATH_TO_ISONET_FOLDER/bin:$PATH 
 export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_ISONET_FOLDER:$PYTHONPATH
-
+# Vesicle3D
 export PATH=PATH_TO_SEGVESICLE_FOLDER/bin:$PATH
 export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_SEGVESICLE_FOLDER:$PYTHONPATH
 ```
