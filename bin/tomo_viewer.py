@@ -39,6 +39,7 @@ from util.predict_vesicle import predict_label, morph_process, vesicle_measure, 
 from util.resample import resample_image
 from util.json2xlsx import json_to_excel
 from util.io import get_tomo
+from util.export_excel import export_final_execl
 from widget.function_widget import ToolbarWidget
 
 
@@ -94,7 +95,8 @@ class TomoViewer:
         # self.register_analyze_by_volume()
         # self.register_show_single_vesicle()
         # self.register_fix_fn_vesicle()
-        self.register_xport_wd_excel()
+        # self.register_xport_wd_excel()
+        self.register_export_final_excel()
         try:
             self.toolbar_widget.finish_isonet_button.clicked.disconnect()
         except TypeError:
@@ -965,6 +967,15 @@ class TomoViewer:
     def register_distance_calc(self):
         
         def distance_calculation():
+            fit_reply = QMessageBox.question(
+                self.main_viewer,
+                "fit_radius_2D",
+                "Do you want to do fit_radius_2D?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            fit_2d = fit_reply == QMessageBox.Yes
+
             # Define the file paths
             json_path = self.tomo_path_and_stage.new_json_file_path
             mod_path = self.tomo_path_and_stage.memb_result_path
@@ -978,7 +989,14 @@ class TomoViewer:
             xml_output_path = self.tomo_path_and_stage.ori_xml_path
 
             # Call the distance_calc function, passing the paths and a print function
-            distance_calc(json_path, mod_path, xml_output_path, self.print)
+            distance_calc(
+                json_path,
+                mod_path,
+                xml_output_path,
+                self.print,
+                fit_2d=fit_2d,
+                mrc_path=self.tomo_path_and_stage.isonet_tomo_path,
+            )
 
         
         try:
@@ -1274,6 +1292,24 @@ class TomoViewer:
             lambda: export_wd_excel(self.tomo_path_and_stage, self.print)
         )
         
+    def register_export_final_excel(self):
+        try:
+            self.toolbar_widget.export_final_excel_button.clicked.disconnect()
+        except TypeError:
+            pass
+        def choose_use2d_and_export():
+            reply = QMessageBox.question(
+                self.main_viewer,
+                "Export Folder Excel",
+                "Use 2D distance and projection?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            use2d = reply == QMessageBox.Yes
+            export_final_execl(self.tomo_path_and_stage, self.print, use2D=use2d)
+        self.toolbar_widget.export_final_excel_button.clicked.connect(
+            choose_use2d_and_export
+        )
         
         
     # def register_fix_fn_vesicle(self):

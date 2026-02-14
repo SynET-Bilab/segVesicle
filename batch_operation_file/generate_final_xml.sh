@@ -34,15 +34,21 @@ for folder in */ ; do
 
     # Define the class XML path
     class_xml_path="${CURRENT_PATH}/${tomo_name}/ves_seg/vesicle_analysis/${base_tomo_name}_vesicle_class.xml"
+    ori_final_xml_path="${CURRENT_PATH}/${tomo_name}/ves_seg/vesicle_analysis/${base_tomo_name}.xml"
+    bak_final_xml_path="${CURRENT_PATH}/${tomo_name}/ves_seg/vesicle_analysis/${base_tomo_name}.xml.bak"
 
     # Check if the class XML file exists
     if [[ -f "$class_xml_path" ]]; then
         # Call the Python script to process the XML
+        if [[ -f "$ori_final_xml_path" ]]; then
+            mv "$ori_final_xml_path" "$bak_final_xml_path"
+        fi
+
         echo "Processing $class_xml_path with original pixel size $ORIGINAL_PIXEL_SIZE"
-        python /share/data/CryoET_Data/software/segVesicle/bin/util/generate_xml.py "$class_xml_path" "$ORIGINAL_PIXEL_SIZE"
-    else
-        echo "Warning: $class_xml_path does not exist, skipping."
+        generate_xml.py "$class_xml_path" "$ORIGINAL_PIXEL_SIZE"
+    # else
+    #     echo "Warning: $class_xml_path does not exist, skipping."
     fi
 done
 
-echo "All processing complete."e
+echo "All processing complete."

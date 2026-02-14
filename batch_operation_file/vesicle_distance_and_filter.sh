@@ -20,6 +20,8 @@ current_path=$(pwd)
 
 # Define distance_nm, can be passed via SBATCH parameter or set here
 distance_nm=${distance_nm:-50}  # Default to 50 if not passed
+# Enable 2D fitting when fit_2d is set to true
+fit_2d=${fit_2d:-true}
 
 # Define the path for segVesicle_heart_broken.json
 heart_broken_json="$current_path/segVesicle_heart_broken.json"
@@ -77,7 +79,12 @@ for tomo_dir in "$current_path"/*/; do
     fi
 
     # Call the Python script for processing
-    python /share/data/CryoET_Data/software/segVesicle/bin/vesicle_distance_and_filter.py --json_path "$json_path" --mod_path "$mod_path" --xml_output_path "$xml_output_path" --filter_xml_path "$filter_xml_path" --distance_nm "$distance_nm" --isonet_tomo_path "$isonet_tomo_path"
+    fit_2d_flag=""
+    if [ "$fit_2d" = true ]; then
+        fit_2d_flag="--fit_2d"
+    fi
+
+    python /share/data/CryoET_Data/software/segVesicle/bin/vesicle_distance_and_filter.py --json_path "$json_path" --mod_path "$mod_path" --xml_output_path "$xml_output_path" --filter_xml_path "$filter_xml_path" --distance_nm "$distance_nm" --isonet_tomo_path "$isonet_tomo_path" $fit_2d_flag
 
     # Check if the Python script executed successfully
     if [ $? -ne 0 ]; then
@@ -86,4 +93,3 @@ for tomo_dir in "$current_path"/*/; do
         echo "Successfully processed $tomo_name."
     fi
 done
-

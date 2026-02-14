@@ -1,6 +1,8 @@
 import os
 import re
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import numpy as np
 import mrcfile
 
@@ -27,6 +29,7 @@ def distance_calc(
     fit_2d: bool = False,
     mrc_path: str = None,
     img_output_path: str = None,
+    num_workers: int = None,
 ):
     try:
         ori_pix_size = 1.714
@@ -165,9 +168,10 @@ def distance_calc(
             mean_value = mrc_data.mean()
             data_pad = np.pad(mrc_data, padwidth, mode='constant', constant_values=mean_value)
 
-            for i in tqdm(range(len(vl))):
-                center = np.round(vl[i].getCenter()).astype(np.uint16)
-                radius = vl[i].getRadius().mean()
+            def _fit_single_vesicle(i: int) -> None:
+                vesicle = vl[i]
+                center = np.round(vesicle.getCenter()).astype(np.uint16)
+                radius = vesicle.getRadius().mean()
                 x_init, y_init, z_init = center
                 z_range = range(z_init - 1, z_init + 2)
                 r_ma = 0
@@ -181,24 +185,24 @@ def distance_calc(
                         if r_z > r_ma:
                             r_ma = r_z
                             X, Y = evecs_fit[1, 2], evecs_fit[1, 1]
-                            phi = np.arctan2(Y, X) - np.pi/2
-                            vl[i].setCenter2D(center_fit[[2, 1, 0]] + np.array([1, 1, 1]))  # zyx to xyz
-                            vl[i].setRadius2D(np.array([radii_fit[1], radii_fit[2]]))
-                            vl[i].setRotation2D(phi)
+                            phi = np.arctan2(Y, X) - np.pi / 2
+                            vesicle.setCenter2D(center_fit[[2, 1, 0]] + np.array([1, 1, 1]))  # zyx to xyz
+                            vesicle.setRadius2D(np.array([radii_fit[1], radii_fit[2]]))
+                            vesicle.setRotation2D(phi)
 
-                radius_new = vl[i].getRadius2D().max()
-                fit_vesicle = vl[i].sample_on_vesicle(360)
+                radius_new = vesicle.getRadius2D().max()
+                fit_vesicle = vesicle.sample_on_vesicle(360)
                 shift = np.array([
-                    vl[i]._center2D[0] - radius_new - margin,
-                    vl[i]._center2D[1] - radius_new - margin,
+                    vesicle._center2D[0] - radius_new - margin,
+                    vesicle._center2D[1] - radius_new - margin,
                     fit_vesicle[:, 2].mean()
                 ])
                 fit_vesicle_shift = np.round(fit_vesicle - shift).astype(np.uint16)  # local coordinate, xyz, and z=0
 
                 img = data_pad[
-                    np.round(vl[i]._center2D[2] + padwidth - 1).astype(np.uint16),
-                    np.round(vl[i]._center2D[1] + padwidth - radius_new - margin - 1).astype(np.uint16): np.round(vl[i]._center2D[1] + padwidth + radius_new + margin - 1).astype(np.uint16),
-                    np.round(vl[i]._center2D[0] + padwidth - radius_new - margin - 1).astype(np.uint16): np.round(vl[i]._center2D[0] + padwidth + radius_new + margin - 1).astype(np.uint16)
+                    np.round(vesicle._center2D[2] + padwidth - 1).astype(np.uint16),
+                    np.round(vesicle._center2D[1] + padwidth - radius_new - margin - 1).astype(np.uint16): np.round(vesicle._center2D[1] + padwidth + radius_new + margin - 1).astype(np.uint16),
+                    np.round(vesicle._center2D[0] + padwidth - radius_new - margin - 1).astype(np.uint16): np.round(vesicle._center2D[0] + padwidth + radius_new + margin - 1).astype(np.uint16)
                 ]  # xml from 1, but array from 0
                 img_norm = normalize_scale(img)
                 out = np.array([img_norm] * 3)
@@ -213,7 +217,20 @@ def distance_calc(
                     out[1, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 255
                     out[2, fit_vesicle_shift[:, 1], fit_vesicle_shift[:, 0]] = 0
 
-                imwrite(os.path.join(img_path, '{}.tif'.format(vl[i].getId())), out, photometric='rgb')
+                imwrite(os.path.join(img_path, '{}.tif'.format(vesicle.getId())), out, photometric='rgb')
+
+            max_workers = num_workers or min(32, os.cpu_count() or 1)
+            if len(vl) == 0:
+                max_workers = 0
+
+            if max_workers <= 1:
+                for i in tqdm(range(len(vl)), desc="Fitting 2D vesicles", dynamic_ncols=True):
+                    _fit_single_vesicle(i)
+            else:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(_fit_single_vesicle, i) for i in range(len(vl))]
+                    for future in tqdm(as_completed(futures), total=len(futures), desc="Fitting 2D vesicles", dynamic_ncols=True):
+                        future.result()
 
             if 'premembrane.mod' in mod_path:
                 vl.distance_to_surface(surface, precision=360, mode='sparse', vesicle_mode='fitradius2D')
