@@ -3,7 +3,7 @@
 import mrcfile
 import numpy as np
 from skimage.morphology import dilation, cube
-from util.io import get_tomo
+from segVesicle.bin.util.io import get_tomo
 
 
 def boundary_mask(tomo, mask_boundary, pixelsize = 17.14):

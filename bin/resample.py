@@ -3,7 +3,7 @@ import numpy as np
 import mrcfile
 import fire
 from scipy.ndimage import zoom
-from util.io import get_tomo
+from segVesicle.bin.util.io import get_tomo
 
 
 
