@@ -9,14 +9,14 @@ from tensorflow.keras.utils import Sequence
 
 class DataWrapper(Sequence):
 
-   def __init__(self, X,  batch_size):
-       self.X = X
-       self.batch_size = batch_size
-   def __len__(self):
-       return int(np.ceil(len(self.X) / float(self.batch_size)))
-   def __getitem__(self, i):
-       idx = slice(i*self.batch_size,(i+1)*self.batch_size)
-       return self.X[idx]
+    def __init__(self, X,  batch_size):
+        self.X = X
+        self.batch_size = batch_size
+    def __len__(self):
+        return int(np.ceil(len(self.X) / float(self.batch_size)))
+    def __getitem__(self, i):
+        idx = slice(i*self.batch_size,(i+1)*self.batch_size)
+        return self.X[idx]
 
 def normalize(x, percentile = True, pmin=4.0, pmax=96.0, axis=None, clip=False, eps=1e-20):
     """Percentile-based image normalization."""
@@ -66,12 +66,7 @@ def gene_2d_training_data(tomo,mask,sample_mask=None,num=100,sidelen=128,neighbo
         sample_mask=np.ones(sp)
     else:
         sample_mask=sample_mask
-    # if os.path.isdir('./data'):
-    #     os.system('mv {} {}'.format('./data', './data'+'~'))
-    # os.makedirs('./data')
-    # dirs_tomake = ['train_x','train_y', 'test_x', 'test_y']
-    # for d in dirs_tomake:
-    #     os.makedirs('{}/{}'.format('./data', d))
+    
     border_slices = tuple([slice(s // 2, d - s + s // 2 + 1) for s, d in zip((neighbor_in,sidelen,sidelen), sp)])
     valid_inds = np.where(sample_mask[border_slices])
     valid_inds = [v + s.start for s, v in zip(border_slices, valid_inds)]
@@ -89,22 +84,8 @@ def gene_2d_training_data(tomo,mask,sample_mask=None,num=100,sidelen=128,neighbo
     Y_test = np.swapaxes(crop_patches(mask,seeds2,sidelen=sidelen,neighbor=neighbor_out),1,-1)
 
     print(X_train.shape)
-    # for j,s in enumerate(X_train):
-    #     with mrcfile.new('{}/train_x/{}_{:0>6d}.mrc'.format('./data', 'subtomo_x',j), overwrite=True) as output_mrc:
-    #         output_mrc.set_data(s.astype(np.float32))
-    
-    # for j,s in enumerate(Y_train):
-    #     with mrcfile.new('{}/train_y/{}_{:0>6d}.mrc'.format('./data', 'subtomo_y',j), overwrite=True) as output_mrc:
-    #         output_mrc.set_data(s) 
-
-    # for j,s in enumerate(X_test):
-    #     with mrcfile.new('{}/test_x/{}_{:0>6d}.mrc'.format('./data', 'test_x',j), overwrite=True) as output_mrc:
-    #         output_mrc.set_data(s.astype(np.float32)) 
-
-    # for j,s in enumerate(Y_test):
-    #     with mrcfile.new('{}/test_y/{}_{:0>6d}.mrc'.format('./data', 'test_y',j), overwrite=True) as output_mrc:
-    #         output_mrc.set_data(s) 
     return (X_train,Y_train), (X_test,Y_test)
+
 def crop_patches(img3D,seeds,sidelen=128,neighbor=1):
     size=len(seeds[0])
     disk_size=(neighbor,sidelen,sidelen)
@@ -154,8 +135,7 @@ class Patch:
         sp = self.sp
         half1 = (sidelen - effect_len)//2
         half2 = sidelen - effect_len - half1
-        # neighbor = self.neighbor
-        # tomo_padded = np.zeros(self.padded_dim)
+        
         tomo_padded = np.zeros((sp[0] + neighbor-neighbor%2,self.padded_dim[1],self.padded_dim[2]))
         for k in range(neighbor//2,neighbor//2+self.sp[0]):
             for i in range(n1):
@@ -163,14 +143,12 @@ class Patch:
                     one_patch = tomo_padded[ k-neighbor//2:k-neighbor//2+neighbor,
                                  i*effect_len:i * effect_len + sidelen,
                                 j*effect_len:j * effect_len + sidelen]
-                    # print('brop one_patch',one_patch.shape)
+                    
                     tomo_padded[ k-neighbor//2:k-neighbor//2+neighbor,
                                  i*effect_len + half1 :i * effect_len + sidelen - half2,
                                 j*effect_len + half1 : j * effect_len + sidelen - half2] += \
                                     patch_list[(k-neighbor//2)*n1*n2 + i*n2 + j][:,half1:-half2,half1:-half2] 
-                                    # changed the masking assignment patch size from  (neighbor,sidelen,sidelen) to (nieghbor,effective_len,effective_len)
-            # print('k and index:',k,k*n1*n2 + i*n2 + j)
-        # tomo_padded = (tomo_padded>0).astype(np.uint8)
+
         pad_len1 = (n1-1)*effect_len + sidelen - self.sp[1]
         pad_len2 = (n2-1)*effect_len + sidelen - self.sp[2]
         restored_tomo = tomo_padded[neighbor//2 : neighbor//2+self.sp[0],
@@ -179,32 +157,3 @@ class Patch:
                                 ]
 
         return restored_tomo
-'''
-def bottom_hat(tomo,disk_size=40,factor=1.0):
-    sp = tomo.shape
-    # transformed = np.zeros([1,sp[1],sp[2]])
-    # sli = tomo[108,:,:]
-    # transformed[0,:,:]  = sli - factor * closing(sli,disk(disk_size))
-    transformed = np.zeros(sp)
-    for i,sli in enumerate(tomo):
-        transformed[i,:,:] = sli - factor * closing(sli,disk(disk_size))
-        print(i)
-    transformed[0,:,:] = closing(sli,disk(disk_size)) - sli
-
-    return transformed.astype(type(tomo[0,0,0]))
-
-def bottom_hat_2d(sli,disk_size=40,factor=1.0):
-    transformed = sli - factor * closing(sli,disk(disk_size))
-    return transformed
-
-def bottom_hat_parallel(tomo,disk_size=40,factor=1.0,ncpu=8):
-    from multiprocessing import Pool
-    from functools import partial
-    sp = tomo.shape
-    slice_list  = [ tomo[i,:,:] for i in range(sp[0])]
-    func = partial(bottom_hat_2d,disk_size=40,factor=1.0)
-    with Pool(ncpu) as p:
-        transformed_list  = list(p.map(func,slice_list))
-    transformed = np.array(transformed_list)
-    return transformed.astype(type(tomo[0,0,0]))
-'''     

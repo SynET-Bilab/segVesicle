@@ -41,7 +41,6 @@ def morph_process(
     area_thre = radius**3
     # bimask = dilation(bimask, cube(2))
     labeled_pre = label(bimask)
-    sup_pro = np.zeros(labeled_pre.shape)
     pre_pro = np.zeros(labeled_pre.shape)
     idx_pre = get_indices_sparse(labeled_pre)
     num_pre = np.max(labeled_pre)
@@ -84,16 +83,8 @@ def morph_process(
     for i in tqdm(range(1, num + 1), file=sys.stdout):
         if idx[i][0].shape[0] < area_thre:
             labeled[idx[i][0], idx[i][1], idx[i][2]] = 0
-            if idx[i][0].shape[0] > 0.2 * area_thre:
-                sup_pro[idx[i][0], idx[i][1], idx[i][2]] = (
-                    1  # for very bad prediction, can only do ellipse fit
-                )
-        elif idx[i][0].shape[0] <= 2 * area_thre and idx[i][0].shape[0] > area_thre:
-            sup_pro[idx[i][0], idx[i][1], idx[i][2]] = 1
         elif idx[i][0].shape[0] > area_thre * 12:
-            post_pro[idx[i][0], idx[i][1], idx[i][2]] = (
-                1  # record positon of linked vesicles from closing, Part 2
-            )
+            post_pro[idx[i][0], idx[i][1], idx[i][2]] = 1  # record positon of linked vesicles from closing, Part 2
             labeled[idx[i][0], idx[i][1], idx[i][2]] = 0  # main vesicles here, Part 3
 
     labeled = label(labeled)  # update num of Part3
@@ -114,16 +105,6 @@ def morph_process(
     labeled_pre_pro[labeled_pre_pro == num] = 0  # update num of label for part 1
     labeled = labeled + labeled_post_pro + labeled_pre_pro
     num = np.max(labeled)
-
-    # # for supplementary proccess
-    # labeled_sup_pro = label(sup_pro)
-    # sup_filtered = (labeled_sup_pro >= 1).astype(np.uint8)
-    # #sup_boundaries = sup_filtered - erosion(sup_filtered, cube(3))
-    # sup_bd_labeled = label(sup_filtered)
-    # sup_num = np.max(sup_bd_labeled)
-    # sup_idx = get_indices_sparse(sup_bd_labeled)
-    # vesicle_list_sup = []
-    # vesicle_list_sup = [np.swapaxes(np.array(sup_idx[i]),0,1) for i in range(1, sup_num+1)]
 
     # for main vesicles
     filtered = (labeled >= 1).astype(np.uint8)
@@ -433,7 +414,6 @@ def measure_one(idx, data, vesicle_list, min_radius):
         return a
 
     [center, evecs, radii, ccf] = density_fit(data, center0, np.max(radii))
-    # [center, evecs, radii]=density_fit(data,center0,np.max(radii))
     if ccf < 0.3:  # delete wrong segments
         return
 
@@ -445,7 +425,6 @@ def measure_one(idx, data, vesicle_list, min_radius):
             "evecs": evecs.tolist(),
             "CCF": str(ccf),
         }
-        # info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
         return info
 
 
@@ -545,9 +524,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mask_file", type=str, default=None, help="the output vesicle mask file name"
     )
-    # parser.add_argument(
-    #     "--render", type=str, default=None, help="if draw fitted vesicles on a new tomo"
-    # )
     parser.add_argument(
         "--label", type=str, default=None, help="draw fitted vesicles as labels"
     )
@@ -573,7 +549,6 @@ if __name__ == "__main__":
         help="output vesicles file name (xxx.json)",
     )
 
-    # parser.add_argument('--sup',  type=str, default=True, help='whether need supplement info by ellipse fit(True or False)')
     args = parser.parse_args()
 
     # set some default files
@@ -581,14 +556,12 @@ if __name__ == "__main__":
         args.tomo_file = args.tomo + "_wbp_corrected.mrc"
     if args.mask_file is None:
         args.mask_file = args.tomo + "_segment.mrc"
-    # if args.render is None:
-    #    args.render = args.tomo + '_vesicles.mrc'
     if args.label is None:
         args.label = args.tomo + "_label_vesicle.mrc"
     if args.output_file is None:
         args.output_file = args.tomo + "_vesicle.json"
 
-    t1 = time.time()
+    # t1 = time.time()
     # save raw vesicle mask
     with mrcfile.open(args.mask_file) as m:
         bimask = m.data
@@ -612,4 +585,4 @@ if __name__ == "__main__":
         with mrcfile.new(args.label, overwrite=True) as n:
             n.set_data(ves_tomo.astype(np.int16))
 
-    print(f"morph cost {time.time()-t1} s")
+    # print(f"morph cost {time.time()-t1} s")
