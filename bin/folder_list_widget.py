@@ -186,7 +186,7 @@ class FolderListWidget(QWidget):
                     if self.heart_checkbox_states[item]:
                         heart_checkbox.setIcon(QIcon(QPixmap(self.broken_heart_icon_path)))
 
-                 # 仅传递 item 作为键
+                # 仅传递 item 作为键
                 heart_checkbox.stateChanged.connect(lambda state, item=item: self.toggle_heart_icon(state, item))
 
                 checkbox = QCheckBox()
@@ -286,11 +286,9 @@ class FolderListWidget(QWidget):
             tomo_viewer.print(f"Path {tomo_path.new_label_file_path} does not exist")
             all_paths_exist = False
 
-        if os.path.exists(tomo_path.root_dir):
-            os.system('rm -r {}'.format(tomo_path.root_dir))
-            # tomo_viewer.print(f"{tomo_path.root_dir} removed")
-        else:
-            tomo_viewer.print(f"Path {tomo_path.root_dir} does not exist")
+        cleanup_result = tomo_path.cleanup_process_temp_files()
+        for failed_path, error in cleanup_result['failed']:
+            tomo_viewer.print(f"Failed to remove temp file {failed_path}: {error}")
             all_paths_exist = False
 
         # 打印保存信息

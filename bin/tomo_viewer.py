@@ -576,7 +576,7 @@ class TomoViewer:
             # 检查点的形式
             if validate_points(points_transformed):
                 # 保存路径
-                point_file_path = os.path.join(self.tomo_path_and_stage.root_dir, 'points.point')
+                point_file_path = self.tomo_path_and_stage.point_file_path
                 # output_mod_file = os.path.join(self.tomo_path_and_stage.root_dir, 'area.mod')
                 output_mod_file = self.tomo_path_and_stage.area_path
 

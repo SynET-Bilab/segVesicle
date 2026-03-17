@@ -15,6 +15,9 @@ class TomoPathAndStage:
         self.current_path = current_path
         self.pid = pid
         self.root_dir = None
+        self.new_json_file_path = None
+        self.new_label_file_path = None
+        self.point_file_path = None
         
         # 初始化进度
         self.progress_stage = self.determine_progress()
@@ -73,6 +76,7 @@ class TomoPathAndStage:
         self.xlsx_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle.xlsx')
         self.new_json_file_path = os.path.join(self.root_dir, 'vesicle_new_{}.json'.format(self.pid))
         self.new_label_file_path = os.path.join(self.root_dir, 'label_{}.mrc'.format(self.pid))
+        self.point_file_path = os.path.join(self.root_dir, 'points_{}.point'.format(self.pid))
         self.ori_json_file_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_vesicle_ori.json')
         self.ori_label_path = os.path.join(self.current_path, tomo_name, 'ves_seg', self.base_tomo_name + '_label_vesicle_ori.mrc')
 
@@ -97,3 +101,31 @@ class TomoPathAndStage:
     def update_progress_stage(self):
         """更新进度阶段"""
         self.progress_stage = self.determine_progress()
+
+    @property
+    def process_temp_paths(self):
+        return [path for path in [
+            self.new_json_file_path,
+            self.new_label_file_path,
+            self.point_file_path,
+        ] if path]
+
+    def cleanup_process_temp_files(self):
+        cleanup_result = {
+            'removed': [],
+            'missing': [],
+            'failed': [],
+        }
+
+        for temp_path in self.process_temp_paths:
+            if not os.path.exists(temp_path):
+                cleanup_result['missing'].append(temp_path)
+                continue
+
+            try:
+                os.remove(temp_path)
+                cleanup_result['removed'].append(temp_path)
+            except OSError as error:
+                cleanup_result['failed'].append((temp_path, str(error)))
+
+        return cleanup_result
