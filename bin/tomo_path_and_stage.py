@@ -1,4 +1,7 @@
+import json
 import os
+import traceback
+from datetime import datetime, timezone
 from enum import Enum
 
 class TomoPathAndStage:
@@ -110,7 +113,45 @@ class TomoPathAndStage:
             self.point_file_path,
         ] if path]
 
-    def cleanup_process_temp_files(self):
+    def _audit_log_path(self):
+        root_dir = self.root_dir
+        if not root_dir:
+            root_dir = os.path.join(os.path.expanduser("~"), ".segvesicle")
+        return os.path.join(root_dir, "cleanup_audit.log")
+
+    def _stack_summary(self, limit=12):
+        stack = traceback.extract_stack(limit=limit)
+        # drop helper frames: _stack_summary and record_audit_event
+        stack = stack[:-2]
+        return [
+            {
+                "file": frame.filename,
+                "line": frame.lineno,
+                "function": frame.name,
+            }
+            for frame in stack
+        ]
+
+    def record_audit_event(self, source, event, details=None):
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "pid": self.pid,
+            "source": source,
+            "event": event,
+            "details": details or {},
+            "stack": self._stack_summary(),
+        }
+
+        log_path = self._audit_log_path()
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, "a", encoding="utf-8") as log_file:
+                log_file.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except OSError:
+            # Never block core workflow if audit logging fails.
+            pass
+
+    def cleanup_process_temp_files(self, source="unknown"):
         cleanup_result = {
             'removed': [],
             'missing': [],
@@ -128,4 +169,9 @@ class TomoPathAndStage:
             except OSError as error:
                 cleanup_result['failed'].append((temp_path, str(error)))
 
+        self.record_audit_event(
+            source=source,
+            event="cleanup_process_temp_files",
+            details=cleanup_result,
+        )
         return cleanup_result

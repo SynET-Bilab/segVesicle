@@ -988,15 +988,44 @@ class TomoViewer:
             
             xml_output_path = self.tomo_path_and_stage.ori_xml_path
 
-            # Call the distance_calc function, passing the paths and a print function
-            distance_calc(
-                json_path,
-                mod_path,
-                xml_output_path,
-                self.print,
-                fit_2d=fit_2d,
-                mrc_path=self.tomo_path_and_stage.isonet_tomo_path,
+            self.tomo_path_and_stage.record_audit_event(
+                source='distance_calc_button',
+                event='distance_calc_start',
+                details={
+                    'fit_2d': fit_2d,
+                    'json_path': json_path,
+                    'mod_path': mod_path,
+                    'xml_output_path': xml_output_path,
+                    'mrc_path': self.tomo_path_and_stage.isonet_tomo_path,
+                }
             )
+
+            status = 'completed'
+            error_message = None
+            try:
+                # Call the distance_calc function, passing the paths and a print function
+                distance_calc(
+                    json_path,
+                    mod_path,
+                    xml_output_path,
+                    self.print,
+                    fit_2d=fit_2d,
+                    mrc_path=self.tomo_path_and_stage.isonet_tomo_path,
+                )
+            except Exception as error:
+                status = 'exception'
+                error_message = str(error)
+                raise
+            finally:
+                self.tomo_path_and_stage.record_audit_event(
+                    source='distance_calc_button',
+                    event='distance_calc_end',
+                    details={
+                        'fit_2d': fit_2d,
+                        'status': status,
+                        'error': error_message,
+                    }
+                )
 
         
         try:

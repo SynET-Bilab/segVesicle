@@ -286,7 +286,7 @@ class FolderListWidget(QWidget):
             tomo_viewer.print(f"Path {tomo_path.new_label_file_path} does not exist")
             all_paths_exist = False
 
-        cleanup_result = tomo_path.cleanup_process_temp_files()
+        cleanup_result = tomo_path.cleanup_process_temp_files(source='switch_tomo')
         for failed_path, error in cleanup_result['failed']:
             tomo_viewer.print(f"Failed to remove temp file {failed_path}: {error}")
             all_paths_exist = False

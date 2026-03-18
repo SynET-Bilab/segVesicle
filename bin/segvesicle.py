@@ -64,7 +64,7 @@ def main():
             # 将JSON数据格式化为多行结构并保存
             with open(tomo_viewer.tomo_path_and_stage.json_file_path, 'w') as file:
                 json.dump(data, file, indent=4)
-        cleanup_result = tomo_viewer.tomo_path_and_stage.cleanup_process_temp_files()
+        cleanup_result = tomo_viewer.tomo_path_and_stage.cleanup_process_temp_files(source='app_exit')
         for failed_path, error in cleanup_result['failed']:
             print(f"Failed to remove temp file {failed_path}: {error}")
         print('! '*20)
