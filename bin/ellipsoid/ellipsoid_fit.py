@@ -5,7 +5,8 @@ from scipy.sparse import csr_matrix
 from numpy.linalg import eig, inv
 from scipy.optimize import minimize
 
-def ellipsoid_fit(X, alpha=1.5, gamma=0.1, lambda_reg=1000.0):
+
+def _ellipsoid_fit_n(X, alpha=1.5, gamma=0.1, lambda_reg=1000.0):
     
     mean = np.mean(X, axis=0)
     std = np.std(X, axis=0)
@@ -24,7 +25,7 @@ def ellipsoid_fit(X, alpha=1.5, gamma=0.1, lambda_reg=1000.0):
             [params[1], params[2], 0],
             [params[3], params[4], params[5]]
         ])
-        return L @ L.T  # 保证对称正定
+        return L @ L.T
     
     def objective(params, pts):
         center = params[:3]
@@ -105,8 +106,133 @@ def ellipsoid_fit(X, alpha=1.5, gamma=0.1, lambda_reg=1000.0):
     
     return center_orig, eigvecs, radii
 
-def ellipse_fit(x, y, Zc):
 
+# http://www.mathworks.com/matlabcentral/fileexchange/24693-ellipsoid-fit
+def _ellipsoid_fit_llsq(X):
+    x = X[:, 0]
+    y = X[:, 1]
+    z = X[:, 2]
+    D = np.array([x * x + y * y - 2 * z * z,
+                 x * x + z * z - 2 * y * y,
+                 2 * x * y,
+                 2 * x * z,
+                 2 * y * z,
+                 2 * x,
+                 2 * y,
+                 2 * z,
+                 1 - 0 * x])
+    d2 = np.array(x * x + y * y + z * z).T # rhs for LLSQ
+    u = np.linalg.solve(D.dot(D.T), D.dot(d2))
+    a = np.array([u[0] + 1 * u[1] - 1])
+    b = np.array([u[0] - 2 * u[1] - 1])
+    c = np.array([u[1] - 2 * u[0] - 1])
+    v = np.concatenate([a, b, c, u[2:]], axis=0).flatten()
+    A = np.array([[v[0], v[3], v[4], v[6]],
+                  [v[3], v[1], v[5], v[7]],
+                  [v[4], v[5], v[2], v[8]],
+                  [v[6], v[7], v[8], v[9]]])
+
+    center = np.linalg.solve(- A[:3, :3], v[6:9])
+
+    translation_matrix = np.eye(4)
+    translation_matrix[3, :3] = center.T
+
+    R = translation_matrix.dot(A).dot(translation_matrix.T)
+
+    evals, evecs = np.linalg.eig(R[:3, :3] / -R[3, 3])
+    evecs = evecs.T
+
+    radii = np.sqrt(1. / np.abs(evals))
+    radii *= np.sign(evals)
+    
+    return center, evecs, radii
+
+
+def ellipsoid_fit(  X, 
+                    alpha=0.3,
+                    n_iter=10,
+                    alpha_n=1.5,
+                    gamma=0.1,
+                    lambda_reg=1000.0,
+                    use_LLSQ_regularization=False,
+                    use_sampson_regularization=False
+                ):
+    """
+    """
+    # determine method
+    if use_sampson_regularization:
+        if use_LLSQ_regularization:
+            print('Conflicting regularization methods specified. Use Sampson regularization.')
+        return _ellipsoid_fit_n(X, alpha_n, gamma, lambda_reg)
+    
+    center0, evecs0, radii0 = _ellipsoid_fit_llsq(X)
+
+    if not use_LLSQ_regularization:
+        return center0, evecs0, radii0
+    n = len(X)
+
+    def _compute_rss(X, center, evecs, radii):
+        """
+        """
+        diff = X - center
+        cloud_r = diff @ evecs.T
+        radii_safe = np.maximum(np.abs(radii), 1e-6)
+        cloud_n = cloud_r / radii_safe
+        d = np.sqrt(np.sum(cloud_n**2, axis=1))
+        return np.mean((d - 1.0)**2)
+    
+    centroid = np.median(X, axis=0)
+    dists = np.linalg.norm(X - centroid, axis=1)
+    trim_idx = np.argsort(dists)[:int(0.8 * n)]
+    try:
+        center, evecs, radii = _ellipsoid_fit_llsq(X[trim_idx])
+    except Exception:
+        center, evecs, radii = center0, evecs0, radii0
+
+    best_center, best_evecs, best_radii = center, evecs, radii
+    best_rss = _compute_rss(X, center, evecs, radii)
+
+    for iteration in range(n_iter):
+        diff = X - center
+        cloud_r = diff @ evecs.T
+        radii_safe = np.maximum(np.abs(radii), 1e-6)
+        cloud_n = cloud_r / radii_safe
+        d = np.sqrt(np.sum(cloud_n**2, axis=1))
+        residuals = np.abs(d - 1.0)
+
+        mad = np.median(residuals)
+        
+        progress = iteration / max(n_iter - 1, 1)
+        threshold = max(alpha, mad * (5.0 - 3.0 * progress))
+
+        inlier_mask = residuals < threshold
+        n_inliers = np.sum(inlier_mask)
+
+        min_points = max(10, int(0.6 * n))
+        if n_inliers < min_points:
+            sorted_idx = np.argsort(residuals)
+            inlier_mask = np.zeros(n, dtype=bool)
+            inlier_mask[sorted_idx[:min_points]] = True
+
+        try:
+            center_new, evecs_new, radii_new = _ellipsoid_fit_llsq(X[inlier_mask])
+            if np.all(radii_new > 0) and np.all(np.isfinite(radii_new)):
+                center, evecs, radii = center_new, evecs_new, radii_new
+                rss = _compute_rss(X[inlier_mask], center, evecs, radii)
+                if rss < best_rss or iteration == 0:
+                    best_center, best_evecs, best_radii = center, evecs, radii
+                    best_rss = rss
+        except Exception:
+            pass
+
+    return best_center, best_evecs, best_radii
+
+
+def ellipse_fit(x, y, Zc):
+    """
+    ellipse fitting by least square method
+    http://nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
+    """
     x=np.array(x,dtype=np.double)
     y=np.array(y,dtype=np.double)
     x = x[:,np.newaxis]
@@ -134,7 +260,7 @@ def ellipse_fit(x, y, Zc):
 
     angle = 0.5*np.arctan(2*b/(a-c))
     evecs = np.array([[1,0,0], [0, np.cos(angle), -np.sin(angle)],[0, np.sin(angle), np.cos(angle)]])
-    #zyx.dot(mat)
+    
     return center, evecs, radii
 
 
