@@ -15,7 +15,7 @@ from key_bindings.add_del_label import add_button_and_register_add_and_delete
 from tomo_viewer import TomoViewer
 from global_vars import TOMO_NAME
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
-from util.resample import resample_image
+from util.resample_module import resample_image
 from util.io import get_tomo
 
 LABEL_START = 10000  # large enough to avoid overlap with original labe

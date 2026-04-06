@@ -36,7 +36,7 @@ from util.wd_excel_export import export_wd_excel
 from window.finetune_model_window import FinetuneModelWindow
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
-from util.resample import resample_image
+from util.resample_module import resample_image
 from util.json2xlsx import json_to_excel
 from util.io import get_tomo
 from util.export_excel import export_final_execl
