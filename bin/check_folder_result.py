@@ -15,7 +15,7 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Set, Tuple
 
 import mrcfile
 import numpy as np
@@ -66,14 +66,17 @@ def get_selected_tomos(current_path: str) -> Tuple[List[str], List[str]]:
     return selected, notes
 
 
-def parse_json_vesicles(json_file_path: str) -> Tuple[List[Tuple[int, Tuple[float, float, float]]], List[str]]:
+def parse_json_vesicles(
+    json_file_path: str,
+) -> Tuple[List[Tuple[int, Tuple[float, float, float]]], List[str], Set[int]]:
     issues: List[str] = []
     data = load_json(json_file_path)
     vesicles = data.get("vesicles", [])
     if not isinstance(vesicles, list):
-        return [], [f"json format error: 'vesicles' should be a list in {json_file_path}"]
+        return [], [f"json format error: 'vesicles' should be a list in {json_file_path}"], set()
 
     records: List[Tuple[int, Tuple[float, float, float]]] = []
+    json_ids: Set[int] = set()
     seen_ids = set()
     for idx, ves in enumerate(vesicles, start=1):
         if not isinstance(ves, dict):
@@ -93,6 +96,7 @@ def parse_json_vesicles(json_file_path: str) -> Tuple[List[Tuple[int, Tuple[floa
             issues.append(f"json duplicate vesicle id: {vesicle_id}")
             continue
         seen_ids.add(vesicle_id)
+        json_ids.add(vesicle_id)
 
         if not isinstance(center, Sequence) or len(center) < 3:
             issues.append(f"json vesicle_{vesicle_id} invalid center: {center!r}")
@@ -107,18 +111,21 @@ def parse_json_vesicles(json_file_path: str) -> Tuple[List[Tuple[int, Tuple[floa
 
         records.append((vesicle_id, (z, y, x)))
 
-    return records, issues
+    return records, issues, json_ids
 
 
-def parse_xml_vesicles(xml_file_path: str) -> Tuple[List[Tuple[int, Tuple[float, float, float]]], List[str]]:
+def parse_xml_vesicles(
+    xml_file_path: str,
+) -> Tuple[List[Tuple[int, Tuple[float, float, float]]], List[str], Set[int]]:
     issues: List[str] = []
     try:
         tree = ET.parse(xml_file_path)
         root = tree.getroot()
     except ET.ParseError as exc:
-        return [], [f"xml parse error: {xml_file_path}: {exc}"]
+        return [], [f"xml parse error: {xml_file_path}: {exc}"], set()
 
     records: List[Tuple[int, Tuple[float, float, float]]] = []
+    xml_ids: Set[int] = set()
     seen_ids = set()
     for ves in root.findall("Vesicle"):
         type_element = ves.find("Type")
@@ -139,6 +146,7 @@ def parse_xml_vesicles(xml_file_path: str) -> Tuple[List[Tuple[int, Tuple[float,
             issues.append(f"xml duplicate vesicle id: {vesicle_id}")
             continue
         seen_ids.add(vesicle_id)
+        xml_ids.add(vesicle_id)
 
         center = ves.find("Center")
         if center is None:
@@ -155,7 +163,22 @@ def parse_xml_vesicles(xml_file_path: str) -> Tuple[List[Tuple[int, Tuple[float,
 
         records.append((vesicle_id, (z, y, x)))
 
-    return records, issues
+    return records, issues, xml_ids
+
+
+def parse_label_ids(label_data: np.ndarray) -> Tuple[Set[int], List[str]]:
+    issues: List[str] = []
+    label_ids: Set[int] = set()
+    for value in np.unique(label_data):
+        fv = float(value)
+        if np.isclose(fv, 0.0):
+            continue
+        iv = int(np.rint(fv))
+        if not np.isclose(fv, float(iv)):
+            issues.append(f"label contains non-integer value: {fv}")
+            continue
+        label_ids.add(iv)
+    return label_ids, issues
 
 
 def get_label_value(label_data: np.ndarray, z: int, y: int, x: int) -> Tuple[int, str]:
@@ -182,6 +205,16 @@ def check_records_against_label(
             issues.append(
                 f"{source_name} vesicle_{vesicle_id}: label[{zi},{yi},{xi}]={label_value}, expected {vesicle_id}"
             )
+    return issues
+
+
+def check_label_id_coverage(label_ids: Set[int], json_ids: Set[int], xml_ids: Set[int]) -> List[str]:
+    issues: List[str] = []
+    for vid in sorted(label_ids):
+        if vid not in json_ids:
+            issues.append(f"label id {vid} missing in json ids")
+        if vid not in xml_ids:
+            issues.append(f"label id {vid} missing in xml ids")
     return issues
 
 
@@ -226,18 +259,24 @@ def check_one_tomo(current_path: str, tomo_name: str) -> Dict[str, object]:
             "issues": [f"label mrc is not 3D: {label_path}, ndim={label_data.ndim}"],
         }
 
-    json_records, json_parse_issues = parse_json_vesicles(json_file_path)
-    xml_records, xml_parse_issues = parse_xml_vesicles(class_xml_path)
+    json_records, json_parse_issues, json_ids = parse_json_vesicles(json_file_path)
+    xml_records, xml_parse_issues, xml_ids = parse_xml_vesicles(class_xml_path)
+    label_ids, label_id_parse_issues = parse_label_ids(label_data)
     issues.extend(json_parse_issues)
     issues.extend(xml_parse_issues)
+    issues.extend(label_id_parse_issues)
 
     issues.extend(check_records_against_label(json_records, label_data, "json"))
     issues.extend(check_records_against_label(xml_records, label_data, "xml"))
+    issues.extend(check_label_id_coverage(label_ids, json_ids, xml_ids))
 
     return {
         "tomo_name": tomo_name,
         "ok": len(issues) == 0,
         "issues": issues,
+        "num_label_ids_nonzero": len(label_ids),
+        "num_json_ids": len(json_ids),
+        "num_xml_ids_non_pit": len(xml_ids),
         "num_json_records": len(json_records),
         "num_xml_records_non_pit": len(xml_records),
     }
@@ -271,7 +310,11 @@ def run(current_path: str, max_issues: int, only_failed: bool) -> int:
             if not only_failed:
                 print(
                     f"[PASS] {tomo_name} "
-                    f"(json={result.get('num_json_records', 0)}, xml_non_pit={result.get('num_xml_records_non_pit', 0)})"
+                    f"(label_ids={result.get('num_label_ids_nonzero', 0)}, "
+                    f"json_ids={result.get('num_json_ids', 0)}, "
+                    f"xml_ids_non_pit={result.get('num_xml_ids_non_pit', 0)}, "
+                    f"json_records={result.get('num_json_records', 0)}, "
+                    f"xml_records_non_pit={result.get('num_xml_records_non_pit', 0)})"
                 )
             continue
 
