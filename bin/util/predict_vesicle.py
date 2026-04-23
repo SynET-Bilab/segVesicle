@@ -224,7 +224,7 @@ def measure_one(idx,data,vesicle_list,min_radius):
         return
 
     if if_normal(radii):
-        info={'name':'vesicle_'+str(idx),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
+        info={'name':'vesicle_'+str(idx + 1),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist(), 'CCF':str(ccf)}
         #info={'name':'vesicle_'+str(i),'center':center.tolist(),'radii':radii.tolist(),'evecs':evecs.tolist()}
         return info
 
