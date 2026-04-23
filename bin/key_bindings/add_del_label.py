@@ -4,11 +4,13 @@ import mrcfile
 import threading
 import numpy as np
 import queue
+import tempfile
+import traceback
+import re
 
 from qtpy.QtCore import QObject
 from qtpy.QtGui import QTextCursor
 from skimage.morphology import closing, cube
-from scipy.spatial import KDTree
 from napari.utils.notifications import show_info
 from napari.resources import ICONS
 # from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
@@ -32,6 +34,7 @@ tomo_path = None
 # 全局任务队列和锁
 task_queue = queue.Queue()
 lock = threading.Lock()
+VESICLE_NAME_PATTERN = re.compile(r"^vesicle_(\d+)$")
 
 # 处理队列中的任务
 def process_queue():
@@ -39,6 +42,9 @@ def process_queue():
         func, args = task_queue.get()
         try:
             func(*args)
+        except Exception:
+            print(f"[add_del_label] Queued task {func.__name__} failed")
+            traceback.print_exc()
         finally:
             task_queue.task_done()
 
@@ -130,42 +136,83 @@ def save_label_layer(tomo_viewer, layer_idx):
 
 def get_info_from_json(json_file):
     with open(json_file, "r") as f:
-        vesicles = json.load(f)['vesicles']
-    centers = []
-    for vesicle in vesicles:
-        centers.append(vesicle['center'])
-    centers = np.asarray(centers)
-    
-    # 如果 centers 为空，则初始化为一个形状为 (0, 3) 的二维数组
-    if centers.size == 0:
-        centers = np.empty((0, 3))
-        tree = KDTree(np.empty((0, 3)))  # 创建一个空的 KDTree
-    else:
-        tree = KDTree(centers, leafsize=2)
-    return vesicles, tree
+        info = json.load(f)
+    if not isinstance(info, dict):
+        raise ValueError("JSON root must be an object.")
+    vesicles = info.get('vesicles', [])
+    if not isinstance(vesicles, list):
+        raise ValueError("'vesicles' must be a list in JSON.")
+    return info
 
-def update_json_file(tomo_viewer, points, mode, vesicle_to_add):
+def atomic_write_json(json_file, data):
+    json_dir = os.path.dirname(json_file) or '.'
+    fd, tmp_path = tempfile.mkstemp(dir=json_dir, prefix='tmp_vesicle_', suffix='.json')
+    try:
+        with os.fdopen(fd, "w", encoding='utf-8') as out:
+            json.dump(data, out)
+        os.replace(tmp_path, json_file)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+def parse_vesicle_id(vesicle):
+    name = vesicle.get('name', '')
+    if not isinstance(name, str):
+        return None
+    match = VESICLE_NAME_PATTERN.match(name)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+def update_json_file(tomo_viewer, mode, vesicle_to_add=None, delete_label_ids=None):
     json_file = tomo_viewer.tomo_path_and_stage.new_json_file_path
-    vesicles, tree = get_info_from_json(json_file)
+    info = get_info_from_json(json_file)
+    vesicles = info.get('vesicles', [])
+    result = {
+        'removed_count': 0,
+        'invalid_name_count': 0,
+        'unmatched_ids': [],
+    }
+
     if mode == 'Deleted':
-        # 首先计算出所有要删除的索引
-        delete_indices = []
-        for point in points:
-            delete_idx = tree.query(point.reshape(1, -1), k=1)[1][0]
-            delete_indices.append(delete_idx)
-        
-        # 对删除索引进行逆序排列
-        delete_indices.sort(reverse=True)
-        
-        # 按逆序删除元素
-        for delete_idx in delete_indices:
-            vesicles.pop(delete_idx)
+        delete_ids = set(int(i) for i in (delete_label_ids or []) if int(i) > 0)
+        if delete_ids:
+            filtered_vesicles = []
+            removed_ids = set()
+            for vesicle in vesicles:
+                vesicle_id = parse_vesicle_id(vesicle)
+                if vesicle_id is None:
+                    result['invalid_name_count'] += 1
+                    filtered_vesicles.append(vesicle)
+                    continue
+                if vesicle_id in delete_ids:
+                    removed_ids.add(vesicle_id)
+                    result['removed_count'] += 1
+                    continue
+                filtered_vesicles.append(vesicle)
+            vesicles = filtered_vesicles
+            result['unmatched_ids'] = sorted(delete_ids - removed_ids)
 
     elif mode == 'Added':
         vesicles.append(vesicle_to_add)
-    vesicle_info = {'vesicles': vesicles}
-    with open(json_file, "w", encoding='utf-8') as out:
-        json.dump(vesicle_info, out)
+
+    info['vesicles'] = vesicles
+    atomic_write_json(json_file, info)
+    return result
+
+def get_delete_label_ids(label_data, points):
+    delete_label_ids = set()
+    out_of_bounds_count = 0
+    for point in points:
+        z, y, x = [int(np.rint(v)) for v in point[:3]]
+        if z < 0 or y < 0 or x < 0 or z >= label_data.shape[0] or y >= label_data.shape[1] or x >= label_data.shape[2]:
+            out_of_bounds_count += 1
+            continue
+        label_num = int(label_data[z, y, x])
+        if label_num > 0:
+            delete_label_ids.add(label_num)
+    return sorted(delete_label_ids), out_of_bounds_count
 
 def add_vesicle_show(tomo_viewer, point, add_mode):
     viewer = tomo_viewer.viewer
@@ -204,13 +251,65 @@ def save_and_update_delete(tomo_viewer):
                 tomo_viewer.print('Please pick a point to delete')
             else:
                 points = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Deleted')
-                for point in points:
-                    delete_picked_vesicle(tomo_viewer, point)
-                viewer.layers[POINT_LAYER_IDX].data = None
-                save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-                update_json_file(tomo_viewer, points, mode='Deleted', vesicle_to_add=None)
-                # tomo_viewer._save_history()
-                tomo_viewer.print('Successfully deleted Vesicles')
+                label_layer = viewer.layers[LABEL_LAYER_IDX]
+                label_before = np.asarray(label_layer.data).copy()
+                points_backup = np.asarray(points).copy()
+                delete_label_ids, out_of_bounds_count = get_delete_label_ids(label_before, points)
+                if len(delete_label_ids) == 0:
+                    viewer.layers[POINT_LAYER_IDX].data = None
+                    msg = 'No valid vesicle labels selected for deletion'
+                    if out_of_bounds_count > 0:
+                        msg = f'{msg} (out-of-bounds points: {out_of_bounds_count})'
+                    show_info(msg)
+                    tomo_viewer.print(msg)
+                    return
+
+                json_file = tomo_viewer.tomo_path_and_stage.new_json_file_path
+                json_before = get_info_from_json(json_file)
+                label_after = label_before.copy()
+                label_after[np.isin(label_after, delete_label_ids)] = 0
+
+                try:
+                    json_result = update_json_file(
+                        tomo_viewer,
+                        mode='Deleted',
+                        vesicle_to_add=None,
+                        delete_label_ids=delete_label_ids,
+                    )
+                    label_layer.data = label_after
+                    label_layer.refresh()
+                    save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+                    viewer.layers[POINT_LAYER_IDX].data = None
+
+                    summary = (
+                        f"Successfully deleted vesicles. points={len(points)}, "
+                        f"unique_ids={len(delete_label_ids)}, json_removed={json_result['removed_count']}"
+                    )
+                    if json_result['invalid_name_count'] > 0:
+                        summary = f"{summary}, invalid_json_names={json_result['invalid_name_count']}"
+                    if len(json_result['unmatched_ids']) > 0:
+                        summary = f"{summary}, unmatched_ids={json_result['unmatched_ids']}"
+                    if out_of_bounds_count > 0:
+                        summary = f"{summary}, out_of_bounds_points={out_of_bounds_count}"
+                    tomo_viewer.print(summary)
+                except Exception as exc:
+                    rollback_issues = []
+                    try:
+                        label_layer.data = label_before
+                        label_layer.refresh()
+                        save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
+                    except Exception as rollback_exc:
+                        rollback_issues.append(f"label rollback failed: {rollback_exc}")
+                    try:
+                        atomic_write_json(json_file, json_before)
+                    except Exception as rollback_exc:
+                        rollback_issues.append(f"json rollback failed: {rollback_exc}")
+                    viewer.layers[POINT_LAYER_IDX].data = points_backup
+                    err_msg = f'Delete failed and was reverted: {exc}'
+                    if rollback_issues:
+                        err_msg = f"{err_msg}. {'; '.join(rollback_issues)}"
+                    show_info(err_msg)
+                    tomo_viewer.print(err_msg)
         else:
             viewer.layers[POINT_LAYER_IDX].data = None
             tomo_viewer.print('Please Make Predict or Start Manual Correction')
@@ -252,7 +351,7 @@ def save_and_update_add(tomo_viewer):
                 add_picked_vesicle(tomo_viewer, data_to_add)
                 viewer.layers[POINT_LAYER_IDX].data = None
                 save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-                update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+                update_json_file(tomo_viewer, mode='Added', vesicle_to_add=new_added_vesicle[0])
                 # tomo_viewer._save_history()
                 tomo_viewer.print('Successfully added 3d Vesicle')
 
@@ -266,12 +365,13 @@ def save_and_update_add_2d(tomo_viewer):
             point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added')
             data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='2d')
             if new_added_vesicle is None:
+                viewer.layers[POINT_LAYER_IDX].data = None
                 tomo_viewer.print('Not a good 2d Vesicle, please reselect')
             else:
                 add_picked_vesicle(tomo_viewer, data_to_add)
                 viewer.layers[POINT_LAYER_IDX].data = None
                 save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-                update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+                update_json_file(tomo_viewer, mode='Added', vesicle_to_add=new_added_vesicle[0])
                 # tomo_viewer._save_history()
                 tomo_viewer.print('Successfully added 2d Vesicle')
 
@@ -285,12 +385,13 @@ def save_and_update_add_6pts(tomo_viewer):
             point = save_point_layer(tomo_viewer, POINT_LAYER_IDX, mode='Added_6pts')
             data_to_add, new_added_vesicle = add_vesicle_show(tomo_viewer, point, add_mode='6pts')
             if new_added_vesicle is None:
+                viewer.layers[POINT_LAYER_IDX].data = None
                 tomo_viewer.print('Not a good 2d Vesicle, please reselect')
             else:
                 add_picked_vesicle(tomo_viewer, data_to_add)
                 viewer.layers[POINT_LAYER_IDX].data = None
                 save_label_layer(tomo_viewer, LABEL_LAYER_IDX)
-                update_json_file(tomo_viewer, point, mode='Added', vesicle_to_add=new_added_vesicle[0])
+                update_json_file(tomo_viewer, mode='Added', vesicle_to_add=new_added_vesicle[0])
                 # tomo_viewer._save_history()
                 tomo_viewer.print('Successfully added 2d Vesicle')
 
@@ -316,7 +417,7 @@ def register_save_shortcut_add_6pts(tomo_viewer):
     def save_point_image(viewer):
         save_and_update_add_6pts_with_queue(tomo_viewer)
     add_6pts_button = create_button(viewer, 'Add 6pts label (Shortcut: h)', 'polygon_lasso', 'yellow', 2)
-    add_6pts_button.clicked.connect(lambda: threading.Thread(target=save_and_update_add_6pts, args=(tomo_viewer,)).start())
+    add_6pts_button.clicked.connect(lambda: save_point_image(viewer))
 
 def create_button(viewer, label, icon_key, icon_color, position):
     from napari._qt.widgets.qt_viewer_buttons import QtViewerPushButton
