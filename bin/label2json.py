@@ -130,17 +130,19 @@ if __name__ == "__main__":
     with mrcfile.open(label_path) as m:
         labeldata = m.data.astype(np.int16)
 
-    # 如果备份的 MRC 文件不存在，则备份原始的 MRC 文件
-    backup_mrcfile = label_path.replace(".mrc", "_bak.mrc")
-    if not os.path.exists(backup_mrcfile):
-        os.system(f'mv {label_path} {backup_mrcfile}')
+    # only if u use the lodest version of vesicle 3d, you can use the following code to update the mrc file, otherwise, you can skip this step
+    # # 如果备份的 MRC 文件不存在，则备份原始的 MRC 文件
+    # backup_mrcfile = label_path.replace(".mrc", "_bak.mrc")
+    # if not os.path.exists(backup_mrcfile):
+    #     os.system(f'mv {label_path} {backup_mrcfile}')
 
-    # 更新并保存新的 MRC 数据
-    label_data = update_mrc(labeldata).astype(np.int16)
-    with mrcfile.new(label_path, overwrite=True) as m:
-        m.set_data(label_data.astype(np.int16))
+    # # 更新并保存新的 MRC 数据
+    # label_data = update_mrc(labeldata).astype(np.int16)
+    # with mrcfile.new(label_path, overwrite=True) as m:
+    #     m.set_data(label_data.astype(np.int16))
 
     # 生成 json 文件
     t1 = time.time()
-    vesicle_info = labels2json(label_data, args.jsonfile)
+    vesicle_info = labels2json(labeldata, args.jsonfile)
+    # vesicle_info = labels2json(label_data, args.jsonfile)
     print(f'done json generating, cost {time.time() - t1} s')
