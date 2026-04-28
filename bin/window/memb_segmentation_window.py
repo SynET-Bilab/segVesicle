@@ -52,8 +52,8 @@ class MembSegmentationWindow(QMainWindow):
 
         # Pixel size 输入
         self.pixel_size_input = QLineEdit(self)
-        self.pixel_size_input.setPlaceholderText("Enter pixel size (default: Read from the header of tomo)")
-        self.form_layout.addRow(QLabel("Pixel Size:"), self.pixel_size_input)
+        self.pixel_size_input.setPlaceholderText("Enter pixel size in Å (default: read from tomo header)")
+        self.form_layout.addRow(QLabel("Pixel Size (Å):"), self.pixel_size_input)
 
         # Extend 输入
         self.extend_input = QLineEdit(self)

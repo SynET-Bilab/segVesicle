@@ -45,6 +45,7 @@ class ToolbarWidget(QWidget):
         # # Create layout for the Memb tab and add buttons
         self.memb_layout = QVBoxLayout()
         self.memb_tab.setLayout(self.memb_layout)
+        self.check_memb_area_mod_points_button = self.add_button(self.memb_layout, "Check Area Mod Points")
         self.draw_memb_button = self.add_button(self.memb_layout, "Draw Membrane Area Mod")
         self.stsyseg_button = self.add_button(self.memb_layout, "Stsyseg")
         self.visualize_button = self.add_button(self.memb_layout, "Visualize")

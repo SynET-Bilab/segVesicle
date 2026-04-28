@@ -20,7 +20,7 @@ from pathlib import Path
 
 from three_orthos_viewer import CrossWidget, MultipleViewerWidget
 from tomo_path_and_stage import TomoPathAndStage
-from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox, QRadioButton
+from qtpy.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QPushButton, QLineEdit, QLabel, QHBoxLayout, QMessageBox, QRadioButton, QCheckBox, QDialogButtonBox
 
 from util.distance_calculator import distance_calc
 # from window.vesicle_window import VesicleViewer
@@ -114,6 +114,12 @@ class TomoViewer:
         except TypeError:
             pass
         self.toolbar_widget.draw_memb_button.clicked.connect(self.register_draw_memb_mod)
+
+        try:
+            self.toolbar_widget.check_memb_area_mod_points_button.clicked.disconnect()
+        except TypeError:
+            pass
+        self.toolbar_widget.check_memb_area_mod_points_button.clicked.connect(self.check_memb_area_mod_points)
         
         try:
             self.toolbar_widget.visualize_button.clicked.disconnect()
@@ -383,6 +389,63 @@ class TomoViewer:
         
         self.toolbar_widget.export_xlsx_button.clicked.connect(export_xlsx)
     
+    def _validate_memb_area_mod_points(self, points, print_errors=True):
+        if points is None or len(points) == 0:
+            if print_errors:
+                self.print("Error: No points found in 'edit vesicles'.")
+            return None
+
+        # Points from napari are in (z, y, x). The membrane area prompt requires
+        # one z plane with a single point and at least three z planes with contours.
+        z_groups = {}
+        for point in points:
+            z = point[0]
+            if z not in z_groups:
+                z_groups[z] = []
+            z_groups[z].append(point)
+
+        z_summary = ", ".join(
+            f"z={z:g}: {len(group)} point(s)"
+            for z, group in sorted(z_groups.items())
+        )
+
+        if len(z_groups) < 4:
+            if print_errors:
+                self.print(
+                    "Error: Points must be distributed across at least four distinct Z-axes. "
+                    f"Current: {z_summary}"
+                )
+            return None
+
+        single_point_z_count = 0
+        multi_point_z_count = 0
+        for group in z_groups.values():
+            if len(group) == 1:
+                single_point_z_count += 1
+            elif len(group) > 1:
+                multi_point_z_count += 1
+
+        if single_point_z_count != 1 or multi_point_z_count < 3:
+            if print_errors:
+                self.print(
+                    "Error: There must be exactly one Z-axis with a single point "
+                    "and at least three Z-axes with more than one point. "
+                    f"Current: {z_summary}"
+                )
+            return None
+
+        if print_errors:
+            self.print(f"Area mod points are valid. Current: {z_summary}")
+        return z_groups
+
+    def check_memb_area_mod_points(self):
+        if 'edit vesicles' not in self.viewer.layers:
+            self.print("Error: 'edit vesicles' layer not found.")
+            return
+
+        points = self.viewer.layers['edit vesicles'].data
+        self._validate_memb_area_mod_points(points)
+
     def register_draw_memb_mod(self):
         # 保存为临时点文件并转换为 .mod 文件
         def write_model(model_file, model_df):
@@ -405,41 +468,14 @@ class TomoViewer:
                 cmd = f"point2model -op {point_file} {model_file} >/dev/null"
                 subprocess.run(cmd, shell=True, check=True)
 
-        def validate_points(points):
-            """ 验证点是否满足要求 """
-            # 按照 z 轴分组
-            z_groups = {}
-            for point in points:
-                z = point[0]
-                if z not in z_groups:
-                    z_groups[z] = []
-                z_groups[z].append(point)
-
-            # 检查是否有四个不同的 z 轴
-            if len(z_groups) != 4:
-                self.print("Error: Points must be distributed across exactly four distinct Z-axes.")
-                return None
-
-            # 检查其中一个 z 轴上只有一个点，其他三个 z 轴上点的数量大于一个
-            single_point_z_count = 0
-            multi_point_z_count = 0
-            for group in z_groups.values():
-                if len(group) == 1:
-                    single_point_z_count += 1
-                elif len(group) > 1:
-                    multi_point_z_count += 1
-
-            if single_point_z_count != 1 or multi_point_z_count != 3:
-                self.print("Error: There must be exactly one Z-axis with a single point and three Z-axes with more than one point.")
-                return None
-
-            return z_groups
-
         # 获取点数据
+        if 'edit vesicles' not in self.viewer.layers:
+            self.print("Error: 'edit vesicles' layer not found.")
+            return
         points = self.viewer.layers['edit vesicles'].data
 
         # 验证点数据是否符合要求
-        z_groups = validate_points(points)
+        z_groups = self._validate_memb_area_mod_points(points)
 
         # 如果验证不通过，直接退出并清空点数据
         if z_groups is None:
@@ -448,11 +484,11 @@ class TomoViewer:
 
         # 准备保存的点数据
         data = []
-        # 创建 object1 并添加三个 contour
+        # 创建 object1 并添加所有多点 z 平面的 contour
         object_id = 1
         contour_count = 0
         for z, group in z_groups.items():
-            if len(group) > 1 and contour_count < 3:
+            if len(group) > 1:
                 for point in group:
                     # object_id, contour_id, x, y, z (1-based for object and contour)
                     data.append([object_id, contour_count + 1, point[2], point[1], point[0]])
@@ -967,14 +1003,23 @@ class TomoViewer:
     def register_distance_calc(self):
         
         def distance_calculation():
-            fit_reply = QMessageBox.question(
-                self.main_viewer,
-                "fit_radius_2D",
-                "Do you want to do fit_radius_2D?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            fit_2d = fit_reply == QMessageBox.Yes
+            dialog = QDialog(self.main_viewer)
+            dialog.setWindowTitle("Calculate Vesicle to Membrane Distance")
+            layout = QVBoxLayout(dialog)
+
+            fit_2d_checkbox = QCheckBox("fit_radius_2D")
+            fit_2d_checkbox.setChecked(False)
+            layout.addWidget(fit_2d_checkbox)
+
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+
+            if dialog.exec_() != QDialog.Accepted:
+                self.print("Distance calculation canceled.")
+                return
+            fit_2d = fit_2d_checkbox.isChecked()
 
             # Define the file paths
             json_path = self.tomo_path_and_stage.new_json_file_path

@@ -109,7 +109,7 @@ def filter_vesicles_and_extract(
             if distance * pixel_size < distance_nm:
                 type_elem = vesicle.find('Type')
                 if type_elem is not None and type_elem.attrib.get('t') == 'vesicle':
-                    type_elem.set('t', 'others')
+                    type_elem.set('t', 'tether')
 
         tree.write(filter_xml_path, encoding='utf-8', xml_declaration=False)
         print_func(f"Filtered vesicle XML successfully saved: {filter_xml_path}")
@@ -131,7 +131,7 @@ def filter_vesicles_and_extract(
 
         for vesicle in filtered_vesicles:
             type_elem = vesicle.find('Type')
-            if type_elem is not None and type_elem.attrib.get('t') == 'others':
+            if type_elem is not None and type_elem.attrib.get('t') == 'tether':
                 vesicle_id = vesicle.attrib['vesicleId']
                 center = vesicle.find('Center')
                 x = int(round(float(center.attrib['X'])))
@@ -215,14 +215,14 @@ class DistanceFilterWindow(QDialog):
             tree = ET.parse(self.tomo_viewer.tomo_path_and_stage.ori_xml_path)
             root = tree.getroot()
             
-            # 筛选距离小于指定距离的囊泡，并将其类型改为 'others'
+            # 筛选距离小于指定距离的囊泡，并将其类型改为 'tether'
             for vesicle in root.findall('Vesicle'):
                 distance = float(vesicle.find('Distance').attrib['d'])
                 if distance * pixel_size < distance_nm:
-                    # 将类型改为 'others'
+                    # 将类型改为 'tether'
                     type_elem = vesicle.find('Type')
                     if type_elem is not None and type_elem.attrib.get('t') == 'vesicle':
-                        type_elem.set('t', 'others')
+                        type_elem.set('t', 'tether')
             
             # 保存修改后的 XML
             tree.write(self.tomo_viewer.tomo_path_and_stage.filter_xml_path, encoding='utf-8', xml_declaration=False)
@@ -234,12 +234,12 @@ class DistanceFilterWindow(QDialog):
             tree_new = ET.parse(self.tomo_viewer.tomo_path_and_stage.filter_xml_path)
             root_new = tree_new.getroot()
             
-            # 提取所有类型为 'others' 的 Vesicle 的 Center 坐标和 ID
+            # 提取所有类型为 'tether' 的 Vesicle 的 Center 坐标和 ID
             centers = []
             vesicle_ids = []
             for vesicle in root_new.findall('Vesicle'):
                 vesicle_type = vesicle.find('Type').attrib.get('t')
-                if vesicle_type == 'others':
+                if vesicle_type == 'tether':
                     center = vesicle.find('Center')
                     x = float(center.attrib['X'])
                     y = float(center.attrib['Y'])
