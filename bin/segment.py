@@ -15,11 +15,9 @@ def cleanup_tf():
     gc.collect()
 
 
-def segment(path_weights,tomopath,patch_size=192):
-    with mrcfile.mmap(tomopath, mode="r") as m:
-        dataArray=m.data
-    pcrop = 48  # how many pixels to crop from border
-    patch_size = min(patch_size, (dataArray.shape[0]+2*pcrop)//8*8)
+def segment_array(
+    path_weights, dataArray, patch_size=192, pcrop=48, pad_mode="reflect", constant_values=0
+):
     Ncl=2
     #build network
     net=models.my_model(patch_size,Ncl)
@@ -30,7 +28,12 @@ def segment(path_weights,tomopath,patch_size=192):
     dataArray=np.clip(dataArray, percentile_00_5, percentile_99_5)
 
     dataArray = (dataArray[:] - np.mean(dataArray[:])) / np.std(dataArray[:])  # normalize
-    dataArray = np.pad(dataArray, pcrop, mode='reflect')  # reflect pad
+    if pad_mode == "constant":
+        dataArray = np.pad(
+            dataArray, pcrop, mode=pad_mode, constant_values=constant_values
+        )
+    else:
+        dataArray = np.pad(dataArray, pcrop, mode=pad_mode)
     dim = dataArray.shape
     l = int(patch_size / 2)
     lcrop = int(l - pcrop)
@@ -81,6 +84,18 @@ def segment(path_weights,tomopath,patch_size=192):
 
     labelmap = np.int8( np.argmax(predArray,3) )
     return labelmap
+
+
+def segment(path_weights,tomopath,patch_size=192):
+    with mrcfile.mmap(tomopath, mode="r") as m:
+        dataArray=m.data
+    pcrop = 48  # how many pixels to crop from border
+    patch_size = min(patch_size, (dataArray.shape[0]+2*pcrop)//8*8)
+    return segment_array(path_weights, dataArray, patch_size, pcrop=pcrop)
+
+
+def combine_segmentations(seg1, seg2):
+    return np.sign(seg1+seg2).astype(np.int8)
 
 
 
@@ -143,4 +158,4 @@ if __name__ == "__main__":
         raise ValueError("Wrong mode!")
 
     with mrcfile.new(args.mask_file,overwrite=True) as m:
-        m.set_data(np.sign(seg1+seg2).astype(np.int8))
+        m.set_data(combine_segmentations(seg1, seg2))
