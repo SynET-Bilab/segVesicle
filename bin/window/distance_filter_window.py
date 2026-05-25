@@ -114,8 +114,8 @@ def filter_vesicles_and_extract(
         tree.write(filter_xml_path, encoding='utf-8', xml_declaration=False)
         print_func(f"Filtered vesicle XML successfully saved: {filter_xml_path}")
 
-        with mrcfile.open(isonet_tomo_path, "r") as tomo:
-            tomo_data = tomo.data.copy()
+        with mrcfile.mmap(isonet_tomo_path, mode="r") as tomo:
+            tomo_data = tomo.data
 
         voxel_size = 17.14  # Angstroms
 

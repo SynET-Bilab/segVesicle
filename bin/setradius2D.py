@@ -72,7 +72,7 @@ if __name__ == "__main__":
     output_jsonfile = args.json_file.replace(".json", "_2D.json")
 
 
-    with mrcfile.open(args.tomo_file) as m:
+    with mrcfile.mmap(args.tomo_file, mode="r") as m:
         mrc_data = m.data
 
     set_2D_radius(args.json_file, output_jsonfile, mrc_data)

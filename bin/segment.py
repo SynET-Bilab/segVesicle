@@ -16,7 +16,7 @@ def cleanup_tf():
 
 
 def segment(path_weights,tomopath,patch_size=192):
-    with mrcfile.open(tomopath) as m:
+    with mrcfile.mmap(tomopath, mode="r") as m:
         dataArray=m.data
     pcrop = 48  # how many pixels to crop from border
     patch_size = min(patch_size, (dataArray.shape[0]+2*pcrop)//8*8)
@@ -144,4 +144,3 @@ if __name__ == "__main__":
 
     with mrcfile.new(args.mask_file,overwrite=True) as m:
         m.set_data(np.sign(seg1+seg2).astype(np.int8))
-

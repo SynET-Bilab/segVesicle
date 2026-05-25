@@ -21,6 +21,14 @@ def get_tomo(path):
     with mrcfile.open(path) as mrc:
         data = mrc.data
     return data
+
+def get_tomo_mmap(path, permissive=False):
+    """
+    Load a 3D MRC file as a read-only memory-mapped array.
+    """
+    with mrcfile.mmap(path, mode="r", permissive=permissive) as mrc:
+        data = mrc.data
+    return data
 #save_points_as_mod(points, object_id=1, model_file="/share/data/CryoET_Data/lvzy/segVesicle_test/p545/ves_seg/sampled_points.mod")
 
 def save_points_as_mod(points: np.ndarray, object_id: int, model_file: str):

@@ -157,7 +157,7 @@ if __name__ == "__main__":
     with open(jsonfile) as f:
         ves = json.load(f)
     vesicle_info = ves['vesicles']
-    with mrcfile.open(tomofile) as m:
+    with mrcfile.mmap(tomofile, mode="r") as m:
         mrcdata = m.data
     maxvalue=np.max(mrcdata)
     mrcdatapad = np.pad(mrcdata,20,'constant',constant_values= maxvalue)

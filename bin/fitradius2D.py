@@ -54,7 +54,7 @@ def set_2D_radius(synapse, path, xml_file_tail):
         os.mkdir(img_path)
     
     # prepare data to fit and show
-    with mrcfile.open(mrc_file) as mrc:
+    with mrcfile.mmap(mrc_file, mode="r") as mrc:
         mrc_data = mrc.data.astype(np.float32)
         
     padwidth = 100

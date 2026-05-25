@@ -63,7 +63,7 @@ def apply_wedge(ori_data, ld1 = 1, ld2 =0, mw3d = None):
         return outData
     else:
         import mrcfile
-        with mrcfile.open(mw3d, 'r') as mrc:
+        with mrcfile.mmap(mw3d, mode="r") as mrc:
             mw = mrc.data
         mw = np.fft.fftshift(mw)
         mw = mw * ld1 + (1-mw) * ld2
@@ -75,7 +75,7 @@ def apply_wedge(ori_data, ld1 = 1, ld2 =0, mw3d = None):
     return outData
 
 def one_label_fit(data):
-    
+
     idx=get_indices_sparse(data)
     vesicle_points=np.swapaxes(np.array(idx[1]),0,1)
     [center, evecs, radii]=ef.ellipsoid_fit(vesicle_points)
@@ -158,5 +158,3 @@ if __name__ == "__main__":
     t1 = time.time()
     vesicle_info = v_mw_compare(label_path, args.jsonfile)
     print(f'done json generating, cost {time.time() - t1} s')
-
-    

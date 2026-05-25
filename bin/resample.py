@@ -3,7 +3,7 @@ import numpy as np
 import mrcfile
 import fire
 from scipy.ndimage import zoom
-from segVesicle.bin.util.io import get_tomo
+from segVesicle.bin.util.io import get_tomo_mmap
 
 
 
@@ -15,7 +15,7 @@ def generate_new_tomo(out_data, out_name, outspacing):
 
 def resample_image(tomo, pixel_size, out_name=None, outspacing=17.142):
 
-    original_data = get_tomo(tomo)
+    original_data = get_tomo_mmap(tomo)
     
     original_spacing = [pixel_size, pixel_size, pixel_size]
     out_spacing = [outspacing, outspacing, outspacing]
@@ -38,7 +38,7 @@ def resample_image(tomo, pixel_size, out_name=None, outspacing=17.142):
 
 def measure(tomo, pixel_size, outspacing=17.142):
     
-    tomo_data = get_tomo(tomo)
+    tomo_data = get_tomo_mmap(tomo)
     original_spacing = [pixel_size, pixel_size, pixel_size]
     original_spacing = [pixel_size, pixel_size, pixel_size]
     

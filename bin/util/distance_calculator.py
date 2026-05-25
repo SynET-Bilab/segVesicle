@@ -157,7 +157,7 @@ def distance_calc(
             if not os.path.exists(img_path):
                 os.makedirs(img_path)
 
-            with mrcfile.open(mrc_path) as mrc:
+            with mrcfile.mmap(mrc_path, mode="r") as mrc:
                 mrc_data = mrc.data.astype(np.float32)
 
             padwidth = 100

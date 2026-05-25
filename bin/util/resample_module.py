@@ -1,11 +1,11 @@
 import mrcfile
 from scipy.ndimage import zoom
-from segVesicle.bin.util.io import get_tomo
+from segVesicle.bin.util.io import get_tomo_mmap
 
 
 def resample_image(tomo, pixel_size, out_name=None, outspacing=17.142):
 
-    original_data = get_tomo(tomo)
+    original_data = get_tomo_mmap(tomo)
     
     original_spacing = [pixel_size, pixel_size, pixel_size]
     out_spacing = [outspacing, outspacing, outspacing]

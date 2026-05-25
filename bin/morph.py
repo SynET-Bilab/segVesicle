@@ -572,7 +572,7 @@ if __name__ == "__main__":
     )
     print("done morph process")
 
-    with mrcfile.open(args.tomo_file) as m:
+    with mrcfile.mmap(args.tomo_file, mode="r") as m:
         data_iso = m.data
     vesicle_info = vesicle_measure(
         data_iso, vesicle_list, shape, args.min_radius, args.output_file

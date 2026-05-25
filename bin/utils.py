@@ -48,8 +48,8 @@ def toUint8(data):
 
 
 def gene_2d_training_data(tomo,mask,sample_mask=None,num=100,sidelen=128,neighbor_in=5, neighbor_out=1):
-    with mrcfile.open(tomo) as o:
-        orig_tomo=o.data 
+    with mrcfile.mmap(tomo, mode="r") as o:
+        orig_tomo=o.data
     tomo = normalize(orig_tomo,percentile = False)
     tomo = toUint8(tomo)
     

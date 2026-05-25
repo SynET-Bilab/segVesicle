@@ -182,12 +182,12 @@ class FinetuneModelWindow(QtWidgets.QDialog):
                 self.print_callback(f"处理 tomo: {tomo['tomo_name']}")
 
                 # 读取 deconv 文件并转换为 int8
-                with mrcfile.open(tomo['deconv_tomo_path']) as f:
+                with mrcfile.mmap(tomo['deconv_tomo_path'], mode="r") as f:
                     dec_data = f.data
                 dec_data = np.pad(dec_data, 40, 'constant', constant_values=np.mean(dec_data)).astype(np.int8)
 
                 # 读取 isonet 文件并转换为 int8
-                with mrcfile.open(tomo['isonet_tomo_path']) as f:
+                with mrcfile.mmap(tomo['isonet_tomo_path'], mode="r") as f:
                     iso_data = f.data
                 iso_data = np.pad(iso_data, 40, 'constant', constant_values=np.mean(iso_data)).astype(np.int8)
 

@@ -92,7 +92,7 @@ class CorrectionWindow(QMainWindow):
         corrected_tomo_path = self.tomo_viewer.tomo_path_and_stage.isonet_tomo_path
         
         if os.path.exists(corrected_tomo_path):
-            with mrcfile.open(corrected_tomo_path, permissive=True) as mrc:
+            with mrcfile.mmap(corrected_tomo_path, mode="r", permissive=True) as mrc:
                 corrected_data = mrc.data
             
             # Add the corrected tomogram to the Napari viewer

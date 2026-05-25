@@ -177,7 +177,7 @@ def get_tomo(path):
     """
     Load a 3D MRC file as a numpy array.
     """
-    with mrcfile.open(path) as mrc:
+    with mrcfile.mmap(path, mode="r") as mrc:
         return mrc.data
 
 

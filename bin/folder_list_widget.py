@@ -16,7 +16,7 @@ from tomo_viewer import TomoViewer
 from global_vars import TOMO_NAME
 from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.resample_module import resample_image
-from util.io import get_tomo
+from util.io import get_tomo, get_tomo_mmap
 
 LABEL_START = 10000  # large enough to avoid overlap with original labe
 LABEL_LAYER_IDX = 'label'
@@ -347,7 +347,7 @@ class FolderListWidget(QWidget):
                 os.system('cp {} {}'.format(self.tomo_path.json_file_path, self.tomo_path.ori_json_file_path))
             
             if os.path.exists(self.tomo_path.isonet_tomo_path):
-                tomo = get_tomo(self.tomo_path.isonet_tomo_path)
+                tomo = get_tomo_mmap(self.tomo_path.isonet_tomo_path)
                 add_layer_with_right_contrast(tomo, 'corrected_tomo', self.tomo_viewer.viewer)
             else:
                 def choose_tomo():
@@ -458,7 +458,7 @@ class FolderListWidget(QWidget):
             self.progress_dialog.close()
             
         elif self.tomo_path.progress_stage.name == 'MAKE_DECONVOLUTION':
-            tomo = get_tomo(self.tomo_path.ori_tomo_path)
+            tomo = get_tomo_mmap(self.tomo_path.ori_tomo_path)
             
             add_layer_with_right_contrast(tomo, 'ori_tomo', self.tomo_viewer.viewer)
             
@@ -475,7 +475,7 @@ class FolderListWidget(QWidget):
             self.progress_dialog.close()
             
         elif self.tomo_path.progress_stage.name == 'MAKE_CORRECTION':
-            tomo = get_tomo(self.tomo_path.deconv_tomo_path)
+            tomo = get_tomo_mmap(self.tomo_path.deconv_tomo_path)
             
             add_layer_with_right_contrast(tomo, 'deconv_tomo', self.tomo_viewer.viewer)
             
@@ -492,10 +492,10 @@ class FolderListWidget(QWidget):
             self.progress_dialog.close()
             
         elif self.tomo_path.progress_stage.name == 'MAKE_PREDICT':
-            tomo = get_tomo(self.tomo_path.isonet_tomo_path)
+            tomo = get_tomo_mmap(self.tomo_path.isonet_tomo_path)
             add_layer_with_right_contrast(tomo, 'corrected_tomo', self.tomo_viewer.viewer)
             
-            tomo = get_tomo(self.tomo_path.deconv_tomo_path)
+            tomo = get_tomo_mmap(self.tomo_path.deconv_tomo_path)
             add_layer_with_right_contrast(tomo, 'deconv_tomo', self.tomo_viewer.viewer)
             self.tomo_viewer.viewer.layers['deconv_tomo'].visible = False
             

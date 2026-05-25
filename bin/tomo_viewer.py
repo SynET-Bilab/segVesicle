@@ -38,7 +38,7 @@ from util.add_layer_with_right_contrast import add_layer_with_right_contrast
 from util.predict_vesicle import predict_label, morph_process, vesicle_measure, vesicle_rendering
 from util.resample_module import resample_image
 from util.json2xlsx import json_to_excel
-from util.io import get_tomo
+from util.io import get_tomo_mmap
 from util.export_excel import export_final_execl
 from widget.function_widget import ToolbarWidget
 
@@ -332,7 +332,7 @@ class TomoViewer:
             if 'deconv_tomo' in self.viewer.layers:
                 self.deconv_data = self.viewer.layers['deconv_tomo'].data
             elif os.path.exists(self.tomo_path_and_stage.deconv_tomo_path):
-                self.deconv_data = get_tomo(self.tomo_path_and_stage.deconv_tomo_path)
+                self.deconv_data = get_tomo_mmap(self.tomo_path_and_stage.deconv_tomo_path)
             else:
                 self.deconv_data = self.viewer.layers[0].data
 
@@ -340,7 +340,7 @@ class TomoViewer:
             if 'corrected_tomo' in self.viewer.layers:
                 self.corrected_data = self.viewer.layers['corrected_tomo'].data
             elif os.path.exists(self.tomo_path_and_stage.isonet_tomo_path):
-                self.corrected_data = get_tomo(self.tomo_path_and_stage.isonet_tomo_path)
+                self.corrected_data = get_tomo_mmap(self.tomo_path_and_stage.isonet_tomo_path)
             else:
                 self.corrected_data = self.viewer.layers[0].data
             

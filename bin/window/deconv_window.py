@@ -242,7 +242,7 @@ class DeconvWindow(QMainWindow):
         # 读取deconv_tomo的结果
         deconv_result_path = self.tomo_viewer.tomo_path_and_stage.deconv_tomo_path
         if os.path.exists(deconv_result_path):
-            with mrcfile.open(deconv_result_path, mode='r') as output_mrc:
+            with mrcfile.mmap(deconv_result_path, mode="r") as output_mrc:
                 deconv_result = output_mrc.data
 
             add_layer_with_right_contrast(deconv_result, 'deconv_tomo', self.viewer)
