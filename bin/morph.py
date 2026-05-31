@@ -531,6 +531,21 @@ def vesicle_measure(data, vesicle_list, shape, min_radius, outfile=None):
     return vesicle_info
 
 
+def _render_dense_points(vesicle_tomo, points, label_id):
+    if points.size == 0:
+        return
+    zmin, ymin, xmin = np.min(points, axis=0)
+    zmax, ymax, xmax = np.max(points, axis=0)
+    offset = np.array([zmin, ymin, xmin])
+    local_points = points - offset
+    local_shape = (zmax - zmin + 1, ymax - ymin + 1, xmax - xmin + 1)
+    local_mask = np.zeros(local_shape, dtype=bool)
+    local_mask[local_points[:, 0], local_points[:, 1], local_points[:, 2]] = True
+    local_mask = closing(local_mask, cube(3))
+    z, y, x = np.nonzero(local_mask)
+    vesicle_tomo[z + zmin, y + ymin, x + xmin] = label_id
+
+
 def vesicle_rendering(vesicle_file, tomo_dims):
     """ """
     # vesicle file can be json path, {"vesicles": [...]}, or a vesicle info list.
@@ -542,32 +557,24 @@ def vesicle_rendering(vesicle_file, tomo_dims):
         vesicle_info = vesicle_file["vesicles"]
     else:
         vesicle_info = vesicle_file
-    vesicle_tomo = np.zeros(
-        np.array(tomo_dims) + np.array([30, 30, 30]), dtype=np.int16
-    )
+    tomo_shape = tuple(np.asarray(tomo_dims, dtype=np.int64))
+    vesicle_tomo = np.zeros(tomo_shape, dtype=np.int16)
     # vesicle_tomo = np.zeros(np.array(tomo_dims),dtype=np.uint8)
     logging.info("\nrendering vesicle\n")
     # for i,vesicle in enumerate(vesicle_info):
     for i in tqdm(range(len(vesicle_info)), file=sys.stdout):
-        ellip_i = mk.ellipsoid_point(
+        ellip_i = mk.ellipsoid_point_dense(
             vesicle_info[i]["radii"],
             vesicle_info[i]["center"],
             vesicle_info[i]["evecs"],
+            tomo_shape,
         )
-        # ellip_i is an array (N,3) of points of a filled ellipsoid
         Id = int(vesicle_info[i]["name"][8:])
-        vesicle_tomo[ellip_i[:, 0], ellip_i[:, 1], ellip_i[:, 2]] = Id
-        # vesicle_tomo[ellip_i[:,0],ellip_i[:,1],ellip_i[:,2]] = i + 1
-        xmin, xmax = np.min(ellip_i[:, 2]), np.max(ellip_i[:, 2])
-        ymin, ymax = np.min(ellip_i[:, 1]), np.max(ellip_i[:, 1])
-        zmin, zmax = np.min(ellip_i[:, 0]), np.max(ellip_i[:, 0])
-        cube_i = vesicle_tomo[zmin : zmax + 1, ymin : ymax + 1, xmin : xmax + 1]
-        cube_i = closing(cube_i, cube(3))
-        vesicle_tomo[zmin : zmax + 1, ymin : ymax + 1, xmin : xmax + 1] = cube_i
+        _render_dense_points(vesicle_tomo, ellip_i, Id)
 
     # vesicle_tomo = closing(vesicle_tomo,cube(3))
     logging.info("{} vesicles in total".format(len(vesicle_info)))
-    return vesicle_tomo[0 : tomo_dims[0], 0 : tomo_dims[1], 0 : tomo_dims[2]]
+    return vesicle_tomo
 
 
 def dis(m, n):
@@ -645,7 +652,7 @@ if __name__ == "__main__":
     )
     print("done morph process")
 
-    with mrcfile.mmap(args.tomo_file, mode="r") as m:
+    with mrcfile.mmap(args.tomo_file, mode="r", permissive=True) as m:
         data_iso = m.data
     vesicle_info = vesicle_measure(
         data_iso, vesicle_list, shape, args.min_radius, args.output_file

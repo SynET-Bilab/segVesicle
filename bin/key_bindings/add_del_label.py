@@ -66,19 +66,34 @@ def save_and_update_delete_with_queue(tomo_viewer):
     task_queue.put((save_and_update_delete, (tomo_viewer,)))
 
 
+def _render_dense_points(vesicle_tomo, points, idx):
+    if points.size == 0:
+        return
+    zmin, ymin, xmin = np.min(points, axis=0)
+    zmax, ymax, xmax = np.max(points, axis=0)
+    offset = np.array([zmin, ymin, xmin])
+    local_points = points - offset
+    local_shape = (zmax - zmin + 1, ymax - ymin + 1, xmax - xmin + 1)
+    local_mask = np.zeros(local_shape, dtype=bool)
+    local_mask[local_points[:, 0], local_points[:, 1], local_points[:, 2]] = True
+    local_mask = closing(local_mask, cube(3))
+    z, y, x = np.nonzero(local_mask)
+    vesicle_tomo[z + zmin, y + ymin, x + xmin] = idx
+
+
 def vesicle_rendering(vesicle_info, tomo_dims, idx):
-    vesicle_tomo = np.zeros(np.array(tomo_dims) + np.array([30,30,30]), dtype=np.int16)
+    tomo_shape = tuple(np.asarray(tomo_dims, dtype=np.int64))
+    vesicle_tomo = np.zeros(tomo_shape, dtype=np.int16)
 
     for i in range(len(vesicle_info)):
-        ellip_i = mk.ellipsoid_point(vesicle_info[i]['radii'], vesicle_info[i]['center'], vesicle_info[i]['evecs'])
-        vesicle_tomo[ellip_i[:,0], ellip_i[:,1], ellip_i[:,2]] = idx
-        xmin, xmax = np.min(ellip_i[:,2]), np.max(ellip_i[:,2])
-        ymin, ymax = np.min(ellip_i[:,1]), np.max(ellip_i[:,1])
-        zmin, zmax = np.min(ellip_i[:,0]), np.max(ellip_i[:,0])
-        cube_i = vesicle_tomo[zmin:zmax+1, ymin:ymax+1, xmin:xmax+1]
-        cube_i = closing(cube_i, cube(3))
-        vesicle_tomo[zmin:zmax+1, ymin:ymax+1, xmin:xmax+1] = cube_i
-    return vesicle_tomo[0:tomo_dims[0], 0:tomo_dims[1], 0:tomo_dims[2]]
+        ellip_i = mk.ellipsoid_point_dense(
+            vesicle_info[i]['radii'],
+            vesicle_info[i]['center'],
+            vesicle_info[i]['evecs'],
+            tomo_shape,
+        )
+        _render_dense_points(vesicle_tomo, ellip_i, idx)
+    return vesicle_tomo
 
 def add_vesicle(data_iso, points, label_idx, add_mode = '3d'):
     shape = data_iso.shape
